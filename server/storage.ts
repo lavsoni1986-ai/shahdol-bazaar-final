@@ -228,7 +228,17 @@ export class DatabaseStorage implements IStorage {
   async getAllProductsUnfiltered(): Promise<any[]> {
     return await db
       .select({
-        ...products,
+        id: products.id,
+        shopId: products.shopId,
+        sellerId: products.sellerId,
+        name: products.name,
+        price: products.price,
+        imageUrl: products.imageUrl,
+        category: products.category,
+        description: products.description,
+        approved: products.approved,
+        status: products.status,
+        createdAt: products.createdAt,
         shopName: users.shopName,
         shopAddress: users.shopAddress,
         contactNumber: shops.contactNumber,
