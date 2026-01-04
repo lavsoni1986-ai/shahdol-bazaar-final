@@ -3,9 +3,9 @@ import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
 import cors from "cors";
-import { registerRoutes } from "./routes";
-import { setupVite } from "./vite";
-import { serveStatic } from "./static";
+import { registerRoutes } from "./routes.js";
+import { setupVite } from "./vite.js";
+import { serveStatic } from "./static.js";
 import { createServer } from "http";
 
 const app = express();
