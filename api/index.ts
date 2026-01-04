@@ -6,6 +6,7 @@ import { registerRoutes } from "../server/routes";
 
 console.log("🔵 [FN BOOT] Vercel function starting...");
 console.log("🔵 [FN BOOT] DATABASE_URL present:", !!process.env.DATABASE_URL);
+console.log("🔵 [FN BOOT] NODE_ENV:", process.env.NODE_ENV);
 
 // Lightweight Express handler for Vercel Serverless Functions.
 // We do NOT listen on a port here; Vercel invokes the handler per request.
@@ -20,17 +21,18 @@ app.use(cors({
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
-const httpServer = createServer(app);
+let httpServer: ReturnType<typeof createServer> | null = null;
 
-// Register API routes (best-effort async init)
 try {
+  httpServer = createServer(app);
   registerRoutes(httpServer, app)
     .then(() => console.log("✅ [FN BOOT] Routes registered"))
     .catch((err) => {
       console.error("❌ Failed to register routes in serverless handler:", err);
     });
-} catch (err) {
-  console.error("❌ Exception while registering routes:", err);
+} catch (err: any) {
+  console.error("❌ Exception while registering routes:", err?.message || err);
+  console.error(err?.stack || err);
 }
 
 // Simple health for the function itself (bypasses DB)
