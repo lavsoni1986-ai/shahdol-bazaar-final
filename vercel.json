@@ -3,7 +3,7 @@
   "functions": {
     "api/index.ts": {
       "runtime": "nodejs20.x",
-      "includeFiles": "{dist,server,shared}/**",
+      "includeFiles": "dist/**",
       "maxDuration": 10
     }
   },

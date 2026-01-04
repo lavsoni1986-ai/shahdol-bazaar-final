@@ -2,8 +2,6 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
-import { db } from "../server/db.js";
-import { sql } from "drizzle-orm";
 
 console.log("🔵 [FN BOOT] Vercel function starting...");
 console.log("🔵 [FN BOOT] DATABASE_URL present:", !!process.env.DATABASE_URL);
@@ -20,25 +18,28 @@ app.use(cors({
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
-// Inline health to avoid routes import failures blocking startup.
+// Inline health to avoid hard dependency on routes module
 app.get("/api/health", async (_req, res) => {
   try {
+    const { db } = await import("../server/db.js");
+    const { sql } = await import("drizzle-orm");
     await db.execute(sql`select 1`);
     return res.json({ status: "ok" });
   } catch (err: any) {
     console.error("❌ /api/health failed:", err?.message || err);
+    console.error(err?.stack || err);
     return res.status(500).json({ status: "error", message: "DB unavailable" });
   }
 });
 
+// Function-level health (no DB)
 app.get("/api/health-fn", (_req, res) => res.json({ status: "ok", scope: "function" }));
 
-let httpServer: ReturnType<typeof createServer> | null = null;
-
+// Lazy-load the heavier routes; failure won't crash health endpoints
 const loadRoutes = async () => {
   try {
     const { registerRoutes } = await import("../server/routes.js");
-    httpServer = createServer(app);
+    const httpServer = createServer(app);
     await registerRoutes(httpServer, app);
     console.log("✅ [FN BOOT] Routes registered");
   } catch (err: any) {
