@@ -140,7 +140,17 @@ export class DatabaseStorage implements IStorage {
   async getProductsByShopIdWithSeller(shopId: number, search?: string | null): Promise<any[]> {
     const base = db
       .select({
-        ...products,
+        id: products.id,
+        shopId: products.shopId,
+        sellerId: products.sellerId,
+        name: products.name,
+        price: products.price,
+        imageUrl: products.imageUrl,
+        category: products.category,
+        description: products.description,
+        approved: products.approved,
+        status: products.status,
+        createdAt: products.createdAt,
         shopName: users.shopName,
         shopAddress: users.shopAddress,
         contactNumber: shops.contactNumber,
@@ -174,7 +184,17 @@ export class DatabaseStorage implements IStorage {
   async getAllProductsWithSeller(approved?: boolean | null, search?: string | null): Promise<any[]> {
     const base = db
       .select({
-        ...products,
+        id: products.id,
+        shopId: products.shopId,
+        sellerId: products.sellerId,
+        name: products.name,
+        price: products.price,
+        imageUrl: products.imageUrl,
+        category: products.category,
+        description: products.description,
+        approved: products.approved,
+        status: products.status,
+        createdAt: products.createdAt,
         shopName: users.shopName,
         shopAddress: users.shopAddress,
         contactNumber: shops.contactNumber,
@@ -227,7 +247,17 @@ export class DatabaseStorage implements IStorage {
   async getProductWithSeller(id: number): Promise<any | undefined> {
     const [product] = await db
       .select({
-        ...products,
+        id: products.id,
+        shopId: products.shopId,
+        sellerId: products.sellerId,
+        name: products.name,
+        price: products.price,
+        imageUrl: products.imageUrl,
+        category: products.category,
+        description: products.description,
+        approved: products.approved,
+        status: products.status,
+        createdAt: products.createdAt,
         shopName: users.shopName,
         shopAddress: users.shopAddress,
         contactNumber: shops.contactNumber,
