@@ -369,7 +369,16 @@ export class MemStorage implements IStorage {
   }
 
   private initializeSampleData(): void {
-    const adminUser: User = { id: 1, username: "admin", password: "shahdol123", role: "admin", isAdmin: true };
+    const adminUser: User = {
+      id: 1,
+      username: "admin",
+      password: "shahdol123",
+      role: "admin",
+      isAdmin: true,
+      shopName: null,
+      shopAddress: null,
+      mapsLink: null,
+    };
     this.users.set(1, adminUser);
     this.currentIds.users = 2;
   }
