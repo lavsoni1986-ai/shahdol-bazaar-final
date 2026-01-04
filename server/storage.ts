@@ -81,7 +81,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+    const normalized: InsertUser = {
+      ...insertUser,
+      shopName: insertUser.shopName ?? null,
+      shopAddress: insertUser.shopAddress ?? null,
+      mapsLink: insertUser.mapsLink ?? null,
+    };
+    const [user] = await db.insert(users).values(normalized).returning();
     return user;
   }
 
@@ -106,7 +112,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createShop(insertShop: InsertShop): Promise<Shop> {
-    const [shop] = await db.insert(shops).values(insertShop).returning();
+    const normalized: InsertShop = {
+      ...insertShop,
+      description: insertShop.description ?? null,
+      address: insertShop.address ?? null,
+      contactNumber: insertShop.contactNumber ?? null,
+      image: insertShop.image ?? null,
+    };
+    const [shop] = await db.insert(shops).values(normalized).returning();
     return shop;
   }
 
@@ -228,22 +241,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createProduct(insertProduct: InsertProduct): Promise<Product> {
-    const normalized = {
-      ...insertProduct,
-      images: insertProduct.images ?? [],
+    const { description, imageUrl, ...rest } = insertProduct;
+    const normalized: InsertProduct = {
+      ...rest,
+      imageUrl: imageUrl ?? null,
+      description: description ?? null,
       approved: insertProduct.approved ?? false,
+      status: insertProduct.status ?? "pending",
     };
-    const [product] = await db.insert(products).values(normalized).returning();
+    const [product] = await db.insert(products).values(normalized as any).returning();
     return product;
   }
 
   async updateProduct(id: number, update: Partial<InsertProduct>): Promise<Product> {
-    const normalized = {
+    const normalized: Partial<InsertProduct> = {
       ...update,
-      images: update.images ?? update.images === null ? [] : update.images,
-      approved: update.approved ?? update.approved === false ? update.approved : undefined,
+      ...("description" in update ? { description: update.description ?? null } : {}),
+      ...("imageUrl" in update ? { imageUrl: update.imageUrl ?? null } : {}),
+      ...("approved" in update ? { approved: update.approved ?? false } : {}),
+      ...("status" in update ? { status: update.status ?? "pending" } : {}),
     };
-    const [product] = await db.update(products).set(normalized).where(eq(products.id, id)).returning();
+    const [product] = await db.update(products).set(normalized as any).where(eq(products.id, id)).returning();
     return product;
   }
 
@@ -360,7 +378,15 @@ export class MemStorage implements IStorage {
   async getUserByUsername(username: string) { return Array.from(this.users.values()).find(u => u.username === username); }
   async createUser(insertUser: InsertUser) { 
     const id = this.currentIds.users++;
-    const user = { ...insertUser, id, role: insertUser.role || "customer", isAdmin: insertUser.isAdmin ?? false };
+    const user = {
+      ...insertUser,
+      id,
+      role: insertUser.role || "customer",
+      isAdmin: insertUser.isAdmin ?? false,
+      shopName: insertUser.shopName ?? null,
+      shopAddress: insertUser.shopAddress ?? null,
+      mapsLink: insertUser.mapsLink ?? null,
+    };
     this.users.set(id, user); return user;
   }
   async updateUser(id: number, update: Partial<User>) {
@@ -372,7 +398,21 @@ export class MemStorage implements IStorage {
   async getShopByOwnerId(ownerId: number) { return Array.from(this.shops.values()).find(s => s.ownerId === ownerId); }
   async createShop(insertShop: InsertShop) {
     const id = this.currentIds.shops++;
-    const shop = { ...insertShop, id, approved: true, isFeatured: insertShop.isFeatured ?? false, isVerified: false, createdAt: new Date(), rating: null, reviewCount: null, avgRating: null };
+    const shop = {
+      ...insertShop,
+      id,
+      description: insertShop.description ?? null,
+      address: insertShop.address ?? null,
+      contactNumber: insertShop.contactNumber ?? null,
+      image: insertShop.image ?? null,
+      approved: true,
+      isFeatured: insertShop.isFeatured ?? false,
+      isVerified: false,
+      createdAt: new Date(),
+      rating: null,
+      reviewCount: null,
+      avgRating: null,
+    };
     this.shops.set(id, shop); return shop;
   }
   async updateShop(id: number, update: Partial<InsertShop>) {
@@ -409,10 +449,11 @@ export class MemStorage implements IStorage {
     const product = {
       ...insertProduct,
       id,
-      images: insertProduct.images ?? [],
+      imageUrl: insertProduct.imageUrl ?? null,
+      description: insertProduct.description ?? null,
       approved: insertProduct.approved ?? false,
       status: insertProduct.status || "pending",
-      createdAt: new Date()
+      createdAt: new Date(),
     };
     this.products.set(id, product as Product); return product as Product;
   }
@@ -421,8 +462,10 @@ export class MemStorage implements IStorage {
     const updated = {
       ...existing,
       ...update,
-      images: update.images ?? existing.images ?? [],
+      imageUrl: "imageUrl" in update ? update.imageUrl ?? null : existing.imageUrl ?? null,
+      description: "description" in update ? update.description ?? null : existing.description ?? null,
       approved: update.approved ?? existing.approved ?? false,
+      status: "status" in update ? update.status ?? existing.status ?? "pending" : existing.status ?? "pending",
     };
     this.products.set(id, updated as Product); return updated as Product;
   }
