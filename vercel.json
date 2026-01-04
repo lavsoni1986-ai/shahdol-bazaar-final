@@ -3,11 +3,7 @@
 
   "functions": {
     "api/index.ts": {
-      "includeFiles": [
-        "dist/**",
-        "server/**",
-        "shared/**"
-      ],
+      "includeFiles": "dist/**",
       "maxDuration": 10
     }
   }
