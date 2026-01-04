@@ -4,7 +4,7 @@ import path from "path";
 import multer, { type StorageEngine } from "multer";
 import { type Server } from "http";
 import { storage } from "./storage";
-import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, products, users, shops, categories } from "@shared/schema";
+import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, products, users, shops, categories } from "../shared/schema";
 import { z } from "zod";
 import { db } from "./db";
 import { ilike, or, and, eq } from "drizzle-orm";
