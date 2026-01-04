@@ -6,6 +6,7 @@ import { registerRoutes } from "../server/routes";
 
 // Lightweight Express handler for Vercel Serverless Functions.
 // We do NOT listen on a port here; Vercel invokes the handler per request.
+// Touching this file forces a fresh Vercel build & re-bundle of server/shared code.
 const app = express();
 
 app.use(cors({
