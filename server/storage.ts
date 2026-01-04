@@ -454,8 +454,16 @@ export class MemStorage implements IStorage {
   async getOffer(id: number) { return this.offers.get(id); }
   async createOffer(insertOffer: InsertOffer) {
     const id = this.currentIds.offers++;
-    const offer = { ...insertOffer, id, isActive: insertOffer.isActive ?? true, createdAt: new Date() };
-    this.offers.set(id, offer); return offer;
+    // Ensure userId is never undefined for type safety in TS
+    const offer = {
+      ...insertOffer,
+      userId: insertOffer.userId ?? null,
+      id,
+      isActive: insertOffer.isActive ?? true,
+      createdAt: new Date(),
+    };
+    this.offers.set(id, offer);
+    return offer;
   }
   async updateOffer(id: number, update: Partial<InsertOffer>) {
     const existing = this.offers.get(id); if (!existing) throw new Error("Offer not found");
