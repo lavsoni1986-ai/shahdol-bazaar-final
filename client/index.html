@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>ShahdolBazaar - शहडोल का नंबर 1 लोकल मार्केट</title>
+    <meta name="title" content="ShahdolBazaar - Hyperlocal Marketplace" />
+    <meta
+      name="description"
+      content="Your local market, online. Find groceries, medicines, electronics, and more in Shahdol."
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://shahdolbazaar.com/" />
+    <meta
+      property="og:title"
+      content="ShahdolBazaar - Hyperlocal Marketplace"
+    />
+    <meta
+      property="og:description"
+      content="Your local market, online. Find groceries, medicines, electronics, and more in Shahdol."
+    />
+    <meta property="og:image" content="/maskable_icon_x512.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ShahdolBazaar" />
+    <meta
+      name="twitter:description"
+      content="Your local market, online. Find groceries, medicines, electronics, and more in Shahdol."
+    />
+
+    <link rel="icon" type="image/png" href="/maskable_icon_x192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- PWA / Apple Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ShahdolBazaar">
+    <link rel="apple-touch-icon" href="/maskable_icon_x192.png">
+    <meta name="theme-color" content="#f97316">
+    
+    <base href="/" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <script
+      src="https://upload-widget.cloudinary.com/global/all.js"
+      type="text/javascript"
+    ></script>
+
+    <style>
+      :root {
+        --primary-orange: #f97316;
+      }
+      body {
+        margin: 0;
+        font-family: "Plus Jakarta Sans", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .whatsapp-float {
+        position: fixed !important;
+        width: 60px;
+        height: 60px;
+        bottom: 20px;
+        right: 15px;
+        background: linear-gradient(45deg, #25d366, #128c7e);
+        color: #fff;
+        border-radius: 50px;
+        font-size: 24px;
+        box-shadow: 0 4px 15px rgba(18, 140, 126, 0.4);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        animation: pulse 2s infinite;
+      }
+      .whatsapp-float:hover {
+        transform: scale(1.1) rotate(5deg);
+        box-shadow: 0 6px 20px rgba(18, 140, 126, 0.6);
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7);
+        }
+        70% {
+          transform: scale(1.05);
+          box-shadow: 0 0 0 10px rgba(37, 211, 102, 0);
+        }
+        100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(37, 211, 102, 0);
+        }
+      }
+      @media (max-width: 480px) {
+        .whatsapp-float {
+          width: 50px;
+          height: 50px;
+          font-size: 20px;
+          bottom: 15px;
+          right: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

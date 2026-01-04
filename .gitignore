@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.log
+.cursor/
+terminals/
+agent-tools/
+migrations/
+.local/
+scripts/*.js
+!scripts/build.ts
