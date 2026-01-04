@@ -1,5 +1,14 @@
 {
   "version": 2,
+  "functions": {
+    "api/index.ts": {
+      "runtime": "nodejs20.x",
+      "includeFiles": [
+        "server/**",
+        "shared/**"
+      ]
+    }
+  },
   "builds": [
     {
       "src": "package.json",
