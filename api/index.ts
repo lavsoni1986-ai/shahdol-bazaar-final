@@ -38,6 +38,7 @@ app.get("/api/health-fn", (_req, res) => res.json({ status: "ok", scope: "functi
 // Lazy-load the heavier routes; failure won't crash health endpoints
 const loadRoutes = async () => {
   try {
+    console.log("🔵 [FN BOOT] Attempting to load routes module...");
     const { registerRoutes } = await import("../server/routes.js");
     const httpServer = createServer(app);
     await registerRoutes(httpServer, app);
