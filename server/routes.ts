@@ -3,10 +3,10 @@ import fs from "fs";
 import path from "path";
 import multer, { type StorageEngine } from "multer";
 import { type Server } from "http";
-import { storage } from "./storage";
-import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, products, users, shops, categories } from "../shared/schema";
+import { storage } from "./storage.js";
+import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, products, users, shops, categories } from "../shared/schema.js";
 import { z } from "zod";
-import { db } from "./db";
+import { db } from "./db.js";
 import { ilike, or, and, eq, sql } from "drizzle-orm";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {

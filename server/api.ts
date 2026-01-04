@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { type Server } from "http";
-import { storage } from "./storage";
-import { insertShopSchema, insertUserSchema, insertOfferSchema } from "../shared/schema";
+import { storage } from "./storage.js";
+import { insertShopSchema, insertUserSchema, insertOfferSchema } from "../shared/schema.js";
 
 export async function registerRoutes(
   httpServer: Server,

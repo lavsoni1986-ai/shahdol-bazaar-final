@@ -20,8 +20,8 @@ import {
   type InsertBanner,
   type Category,
   type InsertCategory,
-} from "../shared/schema";
-import { db } from "./db";
+} from "../shared/schema.js";
+import { db } from "./db.js";
 import { eq, and, ilike, or } from "drizzle-orm";
 
 // Interface definitions

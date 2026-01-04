@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
-import { registerRoutes } from "../server/routes";
+import { registerRoutes } from "../server/routes.js";
 
 console.log("🔵 [FN BOOT] Vercel function starting...");
 console.log("🔵 [FN BOOT] DATABASE_URL present:", !!process.env.DATABASE_URL);
