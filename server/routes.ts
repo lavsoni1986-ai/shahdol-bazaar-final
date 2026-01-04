@@ -47,8 +47,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.status(500).json({ status: "error", message: "DB unavailable" });
     }
   });
-  const uploadDir = path.resolve(process.cwd(), "public", "uploads");
-  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
+  // Use a writable location on Vercel (read-only FS except /tmp)
+  const uploadDir = process.env.VERCEL
+    ? path.join("/tmp", "uploads")
+    : path.resolve(process.cwd(), "public", "uploads");
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
+  } catch (err: any) {
+    console.error("❌ Failed to ensure uploads dir:", err?.message || err);
+  }
   app.use("/uploads", express.static(uploadDir));
 
   const uploadStorage: StorageEngine = multer.diskStorage({
