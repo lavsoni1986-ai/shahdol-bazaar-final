@@ -54,3 +54,5 @@ loadRoutes();
 // Vercel Node functions expect a default export compatible with (req, res)
 export default app;
 
+// Trigger redeploy: 2026-01-04T00:00:00Z
+
