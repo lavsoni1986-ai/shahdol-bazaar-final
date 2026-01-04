@@ -23,6 +23,11 @@ registerRoutes(httpServer, app).catch((err) => {
   console.error("❌ Failed to register routes in serverless handler:", err);
 });
 
+// Simple health for the function itself (bypasses DB)
+app.get("/api/health-fn", (_req, res) => {
+  res.json({ status: "ok", scope: "function" });
+});
+
 // Vercel Node functions expect a default export compatible with (req, res)
 export default app;
 
