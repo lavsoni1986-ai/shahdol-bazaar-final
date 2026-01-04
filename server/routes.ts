@@ -7,7 +7,7 @@ import { storage } from "./storage";
 import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, products, users, shops, categories } from "../shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { ilike, or, and, eq } from "drizzle-orm";
+import { ilike, or, and, eq, sql } from "drizzle-orm";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // --- 0. DEV UTILITY: CLEAN DATABASE (products, shops, users) ---
@@ -36,6 +36,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   };
   app.get("/api/debug/cleanup", cleanupHandler);
   app.post("/api/debug/cleanup", cleanupHandler);
+
+  // --- HEALTH CHECK ---
+  app.get("/api/health", async (_req, res) => {
+    try {
+      await db.execute(sql`select 1`);
+      return res.json({ status: "ok" });
+    } catch (err: any) {
+      console.error("Health check failed:", err?.message);
+      return res.status(500).json({ status: "error", message: "DB unavailable" });
+    }
+  });
   const uploadDir = path.resolve(process.cwd(), "public", "uploads");
   fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
   app.use("/uploads", express.static(uploadDir));
