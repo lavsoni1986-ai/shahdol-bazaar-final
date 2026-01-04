@@ -20,7 +20,7 @@ import {
   type InsertBanner,
   type Category,
   type InsertCategory,
-} from "@shared/schema";
+} from "../shared/schema";
 import { db } from "./db";
 import { eq, and, ilike, or } from "drizzle-orm";
 
