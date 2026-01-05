@@ -61,10 +61,12 @@ export interface IStorage {
   updateBanner(id: number, update: Partial<InsertBanner>): Promise<Banner>;
   getCategories(): Promise<Category[]>;
   createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: number, update: Partial<InsertCategory>): Promise<Category>;
   deleteCategory(id: number): Promise<void>;
   // Categories
   getCategories(): Promise<Category[]>;
   createCategory(category: InsertCategory): Promise<Category>;
+  updateCategory(id: number, update: Partial<InsertCategory>): Promise<Category>;
   deleteCategory(id: number): Promise<void>;
 }
 
@@ -384,6 +386,15 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
+  async updateCategory(id: number, update: Partial<InsertCategory>): Promise<Category> {
+    const normalized = {
+      ...update,
+      ...(update.imageUrl !== undefined ? { imageUrl: update.imageUrl ?? null } : {}),
+    };
+    const [row] = await db.update(categories).set(normalized as any).where(eq(categories.id, id)).returning();
+    return row;
+  }
+
   async deleteCategory(id: number): Promise<void> {
     await db.delete(categories).where(eq(categories.id, id));
   }
@@ -545,6 +556,17 @@ export class MemStorage implements IStorage {
     const row = { ...insertCategory, id, createdAt: new Date() } as Category;
     this.categories.set(id, row);
     return row;
+  }
+  async updateCategory(id: number, update: Partial<InsertCategory>) {
+    const existing = this.categories.get(id);
+    if (!existing) throw new Error("Category not found");
+    const merged = {
+      ...existing,
+      ...update,
+      imageUrl: "imageUrl" in update ? update.imageUrl ?? null : (existing as any).imageUrl ?? null,
+    } as Category;
+    this.categories.set(id, merged);
+    return merged;
   }
   async deleteCategory(id: number) { this.categories.delete(id); }
   async getOffers() { return Array.from(this.offers.values()); }
