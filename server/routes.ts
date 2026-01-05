@@ -1,7 +1,7 @@
 import express, { type Express, type Request, type Response } from "express";
-import fs from "fs";
-import path from "path";
-import multer, { type StorageEngine } from "multer";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { type Server } from "http";
 import { storage } from "./storage.js";
 import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, products, users, shops, categories } from "../shared/schema.js";
@@ -10,6 +10,7 @@ import { db } from "./db.js";
 import { ilike, or, and, eq, sql } from "drizzle-orm";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  const setNoStore = (res: Response) => res.setHeader("Cache-Control", "no-store, max-age=0");
   // --- 0. DEV UTILITY: CLEAN DATABASE (products, shops, users) ---
   // Placed first so it is always registered.
   const cleanupHandler = async (_req: Request, res: Response) => {
@@ -47,17 +48,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.status(500).json({ status: "error", message: "DB unavailable" });
     }
   });
-  const uploadDir = path.resolve(process.cwd(), "public", "uploads");
-  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
-  app.use("/uploads", express.static(uploadDir));
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
 
-  const uploadStorage: StorageEngine = multer.diskStorage({
-    destination: (_req: Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) =>
-      cb(null, uploadDir),
-    filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
-      const filename = `${Date.now()}-${file.originalname}`;
-      cb(null, filename.replace(/\s+/g, "_"));
-    },
+  const uploadStorage = new CloudinaryStorage({
+    cloudinary,
+    params: async () => ({
+      folder: process.env.CLOUDINARY_UPLOAD_FOLDER || "shahdol-bazaar",
+      resource_type: "image",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    }),
   });
 
   const upload = multer({
@@ -102,6 +105,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2. FETCH ALL PRODUCTS (FOR HOME & ADMIN) ---
   app.get("/api/products", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const shopId = Number(req.query?.shopId);
       const search = typeof req.query?.search === "string" ? req.query.search : null;
       const includeAll = String(req.query?.includeAll || "").toLowerCase() === "true";
@@ -155,6 +159,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2c. FETCH ALL SHOPS (ADMIN SELLER LIST) ---
   app.get("/api/shops", async (_req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const shops = await storage.getShops();
       console.log("Sending shops count:", shops.length);
       return res.json({ data: shops });
@@ -167,6 +172,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2a. ADMIN/ALL PRODUCTS WITH FILTERS (supports approved/status) ---
   app.get("/api/products/all", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const search = typeof req.query?.search === "string" ? req.query.search : null;
       const approvedParam = req.query?.approved;
       const statusParam = typeof req.query?.status === "string" ? req.query.status : null;
@@ -195,6 +201,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2b. FETCH SINGLE PRODUCT ---
   app.get("/api/products/:id", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) {
         return res.status(400).json({ message: "Invalid product id" });
@@ -243,7 +250,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const files = (req as any).files as Express.Multer.File[] | undefined;
       if (!files || files.length === 0) return res.status(400).json({ message: "No files" });
-      const urls = files.map((f) => `/uploads/${f.filename}`);
+      const urls = files.map((f) => (f as any)?.path || (f as any)?.secure_url || f.filename);
       return res.status(201).json({ urls });
     } catch (e) {
       return res.status(500).json({ message: "Upload failed" });
@@ -256,16 +263,52 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(banners);
   });
 
-  app.post("/api/banners", async (req, res) => {
-    const created = await storage.createBanner(req.body);
-    res.status(201).json(created);
+  app.post("/api/banners", upload.single("image"), async (req, res) => {
+    try {
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const image = file
+        ? (file as any)?.path || (file as any)?.secure_url || ""
+        : typeof req.body?.image === "string"
+          ? req.body.image
+          : "";
+      if (!image) return res.status(400).json({ message: "Image required" });
+
+      const payload = {
+        image,
+        title: typeof req.body?.title === "string" ? req.body.title : "",
+        link: typeof req.body?.link === "string" ? req.body.link : "/",
+      };
+
+      const created = await storage.createBanner(payload);
+      res.status(201).json(created);
+    } catch (e: any) {
+      console.error("Create banner failed", e?.message);
+      return res.status(400).json({ message: "Create failed" });
+    }
   });
 
-  app.patch("/api/banners/:id", async (req, res) => {
+  app.patch("/api/banners/:id", upload.single("image"), async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
-      const updated = await storage.updateBanner(id, req.body);
+
+      const existing = (await storage.getBanners()).find((b) => b.id === id);
+      if (!existing) return res.status(404).json({ message: "Banner not found" });
+
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const image = file
+        ? (file as any)?.path || (file as any)?.secure_url || existing.image
+        : typeof req.body?.image === "string" && req.body.image
+          ? req.body.image
+          : existing.image;
+
+      const payload = {
+        title: typeof req.body?.title === "string" ? req.body.title : existing.title,
+        link: typeof req.body?.link === "string" ? req.body.link : existing.link,
+        image,
+      };
+
+      const updated = await storage.updateBanner(id, payload);
       return res.json(updated);
     } catch (e: any) {
       console.error("Update banner failed", e?.message);
@@ -376,7 +419,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!existing) return res.status(404).json({ message: "Product not found" });
 
       const file = (req as any).file as Express.Multer.File | undefined;
-      const uploadedUrl = file ? `/uploads/${file.filename}` : undefined;
+      const uploadedUrl = file ? (file as any)?.path || (file as any)?.secure_url : undefined;
       const imageUrl = uploadedUrl ?? req.body?.imageUrl ?? existing.imageUrl ?? "";
 
       const payload = {
@@ -449,37 +492,71 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 10. CATEGORIES ---
   app.get("/api/categories", async (_req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const data = await storage.getCategories();
       return res.json(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Categories fetch failed", e);
-      return res.status(500).json({ message: "Failed to fetch categories" });
+      return res.status(500).json({
+        message: "Failed to fetch categories",
+        error: e?.message || e,
+      });
     }
   });
 
   app.post("/api/categories", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const parsed = insertCategorySchema.parse({
         name: (req.body?.name || "").trim(),
-        imageUrl: req.body?.imageUrl || undefined,
+        imageUrl: typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : undefined,
       });
       const created = await storage.createCategory(parsed);
       return res.status(201).json(created);
     } catch (e: any) {
-      console.error("Create category failed", e?.message);
-      return res.status(400).json({ message: e?.message || "Invalid category" });
+      console.error("Create category failed", e);
+      return res.status(400).json({ message: e?.message || "Invalid category", error: e });
+    }
+  });
+
+  app.patch("/api/categories/:id", upload.single("image"), async (req: Request, res: Response) => {
+    try {
+      setNoStore(res);
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+
+      const existing = (await storage.getCategories()).find((c) => c.id === id);
+      if (!existing) return res.status(404).json({ message: "Category not found" });
+
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const incomingName = typeof req.body?.name === "string" ? req.body.name.trim() : existing.name;
+      const incomingImageUrl =
+        file
+          ? (file as any)?.path || (file as any)?.secure_url || null
+          : typeof req.body?.imageUrl === "string" && req.body.imageUrl.trim()
+            ? req.body.imageUrl.trim()
+            : existing.imageUrl ?? null;
+
+      if (!incomingName) return res.status(400).json({ message: "Name required" });
+
+      const updated = await storage.updateCategory(id, { name: incomingName, imageUrl: incomingImageUrl ?? null });
+      return res.json(updated);
+    } catch (e: any) {
+      console.error("Update category failed", e?.message);
+      return res.status(400).json({ message: e?.message || "Update failed" });
     }
   });
 
   app.delete("/api/categories/:id", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
       await storage.deleteCategory(id);
       return res.json({ success: true });
     } catch (e: any) {
-      console.error("Delete category failed", e?.message);
-      return res.status(400).json({ message: "Delete failed" });
+      console.error("Delete category failed", e);
+      return res.status(400).json({ message: "Delete failed", error: e?.message || e });
     }
   });
 

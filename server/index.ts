@@ -7,13 +7,26 @@ import { registerRoutes } from "./routes.js";
 import { setupVite } from "./vite.js";
 import { serveStatic } from "./static.js";
 import { createServer } from "http";
+import session from "express-session";
 
 const app = express();
 
-// ✅ CORS FIX: Allow requests from the Netlify live site
+const allowedOrigins = [
+  "https://shahdol-bazaar-live.netlify.app",
+  "https://shahdolbazaar.com",
+  "https://www.shahdolbazaar.com",
+  "https://shahdol-bazaar.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5000",
+];
+
+// ✅ CORS FIX: Allow current production + preview + local
 app.use(cors({
-  origin: ["https://shahdol-bazaar-live.netlify.app", "http://localhost:5173", "http://localhost:5000"],
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
 }));
 
 const httpServer = createServer(app);
@@ -21,6 +34,19 @@ const httpServer = createServer(app);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.static(path.resolve(process.cwd(), "public")));
+
+// Lightweight, cookie-based session for Vercel (stateless between invocations)
+app.use(session({
+  secret: process.env.SESSION_SECRET || "shahdol-temp-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 1000 * 60 * 60 * 24, // 1 day
+  },
+}));
 
 // Ensure uploads folder exists with open permissions
 const uploadsDir = path.resolve(process.cwd(), "public", "uploads");

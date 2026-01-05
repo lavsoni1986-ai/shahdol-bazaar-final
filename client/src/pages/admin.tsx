@@ -8,7 +8,7 @@ type Offer = { id?: number; content: string; isActive: boolean };
 type Product = { id: number; name: string; price: string; category: string; description?: string; approved?: boolean; status?: string; imageUrl?: string; images?: string[] };
 type Shop = { id: number; name: string; approved?: boolean; isVerified?: boolean; category?: string; contactNumber?: string; mobile?: string; phone?: string };
 type Banner = { id?: number; image: string; title?: string; link?: string };
-type Category = { id: number; name: string };
+type Category = { id: number; name: string; imageUrl?: string | null };
 
 export default function Admin() {
   const [username, setUsername] = useState("");
@@ -25,6 +25,9 @@ export default function Admin() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [categoryFile, setCategoryFile] = useState<File | null>(null);
+  const [editCategoryModal, setEditCategoryModal] = useState(false);
+  const [editCategory, setEditCategory] = useState<Category | null>(null);
+  const [editCategoryFile, setEditCategoryFile] = useState<File | null>(null);
 
   const [showOfferCreate, setShowOfferCreate] = useState(false);
   const [newOffer, setNewOffer] = useState<string>("");
@@ -38,6 +41,7 @@ export default function Admin() {
   const [editProductFile, setEditProductFile] = useState<File | null>(null);
   const [editBannerModal, setEditBannerModal] = useState(false);
   const [editBanner, setEditBanner] = useState<Banner | null>(null);
+  const [editBannerFile, setEditBannerFile] = useState<File | null>(null);
   const [editOfferModal, setEditOfferModal] = useState(false);
   const [editOffer, setEditOffer] = useState<Offer | null>(null);
 
@@ -161,6 +165,38 @@ export default function Admin() {
       toast.success("Category deleted");
     } catch (e: any) {
       toast.error(e?.message || "Delete failed");
+    }
+  }
+
+  async function handleUpdateCategory() {
+    if (!editCategory?.id) return;
+    if (!editCategory.name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    try {
+      const form = new FormData();
+      form.append("name", editCategory.name);
+      if (editCategoryFile) {
+        form.append("image", editCategoryFile);
+      } else if (editCategory.imageUrl) {
+        form.append("imageUrl", editCategory.imageUrl);
+      }
+
+      const res = await fetch(`/api/categories/${editCategory.id}`, {
+        method: "PATCH",
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Update failed");
+
+      toast.success("Category updated");
+      setEditCategoryModal(false);
+      setEditCategory(null);
+      setEditCategoryFile(null);
+      fetchCategories();
+    } catch (e: any) {
+      toast.error(e?.message || "Update failed");
     }
   }
 
@@ -298,22 +334,11 @@ export default function Admin() {
     try {
       setBannerLoading(true);
       const form = new FormData();
-      form.append("images", bannerFile);
-      const upload = await fetch(`/api/upload`, {
-        method: "POST",
-        headers: { "x-user-id": "1" },
-        body: form,
-      });
-      const uploadJson = await upload.json();
-      if (!upload.ok) throw new Error(uploadJson?.message || "Upload failed");
-      const image = Array.isArray(uploadJson?.urls) ? uploadJson.urls[0] : uploadJson?.urls || "";
-      if (!image) throw new Error("No image returned");
+      form.append("image", bannerFile);
+      form.append("title", String(bannerTitle || ""));
+      form.append("link", String(bannerLink || "/"));
 
-      const res = await fetch(`/api/banners`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: String(image), title: String(bannerTitle || ""), link: String(bannerLink || "/") }),
-      });
+      const res = await fetch(`/api/banners`, { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || "Create failed");
       toast.success("Banner saved!");
@@ -345,18 +370,21 @@ export default function Admin() {
   async function handleUpdateBanner() {
     if (!editBanner?.id) return;
     try {
-      const res = await fetch(`/api/banners/${editBanner.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: editBanner.title,
-          link: editBanner.link,
-          image: editBanner.image,
-        }),
-      });
-      if (!res.ok) throw new Error("Update failed");
+      const form = new FormData();
+      form.append("title", String(editBanner.title || ""));
+      form.append("link", String(editBanner.link || "/"));
+      if (editBannerFile) {
+        form.append("image", editBannerFile);
+      } else if (editBanner.image) {
+        form.append("image", editBanner.image);
+      }
+
+      const res = await fetch(`/api/banners/${editBanner.id}`, { method: "PATCH", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Update failed");
       toast.success("Banner updated");
       setEditBannerModal(false);
+      setEditBannerFile(null);
       fetchBanners();
     } catch (e: any) {
       toast.error(e?.message || "Update failed");
@@ -715,7 +743,7 @@ export default function Admin() {
                       <td className="p-4 text-sm text-slate-600">{b.link}</td>
                       <td className="p-4 text-right flex items-center justify-end gap-2">
                         <button
-                          onClick={() => { setEditBanner(b); setEditBannerModal(true); }}
+                          onClick={() => { setEditBanner(b); setEditBannerFile(null); setEditBannerModal(true); }}
                           className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
                           title="Edit"
                         >
@@ -763,14 +791,34 @@ export default function Admin() {
                   {categories.length === 0 && <p className="text-sm text-slate-500">No categories yet.</p>}
                   {categories.map((c) => (
                     <div key={c.id} className="flex items-center justify-between border rounded-lg px-4 py-3">
-                      <span className="font-bold text-slate-800">{c.name}</span>
-                      <button
-                        onClick={() => handleDeleteCategory(c.id)}
-                        className="p-2 rounded-full border text-red-500 hover:border-red-200"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-3">
+                        {c.imageUrl ? (
+                          <img
+                            src={c.imageUrl.startsWith("http") ? c.imageUrl : `/uploads/${c.imageUrl.split("/").pop() || ""}`}
+                            alt={c.name}
+                            className="w-10 h-10 rounded object-cover border"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded border bg-slate-50" />
+                        )}
+                        <span className="font-bold text-slate-800">{c.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setEditCategory(c); setEditCategoryFile(null); setEditCategoryModal(true); }}
+                          className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(c.id)}
+                          className="p-2 rounded-full border text-red-500 hover:border-red-200"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -837,6 +885,44 @@ export default function Admin() {
           </div>
         </div>
       )}
+      {editCategoryModal && editCategory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
+            <h3 className="text-lg font-black">Edit Category</h3>
+            <input
+              className="w-full p-3 rounded-lg border border-slate-200"
+              placeholder="Name"
+              value={editCategory.name}
+              onChange={(e) => setEditCategory({ ...editCategory, name: e.target.value })}
+            />
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500 uppercase">Category Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setEditCategoryFile(e.target.files?.[0] || null)}
+              />
+              <div className="flex items-center gap-2">
+                {editCategoryFile ? (
+                  <span className="text-xs font-bold text-green-600">New file selected</span>
+                ) : editCategory.imageUrl ? (
+                  <img
+                    src={editCategory.imageUrl.startsWith("http") ? editCategory.imageUrl : `/uploads/${editCategory.imageUrl.split("/").pop() || ""}`}
+                    alt={editCategory.name}
+                    className="w-16 h-16 rounded object-cover border"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-500">No image</span>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => { setEditCategoryModal(false); setEditCategoryFile(null); }} className="px-4 py-2 rounded-lg border">Cancel</button>
+              <button onClick={handleUpdateCategory} className="px-4 py-2 rounded-lg bg-orange-600 text-white font-black">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
       {editBannerModal && editBanner && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
@@ -853,14 +939,29 @@ export default function Admin() {
               value={editBanner.link || ""}
               onChange={(e) => setEditBanner({ ...editBanner, link: e.target.value })}
             />
-            <input
-              className="w-full p-3 rounded-lg border border-slate-200"
-              placeholder="Image URL"
-              value={editBanner.image}
-              onChange={(e) => setEditBanner({ ...editBanner, image: e.target.value })}
-            />
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500 uppercase">Banner Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setEditBannerFile(e.target.files?.[0] || null)}
+              />
+              <div className="flex items-center gap-2">
+                {editBannerFile ? (
+                  <span className="text-xs font-bold text-green-600">New file selected</span>
+                ) : editBanner.image ? (
+                  <img
+                    src={editBanner.image.startsWith("http") ? editBanner.image : `/uploads/${editBanner.image.split("/").pop() || ""}`}
+                    alt="Current"
+                    className="w-16 h-16 rounded object-cover border"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-500">No image</span>
+                )}
+              </div>
+            </div>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setEditBannerModal(false)} className="px-4 py-2 rounded-lg border">Cancel</button>
+              <button onClick={() => { setEditBannerModal(false); setEditBannerFile(null); }} className="px-4 py-2 rounded-lg border">Cancel</button>
               <button onClick={handleUpdateBanner} className="px-4 py-2 rounded-lg bg-orange-600 text-white font-black">Save</button>
             </div>
           </div>
