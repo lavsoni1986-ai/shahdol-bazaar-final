@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link as WLink } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, Menu, Package, User, MapPin, Phone, RefreshCw } from "lucide-react";
+import { Menu, Package, User, MapPin, Phone, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type Order = {
