@@ -1,17 +1,9 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/auth", "destination": "/index.html" },
-    { "source": "/admin", "destination": "/index.html" },
-    { "source": "/admin/(.*)", "destination": "/index.html" },
     { "source": "/api/(.*)", "destination": "/api/index.ts" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-
-  "functions": {
-    "api/index.ts": {
-      "includeFiles": "dist/**",
-      "maxDuration": 10
-    }
-  }
+    { "source": "/admin(.*)", "destination": "/index.html" },
+    { "source": "/auth(.*)", "destination": "/index.html" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }
