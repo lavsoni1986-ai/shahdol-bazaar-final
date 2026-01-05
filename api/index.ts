@@ -55,7 +55,8 @@ const loadRoutes = async () => {
   }
 };
 
-loadRoutes();
+// Ensure routes are registered before handling requests
+await loadRoutes();
 
 // Vercel Node functions expect a default export compatible with (req, res)
 export default app;
