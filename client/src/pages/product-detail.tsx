@@ -82,6 +82,17 @@ export default function ProductDetail() {
   });
 
   const handleAddToCart = () => {
+    if (!product) return;
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      imageUrl: product.images?.[0] || product.imageUrls?.[0] || product.imageUrl,
+      shopId: product.shopId,
+    });
+    toast.success(`${product.name} added to cart!`);
+  };
+
   const handleBuyNow = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product) return;
@@ -117,18 +128,6 @@ export default function ProductDetail() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-    if (!product) return;
-    
-    addToCart({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-    imageUrl: product.images?.[0] || product.imageUrls?.[0] || product.imageUrl,
-      shopId: product.shopId,
-    });
-    
-    toast.success(`${product.name} added to cart!`);
   };
 
   if (productLoading) {
