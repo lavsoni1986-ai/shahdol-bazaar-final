@@ -1,4 +1,4 @@
-import { drizzle } from "drizzle-orm/neon-serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import * as schema from "../shared/schema.js";
 import { sql } from "drizzle-orm";
@@ -22,24 +22,13 @@ try {
   // ignore parse errors; will fail later if invalid
 }
 
-const DB_TIMEOUT_MS = 30_000;
 const RETRY_DELAY_MS = 2_000;
 const MAX_RETRIES = 2; // total attempts = MAX_RETRIES + 1
-
-const timeoutFetch = (timeoutMs: number) => {
-  return async (input: RequestInfo, init?: RequestInit) => {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(new Error(`DB fetch timeout after ${timeoutMs}ms`)), timeoutMs);
-    try {
-      return await fetch(input as any, { ...(init || {}), signal: controller.signal });
-    } finally {
-      clearTimeout(id);
-    }
-  };
-};
+const DB_TIMEOUT_MS = 30_000;
 
 // Neon serverless driver (HTTP) handles cold/idle states better than pooled pg/postgres
-const client = neon(DATABASE_URL, { fetch: timeoutFetch(DB_TIMEOUT_MS), pipeline: false });
+// Use default fetch to avoid type mismatch with neon-http typings.
+const client = neon(DATABASE_URL, { pipeline: false });
 
 export const db = drizzle(client, { schema });
 
