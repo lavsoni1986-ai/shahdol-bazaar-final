@@ -3,17 +3,29 @@ import { neon } from "@neondatabase/serverless";
 import * as schema from "../shared/schema.js";
 import { sql } from "drizzle-orm";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-
-if (!DATABASE_URL) {
+let rawUrl = process.env.DATABASE_URL;
+if (!rawUrl) {
   const msg = "DATABASE_URL missing. Add it in Vercel env (Neon connection string).";
   console.error(`❌ [DB] ${msg}`);
   throw new Error(msg);
 }
 
+// Strip channel_binding param if present (Neon serverless driver can choke on it)
+try {
+  const urlObj = new URL(rawUrl);
+  const cb = urlObj.searchParams.get("channel_binding");
+  if (cb) {
+    urlObj.searchParams.delete("channel_binding");
+    rawUrl = urlObj.toString();
+    console.warn("⚠️ [DB] Removed channel_binding from DATABASE_URL for compatibility.");
+  }
+} catch {
+  // if URL parse fails, proceed; connection will surface the error
+}
+
 // Warn if not using the Neon pooler host (recommended for serverless cold starts)
 try {
-  const host = new URL(DATABASE_URL).hostname || "";
+  const host = new URL(rawUrl).hostname || "";
   const isPooler = host.includes("pooler") || host.includes("pool");
   if (!isPooler) {
     console.warn("⚠️ [DB] DATABASE_URL host does not look like a pooler host. Use the Neon pooler URL (port 5432 / -pooler).");
@@ -28,7 +40,7 @@ const DB_TIMEOUT_MS = 30_000;
 
 // Neon serverless driver (HTTP) handles cold/idle states better than pooled pg/postgres
 // Explicit initialization without pg/pooler drivers.
-const client = neon(DATABASE_URL);
+const client = neon(rawUrl, { ssl: true });
 export const db = drizzle(client, { schema });
 
 async function sleep(ms: number) {

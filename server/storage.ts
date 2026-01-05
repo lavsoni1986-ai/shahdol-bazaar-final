@@ -370,7 +370,8 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(categories);
     } catch (err) {
       console.error("Full DB Error:", err);
-      throw err;
+      // Surface the DB error message temporarily to aid debugging
+      throw new Error(err instanceof Error ? err.message : String(err));
     }
   }
 
