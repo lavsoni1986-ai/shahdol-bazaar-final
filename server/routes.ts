@@ -48,7 +48,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         shopName: null as any,
         shopAddress: null as any,
         mapsLink: null as any,
-        createdAt: new Date(),
       });
       console.log("DATABASE CLEANED - READY FOR NEW REGISTRATION");
       return res.status(200).send("DATABASE CLEANED");
