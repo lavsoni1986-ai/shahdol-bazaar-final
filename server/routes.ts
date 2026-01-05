@@ -268,16 +268,48 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(banners);
   });
 
-  app.post("/api/banners", async (req, res) => {
-    const created = await storage.createBanner(req.body);
-    res.status(201).json(created);
+  app.post("/api/banners", upload.single("image"), async (req, res) => {
+    try {
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const image = file ? `/uploads/${file.filename}` : typeof req.body?.image === "string" ? req.body.image : "";
+      if (!image) return res.status(400).json({ message: "Image required" });
+
+      const payload = {
+        image,
+        title: typeof req.body?.title === "string" ? req.body.title : "",
+        link: typeof req.body?.link === "string" ? req.body.link : "/",
+      };
+
+      const created = await storage.createBanner(payload);
+      res.status(201).json(created);
+    } catch (e: any) {
+      console.error("Create banner failed", e?.message);
+      return res.status(400).json({ message: "Create failed" });
+    }
   });
 
-  app.patch("/api/banners/:id", async (req, res) => {
+  app.patch("/api/banners/:id", upload.single("image"), async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
-      const updated = await storage.updateBanner(id, req.body);
+
+      const existing = (await storage.getBanners()).find((b) => b.id === id);
+      if (!existing) return res.status(404).json({ message: "Banner not found" });
+
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const image = file
+        ? `/uploads/${file.filename}`
+        : typeof req.body?.image === "string" && req.body.image
+          ? req.body.image
+          : existing.image;
+
+      const payload = {
+        title: typeof req.body?.title === "string" ? req.body.title : existing.title,
+        link: typeof req.body?.link === "string" ? req.body.link : existing.link,
+        image,
+      };
+
+      const updated = await storage.updateBanner(id, payload);
       return res.json(updated);
     } catch (e: any) {
       console.error("Update banner failed", e?.message);
@@ -485,6 +517,34 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (e: any) {
       console.error("Create category failed", e);
       return res.status(400).json({ message: e?.message || "Invalid category", error: e });
+    }
+  });
+
+  app.patch("/api/categories/:id", upload.single("image"), async (req: Request, res: Response) => {
+    try {
+      setNoStore(res);
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+
+      const existing = (await storage.getCategories()).find((c) => c.id === id);
+      if (!existing) return res.status(404).json({ message: "Category not found" });
+
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const incomingName = typeof req.body?.name === "string" ? req.body.name.trim() : existing.name;
+      const incomingImageUrl =
+        file
+          ? `/uploads/${file.filename}`
+          : typeof req.body?.imageUrl === "string" && req.body.imageUrl.trim()
+            ? req.body.imageUrl.trim()
+            : existing.imageUrl ?? null;
+
+      if (!incomingName) return res.status(400).json({ message: "Name required" });
+
+      const updated = await storage.updateCategory(id, { name: incomingName, imageUrl: incomingImageUrl ?? null });
+      return res.json(updated);
+    } catch (e: any) {
+      console.error("Update category failed", e?.message);
+      return res.status(400).json({ message: e?.message || "Update failed" });
     }
   });
 
