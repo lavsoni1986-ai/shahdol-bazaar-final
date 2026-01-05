@@ -8,6 +8,27 @@ import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategor
 import { z } from "zod";
 import { db } from "./db.js";
 import { ilike, or, and, eq, sql } from "drizzle-orm";
+import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+
+const hashPassword = (password: string): string => {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+};
+
+const verifyPassword = (password: string, stored: string): boolean => {
+  if (!stored) return false;
+  const parts = stored.split(":");
+  if (parts.length !== 2) {
+    // legacy plaintext support
+    return stored === password;
+  }
+  const [salt, storedHash] = parts;
+  const hash = scryptSync(password, salt, 64);
+  const hashBuf = Buffer.from(storedHash, "hex");
+  if (hashBuf.length !== hash.length) return false;
+  return timingSafeEqual(hash, hashBuf);
+};
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   const setNoStore = (res: Response) => res.setHeader("Cache-Control", "no-store, max-age=0");
@@ -21,12 +42,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       await db.delete(users);
       await db.insert(users).values({
         username: "admin",
-        password: "shahdol123",
+        password: hashPassword("shahdol123"),
         role: "admin",
         isAdmin: true,
         shopName: null as any,
         shopAddress: null as any,
         mapsLink: null as any,
+        createdAt: new Date(),
       });
       console.log("DATABASE CLEANED - READY FOR NEW REGISTRATION");
       return res.status(200).send("DATABASE CLEANED");
@@ -96,10 +118,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 0b. FETCH LOGGED-IN OWNER SHOP (used by Partner Dashboard) ---
   // --- 1. LOGIN ---
   app.post("/api/login", async (req, res) => {
-    const { username, password } = req.body;
-    const user = await storage.getUserByUsername(username);
-    if (!user || user.password !== password) return res.status(401).json({ message: "Invalid" });
-    res.json(user);
+    try {
+      const { username, password } = req.body;
+      const user = await storage.getUserByUsername(username);
+      if (!user || !verifyPassword(password, user.password as any)) return res.status(401).json({ message: "Invalid" });
+      res.json(user);
+    } catch (e: any) {
+      console.error("Login failed", e?.message);
+      return res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // --- 1b. REGISTER ---
+  app.post("/api/register", async (req, res) => {
+    try {
+      const { username, password, role = "customer" } = req.body || {};
+      const existing = await storage.getUserByUsername(username);
+      if (existing) return res.status(400).json({ message: "User already exists" });
+
+      const hashed = hashPassword(password);
+      const created = await storage.createUser({
+        username,
+        password: hashed,
+        role,
+        isAdmin: role === "admin",
+        shopName: null,
+        shopAddress: null,
+        mapsLink: null,
+      } as any);
+
+      return res.status(201).json(created);
+    } catch (e: any) {
+      console.error("Register failed", e?.message);
+      return res.status(400).json({ message: "Register failed" });
+    }
   });
 
   // --- 2. FETCH ALL PRODUCTS (FOR HOME & ADMIN) ---
