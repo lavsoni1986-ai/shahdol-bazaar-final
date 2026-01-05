@@ -11,10 +11,22 @@ import session from "express-session";
 
 const app = express();
 
-// ✅ CORS FIX: Allow requests from the Netlify live site
+const allowedOrigins = [
+  "https://shahdol-bazaar-live.netlify.app",
+  "https://shahdolbazaar.com",
+  "https://www.shahdolbazaar.com",
+  "https://shahdol-bazaar.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5000",
+];
+
+// ✅ CORS FIX: Allow current production + preview + local
 app.use(cors({
-  origin: ["https://shahdol-bazaar-live.netlify.app", "http://localhost:5173", "http://localhost:5000"],
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
 }));
 
 const httpServer = createServer(app);

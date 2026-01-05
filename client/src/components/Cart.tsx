@@ -20,8 +20,11 @@ interface CartProps {
 }
 
 // Fetch shop details for phone number
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+
 async function fetchShop(shopId: number) {
-  const res = await fetch(`https://shahdol-bazaar-v2.onrender.com/api/shops/${shopId}`);
+  const url = `${API_BASE || ""}/api/shops/${shopId}`;
+  const res = await fetch(url);
   if (!res.ok) return null;
   return res.json();
 }

@@ -1,7 +1,7 @@
 import express, { type Express, type Request, type Response } from "express";
-import fs from "fs";
-import path from "path";
-import multer, { type StorageEngine } from "multer";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { type Server } from "http";
 import { storage } from "./storage.js";
 import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, products, users, shops, categories } from "../shared/schema.js";
@@ -48,24 +48,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.status(500).json({ status: "error", message: "DB unavailable" });
     }
   });
-  // Use a writable location on Vercel (read-only FS except /tmp)
-  const uploadDir = process.env.VERCEL
-    ? path.join("/tmp", "uploads")
-    : path.resolve(process.cwd(), "public", "uploads");
-  try {
-    fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
-  } catch (err: any) {
-    console.error("❌ Failed to ensure uploads dir:", err?.message || err);
-  }
-  app.use("/uploads", express.static(uploadDir));
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
 
-  const uploadStorage: StorageEngine = multer.diskStorage({
-    destination: (_req: Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) =>
-      cb(null, uploadDir),
-    filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
-      const filename = `${Date.now()}-${file.originalname}`;
-      cb(null, filename.replace(/\s+/g, "_"));
-    },
+  const uploadStorage = new CloudinaryStorage({
+    cloudinary,
+    params: async () => ({
+      folder: process.env.CLOUDINARY_UPLOAD_FOLDER || "shahdol-bazaar",
+      resource_type: "image",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    }),
   });
 
   const upload = multer({
@@ -255,7 +250,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const files = (req as any).files as Express.Multer.File[] | undefined;
       if (!files || files.length === 0) return res.status(400).json({ message: "No files" });
-      const urls = files.map((f) => `/uploads/${f.filename}`);
+      const urls = files.map((f) => (f as any)?.path || (f as any)?.secure_url || f.filename);
       return res.status(201).json({ urls });
     } catch (e) {
       return res.status(500).json({ message: "Upload failed" });
@@ -271,7 +266,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/banners", upload.single("image"), async (req, res) => {
     try {
       const file = (req as any).file as Express.Multer.File | undefined;
-      const image = file ? `/uploads/${file.filename}` : typeof req.body?.image === "string" ? req.body.image : "";
+      const image = file
+        ? (file as any)?.path || (file as any)?.secure_url || ""
+        : typeof req.body?.image === "string"
+          ? req.body.image
+          : "";
       if (!image) return res.status(400).json({ message: "Image required" });
 
       const payload = {
@@ -298,7 +297,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const file = (req as any).file as Express.Multer.File | undefined;
       const image = file
-        ? `/uploads/${file.filename}`
+        ? (file as any)?.path || (file as any)?.secure_url || existing.image
         : typeof req.body?.image === "string" && req.body.image
           ? req.body.image
           : existing.image;
@@ -420,7 +419,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!existing) return res.status(404).json({ message: "Product not found" });
 
       const file = (req as any).file as Express.Multer.File | undefined;
-      const uploadedUrl = file ? `/uploads/${file.filename}` : undefined;
+      const uploadedUrl = file ? (file as any)?.path || (file as any)?.secure_url : undefined;
       const imageUrl = uploadedUrl ?? req.body?.imageUrl ?? existing.imageUrl ?? "";
 
       const payload = {
@@ -533,7 +532,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const incomingName = typeof req.body?.name === "string" ? req.body.name.trim() : existing.name;
       const incomingImageUrl =
         file
-          ? `/uploads/${file.filename}`
+          ? (file as any)?.path || (file as any)?.secure_url || null
           : typeof req.body?.imageUrl === "string" && req.body.imageUrl.trim()
             ? req.body.imageUrl.trim()
             : existing.imageUrl ?? null;
