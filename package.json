@@ -13,6 +13,7 @@
     "db:seed": "tsx scripts/seed_news.ts"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
     "@google/generative-ai": "*",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",

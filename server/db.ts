@@ -1,5 +1,5 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import { neon } from "@neondatabase/serverless";
 import * as schema from "../shared/schema.js";
 import { sql } from "drizzle-orm";
 
@@ -11,18 +11,69 @@ if (!DATABASE_URL) {
   throw new Error(msg);
 }
 
-// Tuned for Vercel/Neon: force TLS, short connect timeout, and a tiny pool
-const client = postgres(DATABASE_URL, {
-  ssl: "require",
-  connect_timeout: 5,
-  idle_timeout: 10,
-  max_lifetime: 60,
-  max: 1,
-});
+// Warn if not using the Neon pooler host (recommended for serverless cold starts)
+try {
+  const host = new URL(DATABASE_URL).hostname || "";
+  const isPooler = host.includes("pooler") || host.includes("pool");
+  if (!isPooler) {
+    console.warn("⚠️ [DB] DATABASE_URL host does not look like a pooler host. Use the Neon pooler URL (port 5432 / -pooler).");
+  }
+} catch {
+  // ignore parse errors; will fail later if invalid
+}
+
+const DB_TIMEOUT_MS = 30_000;
+const RETRY_DELAY_MS = 2_000;
+const MAX_RETRIES = 2; // total attempts = MAX_RETRIES + 1
+
+const timeoutFetch = (timeoutMs: number) => {
+  return async (input: RequestInfo, init?: RequestInit) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(new Error(`DB fetch timeout after ${timeoutMs}ms`)), timeoutMs);
+    try {
+      return await fetch(input as any, { ...(init || {}), signal: controller.signal });
+    } finally {
+      clearTimeout(id);
+    }
+  };
+};
+
+// Neon serverless driver (HTTP) handles cold/idle states better than pooled pg/postgres
+const client = neon(DATABASE_URL, { fetch: timeoutFetch(DB_TIMEOUT_MS), pipeline: false });
 
 export const db = drizzle(client, { schema });
 
-export async function verifyDbConnection() {
-  // Lightweight health probe to surface connection issues in logs
-  await db.execute(sql`select 1`);
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export async function verifyDbConnection() {
+  let lastErr: any;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await db.execute(sql`select 1`);
+      return;
+    } catch (err: any) {
+      lastErr = err;
+      const msg = err?.message || err;
+      if (attempt < MAX_RETRIES) {
+        console.warn(`⚠️ [DB] Health check failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}): ${msg}. Retrying in ${RETRY_DELAY_MS}ms...`);
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+      console.error("❌ [DB] Health check failed after retries:", msg);
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
+// Proactively warm the connection during startup so first requests don't hit idle cold starts.
+(async () => {
+  try {
+    await verifyDbConnection();
+    console.log("✅ [DB] Startup health check OK");
+  } catch (err: any) {
+    console.error("❌ [DB] Startup health check failed:", err?.message || err);
+  }
+})();
