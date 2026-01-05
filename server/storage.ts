@@ -370,7 +370,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
-    const [row] = await db.insert(categories).values(category).returning();
+    const normalized = {
+      ...category,
+      imageUrl: category.imageUrl ?? null,
+    };
+    const [row] = await db.insert(categories).values(normalized).returning();
     return row;
   }
 
