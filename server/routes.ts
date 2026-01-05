@@ -10,6 +10,7 @@ import { db } from "./db.js";
 import { ilike, or, and, eq, sql } from "drizzle-orm";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  const setNoStore = (res: Response) => res.setHeader("Cache-Control", "no-store, max-age=0");
   // --- 0. DEV UTILITY: CLEAN DATABASE (products, shops, users) ---
   // Placed first so it is always registered.
   const cleanupHandler = async (_req: Request, res: Response) => {
@@ -109,6 +110,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2. FETCH ALL PRODUCTS (FOR HOME & ADMIN) ---
   app.get("/api/products", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const shopId = Number(req.query?.shopId);
       const search = typeof req.query?.search === "string" ? req.query.search : null;
       const includeAll = String(req.query?.includeAll || "").toLowerCase() === "true";
@@ -162,6 +164,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2c. FETCH ALL SHOPS (ADMIN SELLER LIST) ---
   app.get("/api/shops", async (_req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const shops = await storage.getShops();
       console.log("Sending shops count:", shops.length);
       return res.json({ data: shops });
@@ -174,6 +177,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2a. ADMIN/ALL PRODUCTS WITH FILTERS (supports approved/status) ---
   app.get("/api/products/all", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const search = typeof req.query?.search === "string" ? req.query.search : null;
       const approvedParam = req.query?.approved;
       const statusParam = typeof req.query?.status === "string" ? req.query.status : null;
@@ -202,6 +206,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2b. FETCH SINGLE PRODUCT ---
   app.get("/api/products/:id", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) {
         return res.status(400).json({ message: "Invalid product id" });
@@ -456,6 +461,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 10. CATEGORIES ---
   app.get("/api/categories", async (_req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const data = await storage.getCategories();
       return res.json(data);
     } catch (e) {
@@ -466,6 +472,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/categories", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const parsed = insertCategorySchema.parse({
         name: (req.body?.name || "").trim(),
         imageUrl: typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : undefined,
@@ -480,6 +487,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.delete("/api/categories/:id", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
       await storage.deleteCategory(id);
