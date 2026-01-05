@@ -55,6 +55,11 @@ export default function ProductDetail() {
   const [, params] = useRoute("/product/:id");
   const productId = params?.id;
   const { addToCart } = useCart();
+  const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
+  const [upiStatus, setUpiStatus] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customerData, setCustomerData] = useState({ name: "", phone: "", address: "" });
   const [imageError, setImageError] = useState(false);
 
   // Fetch product
@@ -69,6 +74,42 @@ export default function ProductDetail() {
   });
 
   const handleAddToCart = () => {
+  const handleBuyNow = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!product) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          shopId: product.shopId,
+          customerName: customerData.name,
+          customerPhone: customerData.phone,
+          customerAddress: customerData.address,
+          quantity: 1,
+          totalPrice: product.price,
+          status: paymentMethod === "upi" ? "payment_pending_verification" : "pending",
+          paymentMethod,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to place order");
+      toast.success(
+        paymentMethod === "upi"
+          ? "Payment verification in progress. Your order will be confirmed shortly."
+          : "Order Placed Successfully! 📦"
+      );
+      setShowOrderDialog(false);
+      setCustomerData({ name: "", phone: "", address: "" });
+      setPaymentMethod("cod");
+      setUpiStatus("");
+    } catch (err: any) {
+      toast.error(err?.message || "Order failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
     if (!product) return;
     
     addToCart({
@@ -244,6 +285,15 @@ export default function ProductDetail() {
               Add to Cart
             </Button>
 
+            {/* Buy Now Button */}
+            <Button
+              onClick={() => setShowOrderDialog(true)}
+              className="w-full bg-black hover:bg-orange-700 text-white py-4 text-lg font-black rounded-xl shadow-lg hover:shadow-xl transition-all"
+              size="lg"
+            >
+              Buy Now
+            </Button>
+
             {/* WhatsApp Order Button */}
             <button
               onClick={() => {
@@ -390,6 +440,91 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* Checkout Dialog */}
+      {showOrderDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 relative">
+            <button
+              className="absolute top-3 right-3 text-slate-500 hover:text-orange-600"
+              onClick={() => setShowOrderDialog(false)}
+            >
+              ×
+            </button>
+            <h2 className="text-xl font-bold text-slate-900">Order Details</h2>
+            <form onSubmit={handleBuyNow} className="space-y-3">
+              <input
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Full Name"
+                required
+                value={customerData.name}
+                onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
+              />
+              <input
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Mobile Number"
+                type="tel"
+                maxLength={10}
+                required
+                value={customerData.phone}
+                onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
+              />
+              <input
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Full Address"
+                required
+                value={customerData.address}
+                onChange={(e) => setCustomerData({ ...customerData, address: e.target.value })}
+              />
+
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-slate-800">Payment Method</p>
+                <div className="flex gap-3">
+                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} />
+                    Cash on Delivery
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <input type="radio" checked={paymentMethod === "upi"} onChange={() => setPaymentMethod("upi")} />
+                    Pay via UPI QR
+                  </label>
+                </div>
+                {paymentMethod === "upi" && (
+                  <div className="rounded-xl border bg-orange-50 border-orange-200 p-3 space-y-3">
+                    <p className="text-sm font-bold text-orange-800">Scan & Pay (UPI)</p>
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=lav@upi&pn=ShahdolBazaar&am=${product.price}&cu=INR`)}`}
+                      alt="UPI QR"
+                      className="w-40 h-40 rounded-lg border mx-auto"
+                    />
+                    <p className="text-xs text-slate-600 text-center">
+                      Pay to: lav@upi • Amount: ₹{product.price}
+                    </p>
+                    <Button
+                      type="button"
+                      className="w-full bg-orange-600"
+                      onClick={() => setUpiStatus("Payment verification in progress. Your order will be confirmed shortly.")}
+                    >
+                      I have paid
+                    </Button>
+                    {upiStatus && (
+                      <div className="text-xs font-bold text-orange-700 text-center">{upiStatus}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-orange-600 h-12 text-lg font-bold"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "Confirm Order"}
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
