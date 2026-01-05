@@ -7,6 +7,7 @@ import { registerRoutes } from "./routes.js";
 import { setupVite } from "./vite.js";
 import { serveStatic } from "./static.js";
 import { createServer } from "http";
+import session from "express-session";
 
 const app = express();
 
@@ -21,6 +22,19 @@ const httpServer = createServer(app);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.static(path.resolve(process.cwd(), "public")));
+
+// Lightweight, cookie-based session for Vercel (stateless between invocations)
+app.use(session({
+  secret: process.env.SESSION_SECRET || "shahdol-temp-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 1000 * 60 * 60 * 24, // 1 day
+  },
+}));
 
 // Ensure uploads folder exists with open permissions
 const uploadsDir = path.resolve(process.cwd(), "public", "uploads");

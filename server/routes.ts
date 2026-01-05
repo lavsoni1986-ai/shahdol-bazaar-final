@@ -464,9 +464,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       setNoStore(res);
       const data = await storage.getCategories();
       return res.json(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Categories fetch failed", e);
-      return res.status(500).json({ message: "Failed to fetch categories" });
+      return res.status(500).json({
+        message: "Failed to fetch categories",
+        error: e?.message || e,
+      });
     }
   });
 
@@ -480,8 +483,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const created = await storage.createCategory(parsed);
       return res.status(201).json(created);
     } catch (e: any) {
-      console.error("Create category failed", e?.message);
-      return res.status(400).json({ message: e?.message || "Invalid category" });
+      console.error("Create category failed", e);
+      return res.status(400).json({ message: e?.message || "Invalid category", error: e });
     }
   });
 
@@ -493,8 +496,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       await storage.deleteCategory(id);
       return res.json({ success: true });
     } catch (e: any) {
-      console.error("Delete category failed", e?.message);
-      return res.status(400).json({ message: "Delete failed" });
+      console.error("Delete category failed", e);
+      return res.status(400).json({ message: "Delete failed", error: e?.message || e });
     }
   });
 
