@@ -468,7 +468,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const parsed = insertCategorySchema.parse({
         name: (req.body?.name || "").trim(),
-        imageUrl: req.body?.imageUrl || undefined,
+        imageUrl: typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : undefined,
       });
       const created = await storage.createCategory(parsed);
       return res.status(201).json(created);

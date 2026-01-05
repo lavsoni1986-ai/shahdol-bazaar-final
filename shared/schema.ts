@@ -130,7 +130,10 @@ export const insertCategorySchema = createInsertSchema(categories)
   .omit({ id: true, createdAt: true })
   .extend({
     name: z.string().trim().min(1, "Category name required"),
-    imageUrl: z.string().optional(),
+    imageUrl: z
+      .string()
+      .transform((v) => (v && v.trim() !== "" ? v.trim() : undefined))
+      .optional(),
   });
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;
