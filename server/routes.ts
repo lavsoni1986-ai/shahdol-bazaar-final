@@ -4,7 +4,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { type Server } from "http";
 import { storage } from "./storage.js";
-import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, products, users, shops, categories } from "../shared/schema.js";
+import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, insertOrderSchema, products, users, shops, categories, orders } from "../shared/schema.js";
 import { z } from "zod";
 import { db } from "./db.js";
 import { ilike, or, and, eq, sql } from "drizzle-orm";
@@ -387,6 +387,45 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.delete("/api/offers/:id", async (req, res) => {
     await storage.deleteOffer(Number(req.params.id));
     res.json({ success: true });
+  });
+
+  // --- 6b. ORDERS ---
+  app.post("/api/orders", async (req: Request, res: Response) => {
+    try {
+      const parsed = insertOrderSchema.parse({
+        productId: Number(req.body?.productId),
+        shopId: Number(req.body?.shopId) || 1,
+        customerName: String(req.body?.customerName || "Customer"),
+        customerPhone: String(req.body?.customerPhone || "0000000000"),
+        customerAddress: String(req.body?.customerAddress || "Shahdol"),
+        quantity: Number(req.body?.quantity) || 1,
+        totalPrice: String(req.body?.totalPrice || "0"),
+        status: req.body?.status || "pending",
+      });
+      const created = await storage.createOrder(parsed);
+      return res.status(201).json(created);
+    } catch (e: any) {
+      console.error("Order create failed", e?.message);
+      return res.status(400).json({ message: e?.message || "Order create failed" });
+    }
+  });
+
+  app.get("/api/orders", async (req: Request, res: Response) => {
+    try {
+      const includeAll = String(req.query?.includeAll || "").toLowerCase() === "true";
+      const phone = typeof req.query?.phone === "string" ? req.query.phone.trim() : "";
+      if (!includeAll && !phone) {
+        return res.status(400).json({ message: "Phone required" });
+      }
+      let rows = await db.select().from(orders);
+      if (!includeAll) {
+        rows = rows.filter((o: any) => (o.customerPhone || "").trim() === phone);
+      }
+      return res.json(rows);
+    } catch (e: any) {
+      console.error("Orders fetch failed", e?.message);
+      return res.status(500).json({ message: "Failed to fetch orders" });
+    }
   });
 
   // --- 7. PARTNER SHOP ROUTES ---

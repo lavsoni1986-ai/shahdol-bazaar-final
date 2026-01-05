@@ -18,6 +18,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const myEmail = "shaholbazaar2.0@gmail.com";
   const myName = "Lav Kumar Soni";
   const cartItemCount = getTotalItems();
+  let profileDest = "/customer-dashboard";
+  try {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      const u = JSON.parse(userStr);
+      if (u?.role === "admin" || u?.isAdmin) profileDest = "/admin";
+      else if (u?.role === "seller") profileDest = "/partner";
+    }
+  } catch {}
 
   // Route change hote hi menu band karne ke liye
   useEffect(() => {
@@ -105,6 +114,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   try {
                     const u = JSON.parse(userStr);
                     if (u?.role === "seller") dest = "/partner";
+                    else if (u?.role === "admin" || u?.isAdmin) dest = "/admin";
+                    else dest = "/customer-dashboard";
                   } catch {}
                 }
                 window.location.href = dest;
@@ -117,6 +128,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               <Store size={16} /> Sell on Shahdol Bazaar
             </button>
+
+            <Link href={profileDest}>
+              <span
+                className={`flex items-center gap-2 px-3 py-2 rounded-full border ${
+                  location === profileDest
+                    ? "border-orange-500 text-orange-600 bg-orange-50"
+                    : "border-slate-200 text-slate-600 hover:border-orange-400 hover:text-orange-600"
+                }`}
+              >
+                <User size={16} /> Profile
+              </span>
+            </Link>
 
             {/* Cart Icon */}
             <button
@@ -214,6 +237,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <Store size={18} /> Sell on Shahdol Bazaar
                 </span>
               </Link>
+
+              <Link href={profileDest}>
+                <span
+                  className={`text-sm font-bold flex items-center gap-2 cursor-pointer ${
+                    location === profileDest ? "text-orange-600" : "text-slate-600"
+                  }`}
+                >
+                  <User size={18} /> Profile
+                </span>
+              </Link>
             </nav>
           </div>
         )}
@@ -249,7 +282,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <ShoppingCart size={18} />
             <span>Cart</span>
           </button>
-          <Link href="/auth" className={`py-2 flex flex-col items-center gap-1 ${location === "/auth" ? "text-[#e4488f]" : ""}`}>
+          <Link href="/customer-dashboard" className={`py-2 flex flex-col items-center gap-1 ${location === "/customer-dashboard" ? "text-[#e4488f]" : ""}`}>
             <User size={18} />
             <span>Profile</span>
           </Link>

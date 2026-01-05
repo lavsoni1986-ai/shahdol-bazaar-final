@@ -4,8 +4,16 @@ import "./index.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    for(let reg of regs) reg.unregister();
+// Basic PWA service worker registration for caching
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((registration) => {
+        console.log("SW registered:", registration.scope);
+      })
+      .catch((error) => {
+        console.error("SW registration failed:", error);
+      });
   });
 }
