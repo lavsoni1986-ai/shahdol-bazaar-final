@@ -2,8 +2,6 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Pencil, Trash2, Menu } from "lucide-react";
 
-const API_BASE = ""; // use relative paths via proxy
-
 type Offer = { id?: number; content: string; isActive: boolean };
 type Product = { id: number; name: string; price: string; category: string; description?: string; approved?: boolean; status?: string; imageUrl?: string; images?: string[] };
 type Shop = { id: number; name: string; approved?: boolean; isVerified?: boolean; category?: string; contactNumber?: string; mobile?: string; phone?: string };
