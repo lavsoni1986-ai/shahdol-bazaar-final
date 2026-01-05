@@ -366,7 +366,12 @@ export class DatabaseStorage implements IStorage {
 
   // --- CATEGORY METHODS ---
   async getCategories(): Promise<Category[]> {
-    return await db.select().from(categories);
+    try {
+      return await db.select().from(categories);
+    } catch (err) {
+      console.error("Full DB Error:", err);
+      throw err;
+    }
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
