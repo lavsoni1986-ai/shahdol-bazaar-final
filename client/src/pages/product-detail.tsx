@@ -304,12 +304,12 @@ export default function ProductDetail() {
                   Buy Now
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4">
+            <DialogContent className="bg-white rounded-3xl max-w-[420px] w-[95%] max-h-[85vh] overflow-y-auto p-6 space-y-4">
                 <DialogHeader>
                   <DialogTitle className="text-xl font-bold text-slate-900">Order Details</DialogTitle>
                   <DialogDescription className="sr-only">Checkout</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleBuyNow} className="space-y-3">
+                <form onSubmit={handleBuyNow} className="space-y-3 max-h-[85vh] overflow-y-auto pr-1">
                   <input
                     className="w-full border rounded-lg px-3 py-2 text-sm"
                     placeholder="Full Name"
@@ -349,24 +349,26 @@ export default function ProductDetail() {
                     {paymentMethod === "upi" && (
                       <div className="rounded-xl border bg-orange-50 border-orange-200 p-3 space-y-3">
                         <p className="text-sm font-bold text-orange-800">Scan & Pay (UPI)</p>
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=lav@upi&pn=ShahdolBazaar&am=${product.price}&cu=INR`)}`}
-                          alt="UPI QR"
-                          className="w-40 h-40 rounded-lg border mx-auto"
-                        />
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=lav@upi&pn=ShahdolBazaar&am=${product.price}&cu=INR`)}`}
+                      alt="UPI QR"
+                      className="w-48 h-48 rounded-lg border mx-auto object-contain"
+                    />
                         <p className="text-xs text-slate-600 text-center">
                           Pay to: lav@upi • Amount: ₹{product.price}
                         </p>
-                        <Button
-                          type="button"
-                          className="w-full bg-orange-600"
-                          onClick={() => setUpiStatus("Payment verification in progress. Your order will be confirmed shortly.")}
-                        >
-                          I have paid
-                        </Button>
-                        {upiStatus && (
-                          <div className="text-xs font-bold text-orange-700 text-center">{upiStatus}</div>
-                        )}
+                    <div className="space-y-2">
+                      <Button
+                        type="button"
+                        className="w-full bg-orange-600"
+                        onClick={() => setUpiStatus("Payment verification in progress. Your order will be confirmed shortly.")}
+                      >
+                        I have paid
+                      </Button>
+                      {upiStatus && (
+                        <div className="text-xs font-bold text-orange-700 text-center">{upiStatus}</div>
+                      )}
+                    </div>
                       </div>
                     )}
                   </div>

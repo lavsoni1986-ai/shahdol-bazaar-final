@@ -402,6 +402,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         status: req.body?.status || "pending",
       });
       const created = await storage.createOrder(parsed);
+
+      // --- WhatsApp notification (placeholder) ---
+      const whatsappNumber = process.env.WHATSAPP_ALERT_NUMBER || "YOUR_WHATSAPP_NUMBER";
+      const message = `Naya Order! Customer: ${parsed.customerName}, Amount: ₹${parsed.totalPrice}, Status: ${parsed.status}`;
+      // Replace this with real provider call; keeping safe log for now
+      try {
+        await fetch(process.env.WHATSAPP_WEBHOOK_URL || "", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: whatsappNumber, message }),
+        });
+      } catch (notifyErr) {
+        console.log("WhatsApp notify (placeholder):", { to: whatsappNumber, message });
+      }
+
       return res.status(201).json(created);
     } catch (e: any) {
       console.error("Order create failed", e?.message);
