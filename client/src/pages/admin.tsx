@@ -8,7 +8,6 @@ type Shop = { id: number; name: string; approved?: boolean; isVerified?: boolean
 type Banner = { id?: number; image: string; title?: string; link?: string };
 type Category = { id: number; name: string; imageUrl?: string | null };
 const brandOrange = "#f97316";
-const brandOrange = "#f97316";
 
 export default function Admin() {
   const [username, setUsername] = useState("");
