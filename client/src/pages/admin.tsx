@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Menu } from "lucide-react";
 
 const API_BASE = ""; // use relative paths via proxy
 
@@ -9,6 +9,8 @@ type Product = { id: number; name: string; price: string; category: string; desc
 type Shop = { id: number; name: string; approved?: boolean; isVerified?: boolean; category?: string; contactNumber?: string; mobile?: string; phone?: string };
 type Banner = { id?: number; image: string; title?: string; link?: string };
 type Category = { id: number; name: string; imageUrl?: string | null };
+const brandOrange = "#f97316";
+const brandOrange = "#f97316";
 
 export default function Admin() {
   const [username, setUsername] = useState("");
@@ -35,6 +37,8 @@ export default function Admin() {
   const [bannerTitle, setBannerTitle] = useState("");
   const [bannerLink, setBannerLink] = useState("/");
   const [bannerLoading, setBannerLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [editProductModal, setEditProductModal] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
@@ -47,14 +51,25 @@ export default function Admin() {
 
   useEffect(() => {
     if (loggedIn) {
-      fetchOffers();
-      fetchPendingProducts();
-      fetchLiveProducts();
-      fetchShops();
-      fetchBanners();
-      fetchCategories();
+      loadAllData();
     }
   }, [loggedIn]);
+
+  async function loadAllData() {
+    try {
+      setLoading(true);
+      await Promise.all([
+        fetchOffers(),
+        fetchPendingProducts(),
+        fetchLiveProducts(),
+        fetchShops(),
+        fetchBanners(),
+        fetchCategories(),
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function handleLogin() {
     if (username === "admin" && password === "shahdol123") {
@@ -329,6 +344,28 @@ export default function Admin() {
     }
   }
 
+  const renderStatsSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-pulse">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="bg-white border rounded-xl p-4 shadow-sm">
+          <div className="h-3 w-24 bg-slate-200 rounded mb-3" />
+          <div className="h-6 w-16 bg-slate-200 rounded" />
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderTableSkeleton = (cols: number) => (
+    <div className="bg-white border rounded-xl shadow-sm">
+      <div className="h-12 bg-slate-100 border-b" />
+      <div className="divide-y">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-12 bg-slate-50 animate-pulse" />
+        ))}
+      </div>
+    </div>
+  );
+
   async function handleCreateBanner() {
     if (!bannerFile) return toast.error("Select an image");
     try {
@@ -418,8 +455,9 @@ export default function Admin() {
 
   const tabButton = (key: typeof activeTab, label: string) => (
     <button
-      className={`w-full text-left px-4 py-3 rounded-lg font-bold ${activeTab === key ? "bg-orange-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
-      onClick={() => setActiveTab(key)}
+      className={`w-full text-left px-4 py-3 rounded-lg font-bold ${activeTab === key ? "text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
+      style={activeTab === key ? { backgroundColor: brandOrange } : {}}
+      onClick={() => { setActiveTab(key); setSidebarOpen(false); }}
     >
       {label}
     </button>
@@ -428,7 +466,25 @@ export default function Admin() {
   return (
     <>
     <div className="min-h-screen bg-slate-50 flex">
-      <aside className="w-56 bg-white border-r p-4 space-y-2">
+      {/* Mobile header */}
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-white border-b flex items-center justify-between px-4 py-3 shadow-sm">
+        <div className="font-black text-slate-800 flex items-center gap-2">
+          <span style={{ color: brandOrange }}>Admin</span> Panel
+        </div>
+        <button
+          aria-label="Toggle menu"
+          onClick={() => setSidebarOpen((s) => !s)}
+          className="p-2 rounded-lg border text-slate-700"
+        >
+          <Menu size={18} />
+        </button>
+      </div>
+
+      <aside
+        className={`w-56 bg-white border-r p-4 space-y-2 md:static fixed top-14 left-0 h-[calc(100%-56px)] md:h-auto z-20 transition-transform duration-200 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
         <p className="text-xs font-black uppercase text-slate-500 mb-2">Admin Panel</p>
         {tabButton("overview", "Overview")}
         {tabButton("sellers", "Manage Sellers")}
@@ -438,7 +494,8 @@ export default function Admin() {
         {tabButton("categories", "Manage Categories")}
       </aside>
 
-      <main className="flex-1 p-8 space-y-6">
+      <main className="flex-1 p-8 pt-16 md:pt-8 space-y-6">
+        {loading ? renderStatsSkeleton() : (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {stats.map((s) => (
             <div key={s.label} className="bg-white border rounded-xl p-4 shadow-sm">
@@ -447,6 +504,7 @@ export default function Admin() {
             </div>
           ))}
         </div>
+        )}
 
         {activeTab === "overview" && (
           <div className="bg-white border rounded-xl p-6 shadow-sm">
@@ -469,6 +527,7 @@ export default function Admin() {
               <h2 className="text-lg font-black">Manage Sellers</h2>
               <span className="text-xs font-black uppercase text-orange-600">{shops.length} total</span>
             </div>
+            {loading ? renderTableSkeleton(5) : (
             <table className="w-full text-left">
               <thead className="bg-slate-50">
                 <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
@@ -481,7 +540,7 @@ export default function Admin() {
               </thead>
               <tbody className="divide-y">
                 {shops.length === 0 && (
-                  <tr><td colSpan={4} className="p-4 text-sm text-slate-500">No sellers found.</td></tr>
+                  <tr><td colSpan={5} className="p-4 text-sm text-slate-500">No sellers found.</td></tr>
                 )}
                 {shops.map((s) => (
                   <tr key={s.id}>
@@ -496,6 +555,7 @@ export default function Admin() {
                 ))}
               </tbody>
             </table>
+            )}
           </div>
         )}
 
@@ -506,6 +566,7 @@ export default function Admin() {
               <h2 className="text-lg font-black">Pending Products</h2>
               <span className="text-xs font-black uppercase text-orange-600">{pendingProducts.length} awaiting approval</span>
             </div>
+            {loading ? renderTableSkeleton(5) : (
             <table className="w-full text-left">
               <thead className="bg-slate-50">
                 <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
@@ -536,7 +597,7 @@ export default function Admin() {
                       <td className="p-4 text-right flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleApprove(p.id)}
-                          className="bg-green-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-green-700 active:scale-95"
+                          className="bg-orange-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-orange-700 active:scale-95"
                         >
                           Approve
                         </button>
@@ -560,6 +621,7 @@ export default function Admin() {
                 })}
               </tbody>
             </table>
+            )}
           </div>
 
           <div className="bg-white border rounded-xl shadow-sm">
@@ -567,6 +629,7 @@ export default function Admin() {
               <h2 className="text-lg font-black">Live Products</h2>
               <span className="text-xs font-black uppercase text-orange-600">{liveProducts.length} live</span>
             </div>
+            {loading ? renderTableSkeleton(5) : (
             <table className="w-full text-left">
               <thead className="bg-slate-50">
                 <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
@@ -597,7 +660,7 @@ export default function Admin() {
                       <td className="p-4 text-right flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleToggleStock(p)}
-                          className="px-3 py-1 rounded-full text-xs font-black border text-slate-600 hover:border-orange-200"
+                      className="px-3 py-1 rounded-full text-xs font-black border text-slate-600 hover:border-orange-200"
                         >
                           {p.status === "out_of_stock" ? "Mark In Stock" : "Toggle Stock"}
                         </button>
@@ -680,7 +743,8 @@ export default function Admin() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+            </table>
+            )}
             </div>
           </div>
         )}
