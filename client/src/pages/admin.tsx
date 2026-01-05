@@ -15,7 +15,7 @@ export default function Admin() {
   const [password, setPassword] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "sellers" | "products" | "news" | "banners">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "sellers" | "products" | "news" | "banners" | "orders">("overview");
 
   const [offers, setOffers] = useState<Offer[]>([]);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
@@ -23,6 +23,7 @@ export default function Admin() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [categoryFile, setCategoryFile] = useState<File | null>(null);
   const [editCategoryModal, setEditCategoryModal] = useState(false);
@@ -37,6 +38,7 @@ export default function Admin() {
   const [bannerLoading, setBannerLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   const [editProductModal, setEditProductModal] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
@@ -63,6 +65,7 @@ export default function Admin() {
         fetchShops(),
         fetchBanners(),
         fetchCategories(),
+        fetchOrders(),
       ]);
     } finally {
       setLoading(false);
@@ -131,6 +134,19 @@ export default function Admin() {
   }
 
   async function fetchCategories() {
+  async function fetchOrders() {
+    try {
+      setOrdersLoading(true);
+      const res = await fetch(`/api/orders?includeAll=true`);
+      if (!res.ok) throw new Error("Failed to fetch orders");
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Error fetching orders:", e);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }
     try {
       const res = await fetch(`/api/categories`);
       if (res.ok) {
@@ -449,6 +465,7 @@ export default function Admin() {
     { label: "Live Products", value: liveProducts.length },
     { label: "Pending Approvals", value: pendingProducts.length },
     { label: "Total News Items", value: offers.length },
+    { label: "Orders", value: orders.length },
   ];
 
   const tabButton = (key: typeof activeTab, label: string) => (
@@ -488,6 +505,7 @@ export default function Admin() {
         {tabButton("sellers", "Manage Sellers")}
         {tabButton("products", "Products")}
         {tabButton("news", "News / Offers")}
+        {tabButton("orders", "Orders")}
         {tabButton("banners", "Manage Banners")}
         {tabButton("categories", "Manage Categories")}
       </aside>
@@ -566,6 +584,75 @@ export default function Admin() {
             <p className="text-sm text-slate-600">Loading Table...</p>
           </div>
           </>
+        )}
+
+        {activeTab === "orders" && (
+          <div className="bg-white border rounded-xl shadow-sm">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-black">Orders</h2>
+              <span className="text-xs font-black uppercase text-orange-600">{orders.length} total</span>
+            </div>
+            {ordersLoading ? renderTableSkeleton(5) : (
+              <table className="w-full text-left">
+                <thead className="bg-slate-50">
+                  <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                    <th className="p-4">ID</th>
+                    <th className="p-4">Customer</th>
+                    <th className="p-4">Phone</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Total</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {orders.length === 0 && (
+                    <tr><td colSpan={6} className="p-6 text-sm font-bold text-slate-500 text-center">No orders yet.</td></tr>
+                  )}
+                  {orders.map((o) => {
+                    const isPendingPay = (o.status || "").toLowerCase() === "payment_pending_verification";
+                    return (
+                      <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-4 text-sm font-black text-slate-800">#{o.id}</td>
+                        <td className="p-4 text-sm text-slate-700">{o.customerName || "—"}</td>
+                        <td className="p-4 text-sm text-slate-700">{o.customerPhone || "—"}</td>
+                        <td className="p-4 text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs font-black ${isPendingPay ? "bg-orange-50 text-orange-700" : "bg-slate-100 text-slate-700"}`}>
+                            {o.status || "pending"}
+                          </span>
+                        </td>
+                        <td className="p-4 text-sm font-bold text-slate-900">₹{o.totalPrice}</td>
+                        <td className="p-4 text-right">
+                          {isPendingPay ? (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(`/api/orders/${o.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ status: "paid" }),
+                                  });
+                                  if (!res.ok) throw new Error("Update failed");
+                                  toast.success("Payment confirmed");
+                                  fetchOrders();
+                                } catch (err: any) {
+                                  toast.error(err?.message || "Failed to confirm");
+                                }
+                              }}
+                              className="bg-orange-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-orange-700 active:scale-95"
+                            >
+                              Confirm Payment
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-500">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         )}
 
         {activeTab === "news" && (

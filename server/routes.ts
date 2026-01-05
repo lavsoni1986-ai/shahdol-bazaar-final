@@ -428,6 +428,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.patch("/api/orders/:id", async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+      const nextStatus = typeof req.body?.status === "string" ? req.body.status : null;
+      if (!nextStatus) return res.status(400).json({ message: "Status required" });
+      const [updated] = await db.update(orders).set({ status: nextStatus }).where(eq(orders.id, id)).returning();
+      return res.json(updated);
+    } catch (e: any) {
+      console.error("Order update failed", e?.message);
+      return res.status(500).json({ message: "Update failed" });
+    }
+  });
+
   // --- 7. PARTNER SHOP ROUTES ---
   app.get("/api/partner/shop", async (req: Request, res: Response) => {
     try {
