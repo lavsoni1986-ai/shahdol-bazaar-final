@@ -27,8 +27,8 @@ const MAX_RETRIES = 2; // total attempts = MAX_RETRIES + 1
 const DB_TIMEOUT_MS = 30_000;
 
 // Neon serverless driver (HTTP) handles cold/idle states better than pooled pg/postgres
-// Use default fetch to avoid type mismatch with neon-http typings.
-const client = neon(DATABASE_URL, { pipeline: false });
+// Use default options (no pipeline override) to avoid type mismatches.
+const client = neon(DATABASE_URL);
 
 export const db = drizzle(client, { schema });
 
