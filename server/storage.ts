@@ -160,18 +160,14 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(users.id, products.sellerId))
       .leftJoin(shops, eq(shops.id, products.shopId));
 
-    const conditions = [eq(products.shopId, shopId)];
+    const baseClause = eq(products.shopId, shopId);
     if (search && search.trim()) {
       const term = `%${search.trim()}%`;
-      conditions.push(
-        or(
-          ilike(products.name, term),
-          ilike(products.description, term),
-        ),
-      );
+      const searchClause = or(ilike(products.name, term), ilike(products.description, term));
+      return await base.where(and(baseClause, searchClause));
     }
 
-    return await base.where(and(...conditions));
+    return await base.where(baseClause);
   }
 
   async getAllProducts(approved?: boolean | null): Promise<Product[]> {
@@ -204,24 +200,23 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(users.id, products.sellerId))
       .leftJoin(shops, eq(shops.id, products.shopId));
 
-    const conditions = [];
+    const clauses: any[] = [];
     if (approved !== undefined && approved !== null) {
-      conditions.push(eq(products.approved, approved));
+      clauses.push(eq(products.approved, approved));
     }
     if (search && search.trim()) {
       const term = `%${search.trim()}%`;
-      conditions.push(
-        or(
-          ilike(products.name, term),
-          ilike(products.category, term),
-          ilike(products.description, term),
-          ilike(users.shopName, term),
-        ),
-      );
+      clauses.push(or(
+        ilike(products.name, term),
+        ilike(products.category, term),
+        ilike(products.description, term),
+        ilike(users.shopName, term),
+      ));
     }
 
-    if (conditions.length === 0) return await base;
-    return await base.where(and(...conditions));
+    if (clauses.length === 0) return await base;
+    if (clauses.length === 1) return await base.where(clauses[0]);
+    return await base.where(and(...clauses as [any, ...any[]]));
   }
 
   // Utility to fetch all products unfiltered (used when no search/category applied)
