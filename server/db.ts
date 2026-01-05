@@ -40,7 +40,7 @@ const DB_TIMEOUT_MS = 30_000;
 
 // Neon serverless driver (HTTP) handles cold/idle states better than pooled pg/postgres
 // Explicit initialization without pg/pooler drivers.
-const client = neon(rawUrl, { ssl: true });
+const client = neon(rawUrl);
 export const db = drizzle(client, { schema });
 
 async function sleep(ms: number) {
