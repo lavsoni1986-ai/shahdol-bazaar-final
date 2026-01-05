@@ -4,6 +4,13 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Loader2,
   ShoppingCart,
   Store,
@@ -55,7 +62,7 @@ export default function ProductDetail() {
   const [, params] = useRoute("/product/:id");
   const productId = params?.id;
   const { addToCart } = useCart();
-  const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
   const [upiStatus, setUpiStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,7 +107,7 @@ export default function ProductDetail() {
           ? "Payment verification in progress. Your order will be confirmed shortly."
           : "Order Placed Successfully! 📦"
       );
-      setShowOrderDialog(false);
+      setIsCheckoutOpen(false);
       setCustomerData({ name: "", phone: "", address: "" });
       setPaymentMethod("cod");
       setUpiStatus("");
@@ -286,13 +293,93 @@ export default function ProductDetail() {
             </Button>
 
             {/* Buy Now Button */}
-            <Button
-              onClick={() => setShowOrderDialog(true)}
-              className="w-full bg-black hover:bg-orange-700 text-white py-4 text-lg font-black rounded-xl shadow-lg hover:shadow-xl transition-all"
-              size="lg"
-            >
-              Buy Now
-            </Button>
+            <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => setIsCheckoutOpen(true)}
+                  className="w-full bg-black hover:bg-orange-700 text-white py-4 text-lg font-black rounded-xl shadow-lg hover:shadow-xl transition-all"
+                  size="lg"
+                >
+                  Buy Now
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold text-slate-900">Order Details</DialogTitle>
+                  <DialogDescription className="sr-only">Checkout</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleBuyNow} className="space-y-3">
+                  <input
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Full Name"
+                    required
+                    value={customerData.name}
+                    onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
+                  />
+                  <input
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Mobile Number"
+                    type="tel"
+                    maxLength={10}
+                    required
+                    value={customerData.phone}
+                    onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
+                  />
+                  <input
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Full Address"
+                    required
+                    value={customerData.address}
+                    onChange={(e) => setCustomerData({ ...customerData, address: e.target.value })}
+                  />
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-slate-800">Payment Method</p>
+                    <div className="flex gap-3">
+                      <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} />
+                        Cash on Delivery
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <input type="radio" checked={paymentMethod === "upi"} onChange={() => setPaymentMethod("upi")} />
+                        Pay via UPI QR
+                      </label>
+                    </div>
+                    {paymentMethod === "upi" && (
+                      <div className="rounded-xl border bg-orange-50 border-orange-200 p-3 space-y-3">
+                        <p className="text-sm font-bold text-orange-800">Scan & Pay (UPI)</p>
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=lav@upi&pn=ShahdolBazaar&am=${product.price}&cu=INR`)}`}
+                          alt="UPI QR"
+                          className="w-40 h-40 rounded-lg border mx-auto"
+                        />
+                        <p className="text-xs text-slate-600 text-center">
+                          Pay to: lav@upi • Amount: ₹{product.price}
+                        </p>
+                        <Button
+                          type="button"
+                          className="w-full bg-orange-600"
+                          onClick={() => setUpiStatus("Payment verification in progress. Your order will be confirmed shortly.")}
+                        >
+                          I have paid
+                        </Button>
+                        {upiStatus && (
+                          <div className="text-xs font-bold text-orange-700 text-center">{upiStatus}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-orange-600 h-12 text-lg font-bold"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "Confirm Order"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
 
             {/* WhatsApp Order Button */}
             <button

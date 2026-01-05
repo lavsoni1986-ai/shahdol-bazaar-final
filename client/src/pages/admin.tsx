@@ -578,10 +578,128 @@ export default function Admin() {
         {activeTab === "products" && (
           <>
           <div className="bg-white border rounded-xl shadow-sm p-6">
-            <p className="text-sm text-slate-600">Loading Table...</p>
+            <div className="flex items-center justify-between px-2 py-2 border-b">
+              <h2 className="text-lg font-black">Pending Products</h2>
+              <span className="text-xs font-black uppercase text-orange-600">{pendingProducts.length} awaiting approval</span>
+            </div>
+            {loading ? renderTableSkeleton(5) : (
+            <table className="w-full text-left">
+              <thead className="bg-slate-50">
+                <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                  <th className="p-4">Product</th>
+                  <th className="p-4">Category</th>
+                  <th className="p-4">Price</th>
+                  <th className="p-4">Preview</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {pendingProducts.length === 0 && (
+                  <tr><td colSpan={5} className="p-6 text-sm font-bold text-slate-500 text-center">No pending products 🎉</td></tr>
+                )}
+                {pendingProducts.map((p) => {
+                  const thumb = (Array.isArray(p.images) && p.images[0]) || p.imageUrl || "";
+                  const src = thumb
+                    ? (thumb.startsWith("http") ? thumb : `${window.location.origin}${thumb.startsWith("/") ? "" : "/"}${thumb}`)
+                    : "";
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 text-sm font-black text-slate-800">{p.name}</td>
+                      <td className="p-4 text-xs font-bold text-slate-500 uppercase">{p.category}</td>
+                      <td className="p-4 text-sm font-bold text-green-600">₹{p.price}</td>
+                      <td className="p-4">
+                        {src ? <img src={src} alt={p.name} className="w-12 h-12 rounded object-cover border" /> : <span className="text-xs text-slate-400">No image</span>}
+                      </td>
+                      <td className="p-4 text-right flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleApprove(p.id)}
+                          className="bg-orange-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-orange-700 active:scale-95"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => { setEditProduct(p); setEditProductModal(true); }}
+                          className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(p.id)}
+                          className="p-2 rounded-full border text-red-500 hover:border-red-200"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            )}
           </div>
           <div className="bg-white border rounded-xl shadow-sm p-6">
-            <p className="text-sm text-slate-600">Loading Table...</p>
+            <div className="flex items-center justify-between px-2 py-2 border-b">
+              <h2 className="text-lg font-black">Live Products</h2>
+              <span className="text-xs font-black uppercase text-orange-600">{liveProducts.length} live</span>
+            </div>
+            {loading ? renderTableSkeleton(5) : (
+            <table className="w-full text-left">
+              <thead className="bg-slate-50">
+                <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                  <th className="p-4">Product</th>
+                  <th className="p-4">Category</th>
+                  <th className="p-4">Price</th>
+                  <th className="p-4">Preview</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {liveProducts.length === 0 && (
+                  <tr><td colSpan={5} className="p-6 text-sm font-bold text-slate-500 text-center">No live products.</td></tr>
+                )}
+                {liveProducts.map((p) => {
+                  const thumb = (Array.isArray(p.images) && p.images[0]) || p.imageUrl || "";
+                  const src = thumb
+                    ? (thumb.startsWith("http") ? thumb : `${window.location.origin}${thumb.startsWith("/") ? "" : "/"}${thumb}`)
+                    : "";
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 text-sm font-black text-slate-800">{p.name}</td>
+                      <td className="p-4 text-xs font-bold text-slate-500 uppercase">{p.category}</td>
+                      <td className="p-4 text-sm font-bold text-green-600">₹{p.price}</td>
+                      <td className="p-4">
+                        {src ? <img src={src} alt={p.name} className="w-12 h-12 rounded object-cover border" /> : <span className="text-xs text-slate-400">No image</span>}
+                      </td>
+                      <td className="p-4 text-right flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleToggleStock(p)}
+                          className="px-3 py-1 rounded-full text-xs font-black border text-slate-600 hover:border-orange-200"
+                        >
+                          {p.status === "out_of_stock" ? "Mark In Stock" : "Toggle Stock"}
+                        </button>
+                        <button
+                          onClick={() => { setEditProduct(p); setEditProductModal(true); }}
+                          className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(p.id)}
+                          className="p-2 rounded-full border text-red-500 hover:border-red-200"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            )}
           </div>
           </>
         )}
