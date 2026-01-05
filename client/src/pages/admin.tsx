@@ -1,3 +1,4 @@
+// Version 1.0.1 - Final Build Fix
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Pencil, Trash2, Menu } from "lucide-react";
@@ -623,7 +624,6 @@ export default function Admin() {
                   ))}
                 </tbody>
             </table>
-            )}
             </div>
           </div>
         )}
