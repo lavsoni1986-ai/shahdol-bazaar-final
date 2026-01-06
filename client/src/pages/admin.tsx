@@ -1,7 +1,7 @@
 // Version 1.0.1 - Final Build Fix
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Pencil, Trash2, Menu } from "lucide-react";
+import { Pencil, Trash2, Menu, Check, X } from "lucide-react";
 
 type Offer = { id?: number; content: string; isActive: boolean };
 type Product = { id: number; name: string; price: string; category: string; description?: string; approved?: boolean; status?: string; imageUrl?: string; images?: string[] };
@@ -765,42 +765,86 @@ export default function Admin() {
                     <tr><td colSpan={6} className="p-6 text-sm font-bold text-slate-500 text-center">No orders yet.</td></tr>
                   )}
                   {orders.map((o) => {
-                    const isPendingPay = (o.status || "").toLowerCase() === "payment_pending_verification";
+                    const status = (o.status || "").toLowerCase();
+                    const isPendingPay = status === "payment_pending_verification";
+                    const isPaid = status === "paid" || status === "confirmed" || status === "completed";
+                    const isPending = status === "pending";
+                    const canCancel = isPending || isPendingPay;
+
                     return (
                       <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="p-4 text-sm font-black text-slate-800">#{o.id}</td>
                         <td className="p-4 text-sm text-slate-700">{o.customerName || "—"}</td>
                         <td className="p-4 text-sm text-slate-700">{o.customerPhone || "—"}</td>
                         <td className="p-4 text-sm">
-                          <span className={`px-2 py-1 rounded-full text-xs font-black ${isPendingPay ? "bg-orange-50 text-orange-700" : "bg-slate-100 text-slate-700"}`}>
-                            {o.status || "pending"}
+                          <span className={`px-2 py-1 rounded-full text-xs font-black ${
+                            isPaid ? "bg-green-50 text-green-700" :
+                            isPendingPay ? "bg-orange-50 text-orange-700" : 
+                            "bg-slate-100 text-slate-700"
+                          }`}>
+                            {isPaid ? "Completed" : (o.status || "pending")}
                           </span>
                         </td>
                         <td className="p-4 text-sm font-bold text-slate-900">₹{o.totalPrice}</td>
                         <td className="p-4 text-right">
-                          {isPendingPay ? (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const res = await fetch(`/api/orders/${o.id}`, {
-                                    method: "PATCH",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ status: "paid" }),
-                                  });
-                                  if (!res.ok) throw new Error("Update failed");
-                                  toast.success("Payment confirmed");
-                                  fetchOrders();
-                                } catch (err: any) {
-                                  toast.error(err?.message || "Failed to confirm");
-                                }
-                              }}
-                              className="bg-orange-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-orange-700 active:scale-95"
-                            >
-                              Confirm Payment
-                            </button>
-                          ) : (
-                            <span className="text-xs text-slate-500">—</span>
-                          )}
+                          <div className="flex items-center justify-end gap-2">
+                            {isPaid ? (
+                              <div className="flex items-center gap-1 text-green-600">
+                                <Check size={16} />
+                                <span className="text-xs font-bold">Completed</span>
+                              </div>
+                            ) : (
+                              <>
+                                {(isPendingPay || isPending) && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch(`/api/orders/${o.id}`, {
+                                          method: "PATCH",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ status: "paid" }),
+                                        });
+                                        if (!res.ok) throw new Error("Update failed");
+                                        toast.success("Order Updated! Payment confirmed successfully ✅");
+                                        await fetchOrders(); // Auto-refresh
+                                      } catch (err: any) {
+                                        toast.error(err?.message || "Failed to confirm payment");
+                                      }
+                                    }}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full text-xs font-black uppercase shadow active:scale-95 transition-all"
+                                    title="Confirm Payment"
+                                  >
+                                    <Check size={12} className="mr-1" />
+                                    Confirm
+                                  </button>
+                                )}
+                                {canCancel && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm(`Are you sure you want to cancel order #${o.id}?`)) return;
+                                      try {
+                                        const res = await fetch(`/api/orders/${o.id}`, {
+                                          method: "PATCH",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ status: "cancelled" }),
+                                        });
+                                        if (!res.ok) throw new Error("Cancel failed");
+                                        toast.success("Order Updated! Order cancelled successfully");
+                                        await fetchOrders(); // Auto-refresh
+                                      } catch (err: any) {
+                                        toast.error(err?.message || "Failed to cancel order");
+                                      }
+                                    }}
+                                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs font-black uppercase shadow active:scale-95 transition-all"
+                                    title="Cancel Order"
+                                  >
+                                    <X size={12} className="mr-1" />
+                                    Cancel
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
