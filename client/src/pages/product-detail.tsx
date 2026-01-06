@@ -639,7 +639,7 @@ const defaultImage =
           </form>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
 
