@@ -36,9 +36,21 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Simple fetch handler
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
-  );
+  // Required fetch handler for PWA installability
+  if (event.request.method === 'GET') {
+    event.respondWith(
+      caches.match(event.request)
+        .then((response) => {
+          // Return cached version or fetch from network
+          return response || fetch(event.request);
+        })
+        .catch(() => {
+          // Fallback for offline scenarios
+          if (event.request.destination === 'document') {
+            return caches.match('/');
+          }
+        })
+    );
+  }
 });
 
