@@ -33,7 +33,10 @@ const httpServer = createServer(app);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// ✅ MANIFEST FIX: Serve static files from both public and client/public directories
 app.use(express.static(path.resolve(process.cwd(), "public")));
+app.use(express.static(path.resolve(process.cwd(), "client", "public")));
 
 // Lightweight, cookie-based session for Vercel (stateless between invocations)
 app.use(session({
