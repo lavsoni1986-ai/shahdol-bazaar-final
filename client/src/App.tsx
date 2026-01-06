@@ -6,6 +6,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/sonner";
 import { Layout } from "@/components/layout";
 import { CartProvider } from "@/contexts/CartContext";
+import InstallPWAButton from "@/components/InstallPWAButton";
 
 // Pages
 import Home from "@/pages/home";
@@ -206,6 +207,7 @@ export default function App() {
       <CartProvider>
         <Toaster position="top-center" richColors />
         <Router />
+        <InstallPWAButton />
       </CartProvider>
     </QueryClientProvider>
   );
