@@ -1,6 +1,6 @@
 // Vercel Force Update 1.0.2
 import { useRoute } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
 
 type Product = {
   id: string | number;
@@ -64,11 +65,15 @@ export default function ProductDetail() {
   const [, params] = useRoute("/product/:id");
   const productId = params?.id;
   const { addToCart } = useCart();
+  const queryClient = useQueryClient();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
   const [upiStatus, setUpiStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customerData, setCustomerData] = useState({ name: "", phone: "", address: "" });
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
   const [imageError, setImageError] = useState(false);
 
   // Fetch product
@@ -80,6 +85,46 @@ export default function ProductDetail() {
     queryKey: ["product", productId],
     queryFn: () => fetchProduct(productId!),
     enabled: !!productId,
+  });
+
+  const {
+    data: reviews,
+    isLoading: reviewsLoading,
+  } = useQuery({
+    queryKey: ["reviews", productId],
+    queryFn: async () => {
+      if (!productId) return [];
+      const res = await fetch(`/api/reviews/${productId}`);
+      if (!res.ok) throw new Error("Failed to load reviews");
+      return res.json();
+    },
+    enabled: !!productId,
+  });
+
+  const addReviewMutation = useMutation({
+    mutationFn: async (payload: { rating: number; comment: string }) => {
+      if (!productId) throw new Error("Missing product");
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: Number(productId),
+          customerName: "Guest",
+          rating: payload.rating,
+          comment: payload.comment,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Failed to submit review");
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Thank you! Your review is pending approval.");
+      queryClient.invalidateQueries({ queryKey: ["reviews", productId] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Review submit failed");
+    },
   });
 
   const handleAddToCart = () => {
@@ -162,8 +207,8 @@ export default function ProductDetail() {
     );
   }
 
-  const defaultImage =
-    "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?auto=format&fit=crop&q=80&w=800";
+const defaultImage =
+  "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?auto=format&fit=crop&q=80&w=800";
 
   const toAbsolute = (url?: string) => {
     if (!url) return "";
@@ -468,27 +513,34 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Customer Reviews */}
-            <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Customer Reviews</h3>
-              <div className="space-y-4">
-                {[
-                  { name: "Aditi", rating: 4.8, comment: "Quality bohot acchi hai, delivery bhi fast thi!" },
-                  { name: "Rahul", rating: 4.6, comment: "Worth the price, packaging bhi safe tha." },
-                  { name: "Neha", rating: 4.7, comment: "Exactly as shown, zaroor kharidein!" },
-                ].map((rev, idx) => (
-                  <div key={idx} className="border border-slate-100 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800">{rev.name}</span>
-                      <span className="flex items-center gap-1 text-xs font-black text-orange-600">
-                        <Star size={14} className="fill-orange-500 text-orange-500" />
-                        {rev.rating.toFixed(1)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-600 mt-2">{rev.comment}</p>
-                  </div>
-                ))}
+            {/* Reviews */}
+            <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-900">Reviews</h3>
+                <Button
+                  onClick={() => setReviewDialogOpen(true)}
+                  className="bg-orange-600 text-white px-3 py-2 rounded-lg text-sm font-black"
+                >
+                  Write a Review
+                </Button>
               </div>
+              {reviewsLoading ? (
+                <p className="text-sm text-slate-500">Loading reviews...</p>
+              ) : !reviews || reviews.length === 0 ? (
+                <p className="text-sm text-slate-500">No reviews yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {reviews.map((r: any) => (
+                    <div key={r.id} className="bg-white border rounded-xl p-3 shadow-sm">
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                        <span>{r.customerName || "Customer"}</span>
+                        <span className="text-orange-600">{"★".repeat(r.rating || 0)}</span>
+                      </div>
+                      <p className="text-sm text-slate-700 mt-1">{r.comment}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Seller Information */}
@@ -531,8 +583,63 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* Checkout Dialog (using Dialog above) */}
-    </div>
+      {/* Review Dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="bg-white rounded-2xl max-w-[420px] w-[95%] p-6 space-y-4">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900">Write a Review</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              Share your experience. Your review will appear once approved.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!productId) return;
+              addReviewMutation.mutate({ rating: reviewRating, comment: reviewComment });
+              setReviewDialogOpen(false);
+              setReviewComment("");
+              setReviewRating(5);
+            }}
+          >
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-800">Rating</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    className={`p-2 rounded-lg border ${
+                      reviewRating >= star ? "bg-orange-100 border-orange-300 text-orange-700" : "border-slate-200"
+                    }`}
+                    onClick={() => setReviewRating(star)}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-800">Comment</label>
+              <Textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="How was the product?"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-orange-600 text-white"
+              disabled={addReviewMutation.isLoading}
+            >
+              {addReviewMutation.isLoading ? "Submitting..." : "Submit Review"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
