@@ -8,6 +8,7 @@ type Product = { id: number; name: string; price: string; category: string; desc
 type Shop = { id: number; name: string; approved?: boolean; isVerified?: boolean; category?: string; contactNumber?: string; mobile?: string; phone?: string };
 type Banner = { id?: number; image: string; title?: string; link?: string };
 type Category = { id: number; name: string; imageUrl?: string | null };
+type Review = { id: number; productId: number; customerName: string; rating: number; comment: string; isApproved?: boolean };
 const brandOrange = "#f97316";
 
 export default function Admin() {
@@ -15,7 +16,7 @@ export default function Admin() {
   const [password, setPassword] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "sellers" | "products" | "news" | "banners" | "orders">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "sellers" | "products" | "news" | "banners" | "orders" | "reviews" | "categories">("overview");
 
   const [offers, setOffers] = useState<Offer[]>([]);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
@@ -24,6 +25,7 @@ export default function Admin() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [pendingReviews, setPendingReviews] = useState<Review[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [categoryFile, setCategoryFile] = useState<File | null>(null);
   const [editCategoryModal, setEditCategoryModal] = useState(false);
@@ -66,6 +68,7 @@ export default function Admin() {
         fetchBanners(),
         fetchCategories(),
         fetchOrders(),
+        fetchPendingReviews(),
       ]);
     } finally {
       setLoading(false);
@@ -134,6 +137,15 @@ export default function Admin() {
   }
 
   async function fetchCategories() {
+    try {
+      const res = await fetch(`/api/categories`);
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error("Error fetching categories:", e); }
+  }
+
   async function fetchOrders() {
     try {
       setOrdersLoading(true);
@@ -147,13 +159,37 @@ export default function Admin() {
       setOrdersLoading(false);
     }
   }
+
+  async function fetchPendingReviews() {
     try {
-      const res = await fetch(`/api/categories`);
+      const res = await fetch(`/api/reviews?pending=true`);
       if (res.ok) {
         const data = await res.json();
-        setCategories(Array.isArray(data) ? data : []);
+        setPendingReviews(Array.isArray(data) ? data : []);
       }
-    } catch (e) { console.error("Error fetching categories:", e); }
+    } catch (e) { console.error("Error fetching reviews:", e); }
+  }
+
+  async function handleApproveReview(id: number) {
+    try {
+      const res = await fetch(`/api/reviews/${id}/approve`, { method: "PATCH" });
+      if (!res.ok) throw new Error("Approve failed");
+      toast.success("Review approved");
+      fetchPendingReviews();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to approve");
+    }
+  }
+
+  async function handleDeleteReview(id: number) {
+    try {
+      const res = await fetch(`/api/reviews/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      toast.success("Review removed");
+      fetchPendingReviews();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to delete");
+    }
   }
 
   async function handleAddCategory() {
@@ -466,6 +502,7 @@ export default function Admin() {
     { label: "Pending Approvals", value: pendingProducts.length },
     { label: "Total News Items", value: offers.length },
     { label: "Orders", value: orders.length },
+    { label: "Pending Reviews", value: pendingReviews.length },
   ];
 
   const tabButton = (key: typeof activeTab, label: string) => (
@@ -504,6 +541,7 @@ export default function Admin() {
         {tabButton("overview", "Overview")}
         {tabButton("sellers", "Manage Sellers")}
         {tabButton("products", "Products")}
+        {tabButton("reviews", "Reviews")}
         {tabButton("news", "News / Offers")}
         {tabButton("orders", "Orders")}
         {tabButton("banners", "Manage Banners")}
@@ -770,6 +808,55 @@ export default function Admin() {
                 </tbody>
               </table>
             )}
+          </div>
+        )}
+
+        {activeTab === "reviews" && (
+          <div className="bg-white border rounded-xl shadow-sm">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-black">Pending Reviews</h2>
+              <span className="text-xs font-black uppercase text-orange-600">{pendingReviews.length} pending</span>
+            </div>
+            <table className="w-full text-left">
+              <thead className="bg-slate-50">
+                <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                  <th className="p-4">ID</th>
+                  <th className="p-4">Product</th>
+                  <th className="p-4">Customer</th>
+                  <th className="p-4">Rating</th>
+                  <th className="p-4">Comment</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {pendingReviews.length === 0 && (
+                  <tr><td colSpan={6} className="p-6 text-sm font-bold text-slate-500 text-center">No pending reviews.</td></tr>
+                )}
+                {pendingReviews.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 text-sm font-black text-slate-800">#{r.id}</td>
+                    <td className="p-4 text-sm text-slate-700">#{r.productId}</td>
+                    <td className="p-4 text-sm text-slate-700">{r.customerName}</td>
+                    <td className="p-4 text-sm text-orange-600">{"★".repeat(r.rating || 0)}</td>
+                    <td className="p-4 text-sm text-slate-700">{r.comment}</td>
+                    <td className="p-4 text-right space-x-2">
+                      <button
+                        onClick={() => handleApproveReview(r.id)}
+                        className="bg-orange-600 text-white px-3 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-orange-700 active:scale-95"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReview(r.id)}
+                        className="bg-red-50 text-red-600 px-3 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-red-100 active:scale-95"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 

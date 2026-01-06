@@ -4,7 +4,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { type Server } from "http";
 import { storage } from "./storage.js";
-import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, insertOrderSchema, products, users, shops, categories, orders } from "../shared/schema.js";
+import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, insertOrderSchema, insertReviewSchema, products, users, shops, categories, orders, reviews } from "../shared/schema.js";
 import { z } from "zod";
 import { db } from "./db.js";
 import { ilike, or, and, eq, sql } from "drizzle-orm";
@@ -453,6 +453,70 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (e: any) {
       console.error("Order update failed", e?.message);
       return res.status(500).json({ message: "Update failed" });
+    }
+  });
+
+  // --- REVIEWS ---
+  app.post("/api/reviews", async (req: Request, res: Response) => {
+    try {
+      const parsed = insertReviewSchema.parse({
+        ...req.body,
+        isApproved: false,
+      });
+      const [created] = await db.insert(reviews).values(parsed as any).returning();
+      return res.status(201).json(created);
+    } catch (e: any) {
+      console.error("Create review failed", e?.message);
+      return res.status(400).json({ message: e?.message || "Review create failed" });
+    }
+  });
+
+  app.get("/api/reviews/:productId", async (req: Request, res: Response) => {
+    try {
+      const productId = Number(req.params.productId);
+      if (!Number.isInteger(productId) || productId <= 0) return res.status(400).json({ message: "Invalid product id" });
+      const rows = await db.select().from(reviews).where(and(eq(reviews.productId, productId), eq(reviews.isApproved, true)));
+      return res.json(rows);
+    } catch (e: any) {
+      console.error("Fetch reviews failed", e?.message);
+      return res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  app.get("/api/reviews", async (req: Request, res: Response) => {
+    try {
+      const onlyPending = String(req.query.pending || "").toLowerCase() === "true";
+      const rows = onlyPending
+        ? await db.select().from(reviews).where(eq(reviews.isApproved, false))
+        : await db.select().from(reviews);
+      return res.json(rows);
+    } catch (e: any) {
+      console.error("Fetch all reviews failed", e?.message);
+      return res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  app.patch("/api/reviews/:id/approve", async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+      const [updated] = await db.update(reviews).set({ isApproved: true }).where(eq(reviews.id, id)).returning();
+      return res.json(updated);
+    } catch (e: any) {
+      console.error("Approve review failed", e?.message);
+      return res.status(500).json({ message: "Approve failed" });
+    }
+  });
+
+  app.delete("/api/reviews/:id", async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+      await db.delete(reviews).where(eq(reviews.id, id));
+      return res.json({ success: true });
+    } catch (e: any) {
+      console.error("Delete review failed", e?.message);
+      return res.status(500).json({ message: "Delete failed" });
     }
   });
 
