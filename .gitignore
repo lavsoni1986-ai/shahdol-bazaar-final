@@ -9,3 +9,9 @@ migrations/
 .local/
 scripts/*.js
 !scripts/build.ts
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

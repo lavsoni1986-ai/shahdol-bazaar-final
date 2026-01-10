@@ -2,6 +2,7 @@ import {
   users,
   shops,
   products,
+  productImages,
   offers,
   orders,
   banners,
@@ -12,6 +13,8 @@ import {
   type InsertShop,
   type Product,
   type InsertProduct,
+  type ProductImage,
+  type InsertProductImage,
   type Offer,
   type InsertOffer,
   type Order,
@@ -43,9 +46,17 @@ export interface IStorage {
   getAllProductsUnfiltered(): Promise<any[]>;
   getProduct(id: number): Promise<Product | undefined>;
   getProductWithSeller(id: number): Promise<any | undefined>;
+  getProductsByMerchant(merchantId: number): Promise<any[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, update: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
+  // Product Images
+  getProductImages(productId: number): Promise<ProductImage[]>;
+  createProductImage(image: InsertProductImage): Promise<ProductImage>;
+  deleteProductImage(id: number): Promise<void>;
+  deleteProductImagesByProduct(productId: number): Promise<void>;
+  // Admin
+  getPendingProducts(): Promise<any[]>;
   getOffers(): Promise<Offer[]>;
   getOffer(id: number): Promise<Offer | undefined>;
   createOffer(offer: InsertOffer): Promise<Offer>;
@@ -303,7 +314,78 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProduct(id: number): Promise<void> {
+    // Delete product images first (cascade will handle it, but explicit is better)
+    await db.delete(productImages).where(eq(productImages.productId, id));
     await db.delete(products).where(eq(products.id, id));
+  }
+
+  async getProductsByMerchant(merchantId: number): Promise<any[]> {
+    return await db
+      .select({
+        id: products.id,
+        shopId: products.shopId,
+        sellerId: products.sellerId,
+        name: products.name,
+        title: products.title,
+        price: products.price,
+        mrp: products.mrp,
+        imageUrl: products.imageUrl,
+        category: products.category,
+        description: products.description,
+        approved: products.approved,
+        status: products.status,
+        stock: products.stock,
+        createdAt: products.createdAt,
+      })
+      .from(products)
+      .where(eq(products.sellerId, merchantId))
+      .orderBy(products.createdAt);
+  }
+
+  // --- PRODUCT IMAGE METHODS ---
+  async getProductImages(productId: number): Promise<ProductImage[]> {
+    return await db.select().from(productImages).where(eq(productImages.productId, productId));
+  }
+
+  async createProductImage(image: InsertProductImage): Promise<ProductImage> {
+    const [productImage] = await db.insert(productImages).values(image).returning();
+    return productImage;
+  }
+
+  async deleteProductImage(id: number): Promise<void> {
+    await db.delete(productImages).where(eq(productImages.id, id));
+  }
+
+  async deleteProductImagesByProduct(productId: number): Promise<void> {
+    await db.delete(productImages).where(eq(productImages.productId, productId));
+  }
+
+  // --- ADMIN METHODS ---
+  async getPendingProducts(): Promise<any[]> {
+    return await db
+      .select({
+        id: products.id,
+        shopId: products.shopId,
+        sellerId: products.sellerId,
+        name: products.name,
+        title: products.title,
+        price: products.price,
+        mrp: products.mrp,
+        imageUrl: products.imageUrl,
+        category: products.category,
+        description: products.description,
+        approved: products.approved,
+        status: products.status,
+        stock: products.stock,
+        createdAt: products.createdAt,
+        shopName: shops.name,
+        merchantName: users.username,
+      })
+      .from(products)
+      .leftJoin(shops, eq(shops.id, products.shopId))
+      .leftJoin(users, eq(users.id, products.sellerId))
+      .where(eq(products.status, "pending"))
+      .orderBy(products.createdAt);
   }
 
   // --- OFFER METHODS (Fixed for Neon "Offer" table) ---

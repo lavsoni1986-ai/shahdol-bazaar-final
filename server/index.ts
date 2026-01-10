@@ -3,6 +3,9 @@ import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes.js";
 import { setupVite } from "./vite.js";
 import { serveStatic } from "./static.js";
@@ -31,6 +34,95 @@ app.use(cors({
 
 const httpServer = createServer(app);
 
+// ============================================
+// SECURITY MIDDLEWARE
+// ============================================
+
+// Helmet for security headers - Completely disable CSP for development
+const isDevelopment = process.env.NODE_ENV === "development" || !process.env.NODE_ENV;
+
+if (isDevelopment) {
+  // COMPLETELY DISABLE CSP in development to avoid blocking Cloudinary/Google Fonts
+  console.log("🔵 [HELMET] Development mode: CSP disabled");
+  app.use(helmet({
+    contentSecurityPolicy: false, // Completely disable CSP
+    crossOriginEmbedderPolicy: false,
+  }));
+} else {
+  // Stricter CSP for production
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'", 
+          "'unsafe-inline'", 
+          "'unsafe-eval'", 
+          "https://www.googletagmanager.com", 
+          "https://www.google-analytics.com", 
+          "https://widget.cloudinary.com", 
+          "https://upload-widget.cloudinary.com",
+          "https://*.cloudinary.com"
+        ],
+        styleSrc: [
+          "'self'", 
+          "'unsafe-inline'", 
+          "https://fonts.googleapis.com",
+          "https://*.cloudinary.com"
+        ],
+        fontSrc: [
+          "'self'", 
+          "https://fonts.gstatic.com", 
+          "data:",
+          "https://*.cloudinary.com"
+        ],
+        imgSrc: [
+          "'self'", 
+          "data:", 
+          "https:", 
+          "http:", 
+          "https://res.cloudinary.com", 
+          "https://*.cloudinary.com",
+          "blob:"
+        ],
+        connectSrc: [
+          "'self'", 
+          "https:", 
+          "http:", 
+          "https://www.google-analytics.com", 
+          "https://api.cloudinary.com", 
+          "https://*.cloudinary.com",
+          "wss:",
+          "ws:"
+        ],
+        frameSrc: [
+          "'self'", 
+          "https://widget.cloudinary.com", 
+          "https://upload-widget.cloudinary.com",
+          "https://*.cloudinary.com"
+        ],
+        workerSrc: ["'self'", "blob:", "https://*.cloudinary.com"],
+        childSrc: ["'self'", "blob:", "https://*.cloudinary.com"],
+      },
+    },
+    crossOriginEmbedderPolicy: false, // Disable for Vite compatibility
+  }));
+}
+
+// Cookie parser (must be before routes)
+app.use(cookieParser());
+
+// Import rate limiters
+import { apiLimiter } from "./auth/rateLimiter.js";
+
+// Apply rate limiting to API routes (except login/refresh, which have their own limiters)
+app.use('/api/', (req, res, next) => {
+  if (req.path === '/login' || req.path === '/auth/refresh' || req.path === '/register') {
+    return next(); // Skip general limiter for auth routes
+  }
+  return apiLimiter(req, res, next);
+});
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
@@ -38,18 +130,19 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.static(path.resolve(process.cwd(), "public")));
 app.use(express.static(path.resolve(process.cwd(), "client", "public")));
 
-// Lightweight, cookie-based session for Vercel (stateless between invocations)
-app.use(session({
-  secret: process.env.SESSION_SECRET || "shahdol-temp-secret",
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 1000 * 60 * 60 * 24, // 1 day
-  },
-}));
+  // Session middleware (optional, kept for backward compatibility)
+  // JWT tokens are now primary auth method
+  app.use(session({
+    secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || "shahdol-temp-secret-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
+    },
+  }));
 
 // Ensure uploads folder exists with open permissions
 const uploadsDir = path.resolve(process.cwd(), "public", "uploads");

@@ -294,8 +294,13 @@ function ProductCard({
                         <p className="text-sm font-bold text-orange-800">Scan & Pay (UPI)</p>
                         <img
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=lav@upi&pn=ShahdolBazaar&am=${product.price}&cu=INR`)}`}
-                          alt="UPI QR"
+                          alt="UPI QR Code"
                           className="w-40 h-40 rounded-lg border mx-auto"
+                          loading="lazy"
+                          onError={(e) => {
+                            // Fallback if QR service is down
+                            (e.target as HTMLImageElement).src = '/maskable_icon_x192.png';
+                          }}
                         />
                         <p className="text-xs text-slate-600 text-center">
                           Pay to: lav@upi • Amount: ₹{product.price}

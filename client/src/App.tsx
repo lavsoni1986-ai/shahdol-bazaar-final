@@ -18,6 +18,7 @@ import ShopDetail from "@/pages/shop-detail";
 import ProductDetail from "@/pages/product-detail";
 import Admin from "@/pages/admin";
 import PartnerDashboard from "@/pages/partner-dashboard";
+import PartnerProducts from "@/pages/partner-products";
 import SellerOnboarding from "@/pages/seller-onboarding";
 import AuthPage from "@/pages/auth";
 import NotFound from "@/pages/not-found";
@@ -29,7 +30,7 @@ interface User {
   id: number | string;
   username?: string;
   name?: string;
-  role: "customer" | "seller" | "admin";
+  role: "customer" | "seller" | "admin" | "SUPER_ADMIN" | "MERCHANT" | "CITY_ADMIN" | "CUSTOMER";
   isAdmin?: boolean;
 }
 
@@ -42,32 +43,37 @@ const useAuth = (): { isAuthenticated: boolean; user: User | null } => {
       return { isAuthenticated: false, user: null };
     }
     
-    // CLIENT-SIDE AUTH HOOK: Explicitly set isAdmin if username is 'admin'
-    const isAdminUser = userData.username === "admin" || userData.role === "admin" || userData.isAdmin === true;
+    // CLIENT-SIDE AUTH HOOK: Explicitly set isAdmin if username is 'admin' or role is SUPER_ADMIN
+    const isAdminUser = 
+      userData.username === "admin" || 
+      userData.role === "admin" || 
+      userData.role === "SUPER_ADMIN" ||
+      userData.isAdmin === true;
     
-    // If username is 'admin', explicitly set isAdmin to true
-    if (userData.username === "admin") {
+    // Normalize admin user data but don't write to localStorage on every render
+    // Only return the normalized data - localStorage updates should happen in auth.tsx
+    if (isAdminUser) {
       const adminUser = {
         ...userData,
-        role: "admin" as const,
+        role: "admin" as const, // Normalize to "admin" for backward compatibility
         isAdmin: true,
       };
-      // Update localStorage to ensure consistency
-      localStorage.setItem("user", JSON.stringify(adminUser));
-      console.log("✅ [useAuth] Admin user detected - setting isAdmin: true");
-      return {
-        isAuthenticated: true,
-        user: adminUser,
-      };
-    }
-    
-    // If isAdmin flag exists and is true, ensure role is admin
-    if (userData.isAdmin === true) {
-      const adminUser = {
-        ...userData,
-        role: "admin" as const,
-        isAdmin: true,
-      };
+      
+      // Only update localStorage if it's actually different (prevents infinite loops)
+      const currentUserStr = localStorage.getItem("user");
+      if (currentUserStr) {
+        try {
+          const currentUser = JSON.parse(currentUserStr);
+          if (currentUser.role !== "admin" || currentUser.isAdmin !== true) {
+            // Only update if actually needed
+            localStorage.setItem("user", JSON.stringify(adminUser));
+          }
+        } catch {
+          // If parsing fails, update it
+          localStorage.setItem("user", JSON.stringify(adminUser));
+        }
+      }
+      
       return {
         isAuthenticated: true,
         user: adminUser,
@@ -98,53 +104,80 @@ function ProtectedRoute({
   const returnUrl = window.location.pathname;
   const [location] = useLocation();
 
-  // IMMEDIATE BYPASS: Force admin page to load regardless of login state
-  if (window.location.pathname === '/admin') {
-    console.log("⚠️ [PROTECTED] IMMEDIATE BYPASS: Forcing admin page to load");
+  // Prevent redirect loops - don't redirect if already on /auth
+  if (location === "/auth") {
     return <Route {...rest} component={Component} />;
   }
 
   // REDIRECT FIX: Check if this is admin route
   const isAdminRoute = location === "/admin";
   
-  // Check for admin user - multiple checks
-  const isAdminUser = 
-    user?.username === "admin" || 
-    user?.role === "admin" || 
-    user?.isAdmin === true ||
-    (user as any)?.isAdmin === true;
-
-  console.log("🔵 [PROTECTED] Route check:", {
-    path: location,
-    isAdminRoute,
-    isAuthenticated,
-    username: user?.username,
-    role: user?.role,
-    isAdmin: user?.isAdmin,
-    isAdminUser,
-  });
-
-  // For admin route, allow access if user is admin (NOT checking for seller role)
+  // PROTECTED ROUTE BYPASS: For /admin route, check localStorage DIRECTLY as PRIORITY
+  // This ensures we always check the most up-to-date session data
   if (isAdminRoute) {
-    if (isAdminUser) {
-      console.log("✅ [PROTECTED] Admin user detected - allowing access to /admin");
-      return <Route {...rest} component={Component} />;
-    } else {
-      console.log("❌ [PROTECTED] Admin route but user is not admin - redirecting to auth");
-      return <Redirect to={`/auth?return=${encodeURIComponent(returnUrl)}`} />;
+    let storedUser: any = null;
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        storedUser = JSON.parse(userStr);
+      }
+    } catch (e) {
+      console.error("❌ [ProtectedRoute] Error parsing localStorage user:", e);
     }
+    
+    // PRIORITY CHECK: localStorage first (most reliable)
+    if (storedUser) {
+      const isAdminFromStorage = 
+        storedUser.username === "admin" ||
+        storedUser.role === "admin" ||
+        storedUser.role === "SUPER_ADMIN" ||
+        storedUser.isAdmin === true;
+      
+      if (isAdminFromStorage) {
+        console.log("✅ [ProtectedRoute] ADMIN DETECTED FROM LOCALSTORAGE - Allowing access to /admin");
+        console.log("🔵 [ProtectedRoute] Storage user data:", {
+          username: storedUser.username,
+          role: storedUser.role,
+          isAdmin: storedUser.isAdmin
+        });
+        return <Route {...rest} component={Component} />;
+      }
+    }
+    
+    // FALLBACK CHECK: useAuth hook (if localStorage check didn't pass)
+    const isAdminFromHook = 
+      user?.username === "admin" ||
+      user?.role === "admin" ||
+      user?.role === "SUPER_ADMIN" ||
+      user?.isAdmin === true ||
+      (user as any)?.isAdmin === true;
+    
+    if (isAdminFromHook) {
+      console.log("✅ [ProtectedRoute] ADMIN DETECTED FROM HOOK - Allowing access to /admin");
+      return <Route {...rest} component={Component} />;
+    }
+    
+    // DEBUG: Log why access was denied
+    console.log("❌ [ProtectedRoute] Admin access DENIED:", {
+      location,
+      storedUser: storedUser ? { username: storedUser.username, role: storedUser.role } : null,
+      hookUser: user ? { username: user.username, role: user.role, isAdmin: user.isAdmin } : null,
+      localStorageExists: !!localStorage.getItem("user")
+    });
+    
+    // Don't redirect if return URL is already /auth (prevents loops)
+    const redirectUrl = returnUrl === "/auth" ? "/auth" : `/auth?return=${encodeURIComponent(returnUrl)}`;
+    return <Redirect to={redirectUrl} />;
   }
 
   // For other protected routes, check authentication
-  return (
-    <Route {...rest}>
-      {isAuthenticated ? (
-        <Component />
-      ) : (
-        <Redirect to={`/auth?return=${encodeURIComponent(returnUrl)}`} />
-      )}
-    </Route>
-  );
+  if (isAuthenticated) {
+    return <Route {...rest} component={Component} />;
+  } else {
+    // Don't redirect if return URL is already /auth (prevents loops)
+    const redirectUrl = returnUrl === "/auth" ? "/auth" : `/auth?return=${encodeURIComponent(returnUrl)}`;
+    return <Redirect to={redirectUrl} />;
+  }
 }
 
 function ScrollToTop() {
@@ -185,6 +218,10 @@ function Router() {
         <ProtectedRoute
           path="/partner/dashboard"
           component={PartnerDashboard}
+        />
+        <ProtectedRoute
+          path="/partner/products"
+          component={PartnerProducts}
         />
 
         {/* 404 Page */}

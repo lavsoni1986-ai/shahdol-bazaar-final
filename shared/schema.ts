@@ -8,6 +8,7 @@ import {
   doublePrecision,
   json,
 } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -48,14 +49,25 @@ export const shops = pgTable("shops", {
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   shopId: integer("shop_id").notNull(),
-  sellerId: integer("seller_id").notNull(),
-  name: text("name").notNull(),
+  sellerId: integer("seller_id").notNull(), // merchant_id
+  name: text("name").notNull(), // title (keeping name for backward compatibility)
+  title: text("title"), // New field
   price: text("price").notNull(),
+  mrp: text("mrp"), // Maximum Retail Price
   imageUrl: text("image_url"),
   category: text("category").notNull(),
   description: text("description"),
   approved: boolean("approved").default(false).notNull(),
-  status: text("status").default("pending").notNull(),
+  status: text("status").default("pending").notNull(), // pending, approved, rejected
+  stock: integer("stock").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/* ===================== PRODUCT IMAGES ===================== */
+export const productImages = pgTable("product_images", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -133,9 +145,32 @@ export const insertShopSchema = createInsertSchema(shops).omit({
 export type InsertShop = z.infer<typeof insertShopSchema>;
 export type Shop = typeof shops.$inferSelect;
 
-export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
+export const insertProductSchema = createInsertSchema(products)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    name: z.string().min(1, "Product name is required").optional(),
+    title: z.string().min(1, "Product title is required").optional(),
+    price: z.string().refine((val) => {
+      const num = parseFloat(val);
+      return !isNaN(num) && num >= 0;
+    }, "Price must be a valid number >= 0"),
+    mrp: z.string().optional().refine((val) => {
+      if (!val || val === "") return true; // Optional
+      const num = parseFloat(val);
+      return !isNaN(num) && num >= 0;
+    }, "MRP must be a valid number >= 0"),
+    stock: z.number().int().min(0).default(0),
+    category: z.string().min(1, "Category is required"),
+    description: z.string().optional(),
+    imageUrl: z.string().url().optional().or(z.literal("")),
+    status: z.enum(["pending", "approved", "rejected"]).default("pending"),
+  });
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
+
+export const insertProductImageSchema = createInsertSchema(productImages).omit({ id: true, createdAt: true });
+export type InsertProductImage = z.infer<typeof insertProductImageSchema>;
+export type ProductImage = typeof productImages.$inferSelect;
 
 export const insertCategorySchema = createInsertSchema(categories)
   .omit({ id: true, createdAt: true })
@@ -177,5 +212,17 @@ export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, c
 });
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 export type Review = typeof reviews.$inferSelect;
+
+/* ===================== RELATIONS ===================== */
+export const productsRelations = relations(products, ({ many }) => ({
+  images: many(productImages),
+}));
+
+export const productImagesRelations = relations(productImages, ({ one }) => ({
+  product: one(products, {
+    fields: [productImages.productId],
+    references: [products.id],
+  }),
+}));
 
 
