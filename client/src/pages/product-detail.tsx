@@ -396,8 +396,13 @@ const defaultImage =
                         <p className="text-sm font-bold text-orange-800">Scan & Pay (UPI)</p>
                     <img
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=lav@upi&pn=ShahdolBazaar&am=${product.price}&cu=INR`)}`}
-                      alt="UPI QR"
+                      alt="UPI QR Code"
                       className="w-48 h-48 rounded-lg border mx-auto object-contain"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Fallback if QR service is down
+                        (e.target as HTMLImageElement).src = '/maskable_icon_x192.png';
+                      }}
                     />
                         <p className="text-xs text-slate-600 text-center">
                           Pay to: lav@upi • Amount: ₹{product.price}
@@ -439,7 +444,10 @@ const defaultImage =
                 }
                 const waNumber = shopNumber || (localStorage.getItem("waNumber") || "910000000000").replace(/\+/g, "");
                 const shopLine = sellerName ? `दुकान: ${sellerName}\n` : "";
-                const message = `नमस्ते! मुझे यह खरीदना है:\n${product.name}\nकीमत: ₹${product.price}\n${shopLine}लिंक: ${window.location.origin}/product/${product.id}`;
+                // Use dynamic public URL for sharing (works in dev and production)
+                const publicUrl = window.location.origin;
+                const productUrl = `${publicUrl}/product/${product.id}`;
+                const message = `नमस्ते! मुझे यह खरीदना है:\n${product.name}\nकीमत: ₹${product.price}\n${shopLine}लिंक: ${productUrl}`;
                 const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
                 window.open(url, "_blank");
               }}
@@ -466,7 +474,10 @@ const defaultImage =
                     }
                     const waNumber = shopNumber || (localStorage.getItem("waNumber") || "910000000000").replace(/\+/g, "");
                     const shopLine = sellerName ? `दुकान: ${sellerName}\n` : "";
-                    const message = `नमस्ते! मुझे यह खरीदना है:\n${product.name}\nकीमत: ₹${product.price}\n${shopLine}लिंक: ${window.location.origin}/product/${product.id}`;
+                    // Use dynamic public URL for sharing (works in dev and production)
+                const publicUrl = window.location.origin;
+                const productUrl = `${publicUrl}/product/${product.id}`;
+                const message = `नमस्ते! मुझे यह खरीदना है:\n${product.name}\nकीमत: ₹${product.price}\n${shopLine}लिंक: ${productUrl}`;
                     const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
                     window.open(url, "_blank");
                   }}

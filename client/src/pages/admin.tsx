@@ -93,29 +93,54 @@ export default function Admin() {
 
   async function fetchPendingProducts() {
     try {
-      const res = await fetch(`/api/products/all?status=pending`);
+      // Get access token from localStorage
+      const accessToken = localStorage.getItem("accessToken");
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+      
+      const res = await fetch(`/api/admin/products/pending`, { headers });
       if (res.ok) {
         const data = await res.json();
-        const list = Array.isArray(data) ? data : data.products || data.data || data.items || [];
-        const pending = list.filter((p: any) => (p?.status || "").toLowerCase() === "pending" || p?.approved === false);
-        setPendingProducts(pending);
+        // API returns { data: [...] } format
+        const list = Array.isArray(data) ? data : (data.data || data.products || data.items || []);
+        setPendingProducts(list);
+      } else {
+        const error = await res.json().catch(() => ({ message: "Failed to fetch pending products" }));
+        console.error("Error fetching pending products:", error);
       }
-    } catch (e) { console.error("Error fetching pending products:", e); }
+    } catch (e) { 
+      console.error("Error fetching pending products:", e);
+      toast.error("Failed to fetch pending products");
+    }
   }
 
   async function fetchLiveProducts() {
     try {
-      const res = await fetch(`/api/products/all?approved=true`);
+      // Get access token from localStorage
+      const accessToken = localStorage.getItem("accessToken");
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+      
+      // Use /api/products/all with approved filter for admin
+      const res = await fetch(`/api/products/all?approved=true`, { headers });
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : data.products || data.data || data.items || [];
+        // Filter out pending and deleted products
         const live = list.filter((p: any) => {
           const status = (p?.status || "").toLowerCase();
-          return status !== "pending" && status !== "deleted";
+          return status !== "pending" && status !== "deleted" && (p?.approved !== false);
         });
         setLiveProducts(live);
       }
-    } catch (e) { console.error("Error fetching live products:", e); }
+    } catch (e) { 
+      console.error("Error fetching live products:", e);
+      toast.error("Failed to fetch live products");
+    }
   }
 
   async function fetchShops() {
@@ -332,12 +357,31 @@ export default function Admin() {
 
   async function handleApprove(id: number) {
     try {
-      const res = await fetch(`/api/products/${id}/approve`, { method: "PATCH" });
-      if (!res.ok) throw new Error("Approve failed");
+      // Get access token from localStorage
+      const accessToken = localStorage.getItem("accessToken");
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+      
+      const res = await fetch(`/api/admin/products/${id}/approve`, { 
+        method: "PATCH",
+        headers 
+      });
+      
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: "Approve failed" }));
+        throw new Error(error.message || "Approve failed");
+      }
+      
       toast.success("Product approved!");
+      // Remove from pending list and refresh live products
       setPendingProducts((prev) => prev.filter(p => p.id !== id));
       fetchLiveProducts();
+      // Refresh pending list to ensure it's up to date
+      fetchPendingProducts();
     } catch (e: any) {
+      console.error("Approve error:", e);
       toast.error(e?.message || "Approve failed");
     }
   }

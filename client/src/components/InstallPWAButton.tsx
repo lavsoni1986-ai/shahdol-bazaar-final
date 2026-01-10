@@ -31,12 +31,12 @@ const InstallPWAButton: React.FC = () => {
       setDeferredPrompt(promptEvent);
       setShowInstallButton(true);
       
-      // Show banner after a short delay if not installed
-      setTimeout(() => {
-        if (!isInstalled) {
-          setShowBanner(true);
-        }
-      }, 3000);
+      // Show banner IMMEDIATELY (no delay) if not dismissed
+      if (!sessionStorage.getItem('installBannerDismissed')) {
+        setShowBanner(true);
+      }
+      
+      console.log('✅ [PWA] Install prompt available - showing immediately');
     };
 
     // Listen for app installed event
