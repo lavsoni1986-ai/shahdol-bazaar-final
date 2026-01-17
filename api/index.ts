@@ -6,6 +6,13 @@ import { createServer } from "http";
 console.log("🔵 [FN BOOT] Vercel function starting...");
 console.log("🔵 [FN BOOT] DATABASE_URL present:", !!process.env.DATABASE_URL);
 console.log("🔵 [FN BOOT] NODE_ENV:", process.env.NODE_ENV);
+try {
+  const dbUrl = process.env.DATABASE_URL || "";
+  const dbHost = dbUrl ? new URL(dbUrl).hostname : "";
+  console.log("🔵 [FN BOOT] DATABASE_URL host:", dbHost || "missing");
+} catch (err: any) {
+  console.error("❌ [FN BOOT] Failed to parse DATABASE_URL:", err?.message || err);
+}
 
 // Lightweight Express handler for Vercel Serverless Functions.
 const app = express();
@@ -21,9 +28,8 @@ app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 // Inline health to avoid hard dependency on routes module
 app.get("/api/health", async (_req, res) => {
   try {
-    const { db } = await import("../server/db.js");
-    const { sql } = await import("drizzle-orm");
-    await db.execute(sql`select 1`);
+    const { verifyDbConnection } = await import("../server/db.js");
+    await verifyDbConnection();
     return res.json({ status: "ok" });
   } catch (err: any) {
     console.error("❌ /api/health failed:", err?.message || err);
@@ -49,7 +55,8 @@ const loadRoutes = async () => {
   }
 };
 
-loadRoutes();
+// Ensure routes are registered before handling requests
+await loadRoutes();
 
 // Vercel Node functions expect a default export compatible with (req, res)
 export default app;

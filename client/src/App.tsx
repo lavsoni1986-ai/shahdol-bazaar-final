@@ -6,6 +6,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/sonner";
 import { Layout } from "@/components/layout";
 import { CartProvider } from "@/contexts/CartContext";
+import InstallPWAButton from "@/components/InstallPWAButton";
 
 // Pages
 import Home from "@/pages/home";
@@ -21,6 +22,7 @@ import SellerOnboarding from "@/pages/seller-onboarding";
 import AuthPage from "@/pages/auth";
 import NotFound from "@/pages/not-found";
 import Bus from "@/pages/bus";
+import CustomerDashboard from "@/pages/customer-dashboard";
 
 /* ---------- ✅ AUTH HOOK ---------- */
 interface User {
@@ -175,6 +177,7 @@ function Router() {
         <Route path="/product/:id" component={ProductDetail} />
         <Route path="/auth" component={AuthPage} />
         <Route path="/seller-onboarding" component={SellerOnboarding} />
+        <Route path="/customer-dashboard" component={CustomerDashboard} />
 
         {/* Protected Routes */}
         <ProtectedRoute path="/admin" component={Admin} />
@@ -204,6 +207,7 @@ export default function App() {
       <CartProvider>
         <Toaster position="top-center" richColors />
         <Router />
+        <InstallPWAButton />
       </CartProvider>
     </QueryClientProvider>
   );

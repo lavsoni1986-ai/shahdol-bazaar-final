@@ -1,21 +1,22 @@
+// Version 1.0.1 - Final Build Fix
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Pencil, Trash2 } from "lucide-react";
-
-const API_BASE = ""; // use relative paths via proxy
+import { Pencil, Trash2, Menu, Check, X } from "lucide-react";
 
 type Offer = { id?: number; content: string; isActive: boolean };
 type Product = { id: number; name: string; price: string; category: string; description?: string; approved?: boolean; status?: string; imageUrl?: string; images?: string[] };
 type Shop = { id: number; name: string; approved?: boolean; isVerified?: boolean; category?: string; contactNumber?: string; mobile?: string; phone?: string };
 type Banner = { id?: number; image: string; title?: string; link?: string };
-type Category = { id: number; name: string };
+type Category = { id: number; name: string; imageUrl?: string | null };
+type Review = { id: number; productId: number; customerName: string; rating: number; comment: string; isApproved?: boolean };
+const brandOrange = "#f97316";
 
 export default function Admin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "sellers" | "products" | "news" | "banners">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "sellers" | "products" | "news" | "banners" | "orders" | "reviews" | "categories">("overview");
 
   const [offers, setOffers] = useState<Offer[]>([]);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
@@ -23,8 +24,13 @@ export default function Admin() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [pendingReviews, setPendingReviews] = useState<Review[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [categoryFile, setCategoryFile] = useState<File | null>(null);
+  const [editCategoryModal, setEditCategoryModal] = useState(false);
+  const [editCategory, setEditCategory] = useState<Category | null>(null);
+  const [editCategoryFile, setEditCategoryFile] = useState<File | null>(null);
 
   const [showOfferCreate, setShowOfferCreate] = useState(false);
   const [newOffer, setNewOffer] = useState<string>("");
@@ -32,25 +38,42 @@ export default function Admin() {
   const [bannerTitle, setBannerTitle] = useState("");
   const [bannerLink, setBannerLink] = useState("/");
   const [bannerLoading, setBannerLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   const [editProductModal, setEditProductModal] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [editProductFile, setEditProductFile] = useState<File | null>(null);
   const [editBannerModal, setEditBannerModal] = useState(false);
   const [editBanner, setEditBanner] = useState<Banner | null>(null);
+  const [editBannerFile, setEditBannerFile] = useState<File | null>(null);
   const [editOfferModal, setEditOfferModal] = useState(false);
   const [editOffer, setEditOffer] = useState<Offer | null>(null);
 
   useEffect(() => {
     if (loggedIn) {
-      fetchOffers();
-      fetchPendingProducts();
-      fetchLiveProducts();
-      fetchShops();
-      fetchBanners();
-      fetchCategories();
+      loadAllData();
     }
   }, [loggedIn]);
+
+  async function loadAllData() {
+    try {
+      setLoading(true);
+      await Promise.all([
+        fetchOffers(),
+        fetchPendingProducts(),
+        fetchLiveProducts(),
+        fetchShops(),
+        fetchBanners(),
+        fetchCategories(),
+        fetchOrders(),
+        fetchPendingReviews(),
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function handleLogin() {
     if (username === "admin" && password === "shahdol123") {
@@ -123,6 +146,52 @@ export default function Admin() {
     } catch (e) { console.error("Error fetching categories:", e); }
   }
 
+  async function fetchOrders() {
+    try {
+      setOrdersLoading(true);
+      const res = await fetch(`/api/orders?includeAll=true`);
+      if (!res.ok) throw new Error("Failed to fetch orders");
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Error fetching orders:", e);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }
+
+  async function fetchPendingReviews() {
+    try {
+      const res = await fetch(`/api/reviews?pending=true`);
+      if (res.ok) {
+        const data = await res.json();
+        setPendingReviews(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error("Error fetching reviews:", e); }
+  }
+
+  async function handleApproveReview(id: number) {
+    try {
+      const res = await fetch(`/api/reviews/${id}/approve`, { method: "PATCH" });
+      if (!res.ok) throw new Error("Approve failed");
+      toast.success("Review approved");
+      fetchPendingReviews();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to approve");
+    }
+  }
+
+  async function handleDeleteReview(id: number) {
+    try {
+      const res = await fetch(`/api/reviews/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      toast.success("Review removed");
+      fetchPendingReviews();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to delete");
+    }
+  }
+
   async function handleAddCategory() {
     if (!newCategory.trim()) return;
     try {
@@ -161,6 +230,38 @@ export default function Admin() {
       toast.success("Category deleted");
     } catch (e: any) {
       toast.error(e?.message || "Delete failed");
+    }
+  }
+
+  async function handleUpdateCategory() {
+    if (!editCategory?.id) return;
+    if (!editCategory.name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    try {
+      const form = new FormData();
+      form.append("name", editCategory.name);
+      if (editCategoryFile) {
+        form.append("image", editCategoryFile);
+      } else if (editCategory.imageUrl) {
+        form.append("imageUrl", editCategory.imageUrl);
+      }
+
+      const res = await fetch(`/api/categories/${editCategory.id}`, {
+        method: "PATCH",
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Update failed");
+
+      toast.success("Category updated");
+      setEditCategoryModal(false);
+      setEditCategory(null);
+      setEditCategoryFile(null);
+      fetchCategories();
+    } catch (e: any) {
+      toast.error(e?.message || "Update failed");
     }
   }
 
@@ -293,27 +394,38 @@ export default function Admin() {
     }
   }
 
+  const renderStatsSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-pulse">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="bg-white border rounded-xl p-4 shadow-sm">
+          <div className="h-3 w-24 bg-slate-200 rounded mb-3" />
+          <div className="h-6 w-16 bg-slate-200 rounded" />
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderTableSkeleton = (cols: number) => (
+    <div className="bg-white border rounded-xl shadow-sm">
+      <div className="h-12 bg-slate-100 border-b" />
+      <div className="divide-y">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-12 bg-slate-50 animate-pulse" />
+        ))}
+      </div>
+    </div>
+  );
+
   async function handleCreateBanner() {
     if (!bannerFile) return toast.error("Select an image");
     try {
       setBannerLoading(true);
       const form = new FormData();
-      form.append("images", bannerFile);
-      const upload = await fetch(`/api/upload`, {
-        method: "POST",
-        headers: { "x-user-id": "1" },
-        body: form,
-      });
-      const uploadJson = await upload.json();
-      if (!upload.ok) throw new Error(uploadJson?.message || "Upload failed");
-      const image = Array.isArray(uploadJson?.urls) ? uploadJson.urls[0] : uploadJson?.urls || "";
-      if (!image) throw new Error("No image returned");
+      form.append("image", bannerFile);
+      form.append("title", String(bannerTitle || ""));
+      form.append("link", String(bannerLink || "/"));
 
-      const res = await fetch(`/api/banners`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: String(image), title: String(bannerTitle || ""), link: String(bannerLink || "/") }),
-      });
+      const res = await fetch(`/api/banners`, { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || "Create failed");
       toast.success("Banner saved!");
@@ -345,18 +457,21 @@ export default function Admin() {
   async function handleUpdateBanner() {
     if (!editBanner?.id) return;
     try {
-      const res = await fetch(`/api/banners/${editBanner.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: editBanner.title,
-          link: editBanner.link,
-          image: editBanner.image,
-        }),
-      });
-      if (!res.ok) throw new Error("Update failed");
+      const form = new FormData();
+      form.append("title", String(editBanner.title || ""));
+      form.append("link", String(editBanner.link || "/"));
+      if (editBannerFile) {
+        form.append("image", editBannerFile);
+      } else if (editBanner.image) {
+        form.append("image", editBanner.image);
+      }
+
+      const res = await fetch(`/api/banners/${editBanner.id}`, { method: "PATCH", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Update failed");
       toast.success("Banner updated");
       setEditBannerModal(false);
+      setEditBannerFile(null);
       fetchBanners();
     } catch (e: any) {
       toast.error(e?.message || "Update failed");
@@ -386,12 +501,15 @@ export default function Admin() {
     { label: "Live Products", value: liveProducts.length },
     { label: "Pending Approvals", value: pendingProducts.length },
     { label: "Total News Items", value: offers.length },
+    { label: "Orders", value: orders.length },
+    { label: "Pending Reviews", value: pendingReviews.length },
   ];
 
   const tabButton = (key: typeof activeTab, label: string) => (
     <button
-      className={`w-full text-left px-4 py-3 rounded-lg font-bold ${activeTab === key ? "bg-orange-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
-      onClick={() => setActiveTab(key)}
+      className={`w-full text-left px-4 py-3 rounded-lg font-bold ${activeTab === key ? "text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
+      style={activeTab === key ? { backgroundColor: brandOrange } : {}}
+      onClick={() => { setActiveTab(key); setSidebarOpen(false); }}
     >
       {label}
     </button>
@@ -400,17 +518,38 @@ export default function Admin() {
   return (
     <>
     <div className="min-h-screen bg-slate-50 flex">
-      <aside className="w-56 bg-white border-r p-4 space-y-2">
+      {/* Mobile header */}
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-white border-b flex items-center justify-between px-4 py-3 shadow-sm">
+        <div className="font-black text-slate-800 flex items-center gap-2">
+          <span style={{ color: brandOrange }}>Admin</span> Panel
+        </div>
+        <button
+          aria-label="Toggle menu"
+          onClick={() => setSidebarOpen((s) => !s)}
+          className="p-2 rounded-lg border text-slate-700"
+        >
+          <Menu size={18} />
+        </button>
+      </div>
+
+      <aside
+        className={`w-56 bg-white border-r p-4 space-y-2 md:static fixed top-14 left-0 h-[calc(100%-56px)] md:h-auto z-20 transition-transform duration-200 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
         <p className="text-xs font-black uppercase text-slate-500 mb-2">Admin Panel</p>
         {tabButton("overview", "Overview")}
         {tabButton("sellers", "Manage Sellers")}
         {tabButton("products", "Products")}
+        {tabButton("reviews", "Reviews")}
         {tabButton("news", "News / Offers")}
+        {tabButton("orders", "Orders")}
         {tabButton("banners", "Manage Banners")}
         {tabButton("categories", "Manage Categories")}
       </aside>
 
-      <main className="flex-1 p-8 space-y-6">
+      <main className="flex-1 p-8 pt-16 md:pt-8 space-y-6">
+        {loading ? renderStatsSkeleton() : (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {stats.map((s) => (
             <div key={s.label} className="bg-white border rounded-xl p-4 shadow-sm">
@@ -419,6 +558,7 @@ export default function Admin() {
             </div>
           ))}
         </div>
+        )}
 
         {activeTab === "overview" && (
           <div className="bg-white border rounded-xl p-6 shadow-sm">
@@ -441,6 +581,7 @@ export default function Admin() {
               <h2 className="text-lg font-black">Manage Sellers</h2>
               <span className="text-xs font-black uppercase text-orange-600">{shops.length} total</span>
             </div>
+            {loading ? renderTableSkeleton(5) : (
             <table className="w-full text-left">
               <thead className="bg-slate-50">
                 <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
@@ -453,7 +594,7 @@ export default function Admin() {
               </thead>
               <tbody className="divide-y">
                 {shops.length === 0 && (
-                  <tr><td colSpan={4} className="p-4 text-sm text-slate-500">No sellers found.</td></tr>
+                  <tr><td colSpan={5} className="p-4 text-sm text-slate-500">No sellers found.</td></tr>
                 )}
                 {shops.map((s) => (
                   <tr key={s.id}>
@@ -468,16 +609,18 @@ export default function Admin() {
                 ))}
               </tbody>
             </table>
+            )}
           </div>
         )}
 
         {activeTab === "products" && (
           <>
-          <div className="bg-white border rounded-xl shadow-sm">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div className="bg-white border rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between px-2 py-2 border-b">
               <h2 className="text-lg font-black">Pending Products</h2>
               <span className="text-xs font-black uppercase text-orange-600">{pendingProducts.length} awaiting approval</span>
             </div>
+            {loading ? renderTableSkeleton(5) : (
             <table className="w-full text-left">
               <thead className="bg-slate-50">
                 <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
@@ -508,7 +651,7 @@ export default function Admin() {
                       <td className="p-4 text-right flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleApprove(p.id)}
-                          className="bg-green-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-green-700 active:scale-95"
+                          className="bg-orange-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-orange-700 active:scale-95"
                         >
                           Approve
                         </button>
@@ -532,13 +675,14 @@ export default function Admin() {
                 })}
               </tbody>
             </table>
+            )}
           </div>
-
-          <div className="bg-white border rounded-xl shadow-sm">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div className="bg-white border rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between px-2 py-2 border-b">
               <h2 className="text-lg font-black">Live Products</h2>
               <span className="text-xs font-black uppercase text-orange-600">{liveProducts.length} live</span>
             </div>
+            {loading ? renderTableSkeleton(5) : (
             <table className="w-full text-left">
               <thead className="bg-slate-50">
                 <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
@@ -593,8 +737,171 @@ export default function Admin() {
                 })}
               </tbody>
             </table>
+            )}
           </div>
           </>
+        )}
+
+        {activeTab === "orders" && (
+          <div className="bg-white border rounded-xl shadow-sm">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-black">Orders</h2>
+              <span className="text-xs font-black uppercase text-orange-600">{orders.length} total</span>
+            </div>
+            {ordersLoading ? renderTableSkeleton(5) : (
+              <table className="w-full text-left">
+                <thead className="bg-slate-50">
+                  <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                    <th className="p-4">ID</th>
+                    <th className="p-4">Customer</th>
+                    <th className="p-4">Phone</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Total</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {orders.length === 0 && (
+                    <tr><td colSpan={6} className="p-6 text-sm font-bold text-slate-500 text-center">No orders yet.</td></tr>
+                  )}
+                  {orders.map((o) => {
+                    const status = (o.status || "").toLowerCase();
+                    const isPendingPay = status === "payment_pending_verification";
+                    const isPaid = status === "paid" || status === "confirmed" || status === "completed";
+                    const isPending = status === "pending";
+                    const canCancel = isPending || isPendingPay;
+
+                    return (
+                      <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-4 text-sm font-black text-slate-800">#{o.id}</td>
+                        <td className="p-4 text-sm text-slate-700">{o.customerName || "—"}</td>
+                        <td className="p-4 text-sm text-slate-700">{o.customerPhone || "—"}</td>
+                        <td className="p-4 text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs font-black ${
+                            isPaid ? "bg-green-50 text-green-700" :
+                            isPendingPay ? "bg-orange-50 text-orange-700" : 
+                            "bg-slate-100 text-slate-700"
+                          }`}>
+                            {isPaid ? "Completed" : (o.status || "pending")}
+                          </span>
+                        </td>
+                        <td className="p-4 text-sm font-bold text-slate-900">₹{o.totalPrice}</td>
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {isPaid ? (
+                              <div className="flex items-center gap-1 text-green-600">
+                                <Check size={16} />
+                                <span className="text-xs font-bold">Completed</span>
+                              </div>
+                            ) : (
+                              <>
+                                {(isPendingPay || isPending) && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch(`/api/orders/${o.id}`, {
+                                          method: "PATCH",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ status: "paid" }),
+                                        });
+                                        if (!res.ok) throw new Error("Update failed");
+                                        toast.success("Order Updated! Payment confirmed successfully ✅");
+                                        await fetchOrders(); // Auto-refresh
+                                      } catch (err: any) {
+                                        toast.error(err?.message || "Failed to confirm payment");
+                                      }
+                                    }}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full text-xs font-black uppercase shadow active:scale-95 transition-all"
+                                    title="Confirm Payment"
+                                  >
+                                    <Check size={12} className="mr-1" />
+                                    Confirm
+                                  </button>
+                                )}
+                                {canCancel && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm(`Are you sure you want to cancel order #${o.id}?`)) return;
+                                      try {
+                                        const res = await fetch(`/api/orders/${o.id}`, {
+                                          method: "PATCH",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ status: "cancelled" }),
+                                        });
+                                        if (!res.ok) throw new Error("Cancel failed");
+                                        toast.success("Order Updated! Order cancelled successfully");
+                                        await fetchOrders(); // Auto-refresh
+                                      } catch (err: any) {
+                                        toast.error(err?.message || "Failed to cancel order");
+                                      }
+                                    }}
+                                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs font-black uppercase shadow active:scale-95 transition-all"
+                                    title="Cancel Order"
+                                  >
+                                    <X size={12} className="mr-1" />
+                                    Cancel
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {activeTab === "reviews" && (
+          <div className="bg-white border rounded-xl shadow-sm">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-black">Pending Reviews</h2>
+              <span className="text-xs font-black uppercase text-orange-600">{pendingReviews.length} pending</span>
+            </div>
+            <table className="w-full text-left">
+              <thead className="bg-slate-50">
+                <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                  <th className="p-4">ID</th>
+                  <th className="p-4">Product</th>
+                  <th className="p-4">Customer</th>
+                  <th className="p-4">Rating</th>
+                  <th className="p-4">Comment</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {pendingReviews.length === 0 && (
+                  <tr><td colSpan={6} className="p-6 text-sm font-bold text-slate-500 text-center">No pending reviews.</td></tr>
+                )}
+                {pendingReviews.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 text-sm font-black text-slate-800">#{r.id}</td>
+                    <td className="p-4 text-sm text-slate-700">#{r.productId}</td>
+                    <td className="p-4 text-sm text-slate-700">{r.customerName}</td>
+                    <td className="p-4 text-sm text-orange-600">{"★".repeat(r.rating || 0)}</td>
+                    <td className="p-4 text-sm text-slate-700">{r.comment}</td>
+                    <td className="p-4 text-right space-x-2">
+                      <button
+                        onClick={() => handleApproveReview(r.id)}
+                        className="bg-orange-600 text-white px-3 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-orange-700 active:scale-95"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReview(r.id)}
+                        className="bg-red-50 text-red-600 px-3 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-red-100 active:scale-95"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {activeTab === "news" && (
@@ -652,7 +959,7 @@ export default function Admin() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+            </table>
             </div>
           </div>
         )}
@@ -715,7 +1022,7 @@ export default function Admin() {
                       <td className="p-4 text-sm text-slate-600">{b.link}</td>
                       <td className="p-4 text-right flex items-center justify-end gap-2">
                         <button
-                          onClick={() => { setEditBanner(b); setEditBannerModal(true); }}
+                          onClick={() => { setEditBanner(b); setEditBannerFile(null); setEditBannerModal(true); }}
                           className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
                           title="Edit"
                         >
@@ -763,14 +1070,34 @@ export default function Admin() {
                   {categories.length === 0 && <p className="text-sm text-slate-500">No categories yet.</p>}
                   {categories.map((c) => (
                     <div key={c.id} className="flex items-center justify-between border rounded-lg px-4 py-3">
-                      <span className="font-bold text-slate-800">{c.name}</span>
-                      <button
-                        onClick={() => handleDeleteCategory(c.id)}
-                        className="p-2 rounded-full border text-red-500 hover:border-red-200"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-3">
+                        {c.imageUrl ? (
+                          <img
+                            src={c.imageUrl.startsWith("http") ? c.imageUrl : `/uploads/${c.imageUrl.split("/").pop() || ""}`}
+                            alt={c.name}
+                            className="w-10 h-10 rounded object-cover border"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded border bg-slate-50" />
+                        )}
+                        <span className="font-bold text-slate-800">{c.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setEditCategory(c); setEditCategoryFile(null); setEditCategoryModal(true); }}
+                          className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(c.id)}
+                          className="p-2 rounded-full border text-red-500 hover:border-red-200"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -837,6 +1164,44 @@ export default function Admin() {
           </div>
         </div>
       )}
+      {editCategoryModal && editCategory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
+            <h3 className="text-lg font-black">Edit Category</h3>
+            <input
+              className="w-full p-3 rounded-lg border border-slate-200"
+              placeholder="Name"
+              value={editCategory.name}
+              onChange={(e) => setEditCategory({ ...editCategory, name: e.target.value })}
+            />
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500 uppercase">Category Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setEditCategoryFile(e.target.files?.[0] || null)}
+              />
+              <div className="flex items-center gap-2">
+                {editCategoryFile ? (
+                  <span className="text-xs font-bold text-green-600">New file selected</span>
+                ) : editCategory.imageUrl ? (
+                  <img
+                    src={editCategory.imageUrl.startsWith("http") ? editCategory.imageUrl : `/uploads/${editCategory.imageUrl.split("/").pop() || ""}`}
+                    alt={editCategory.name}
+                    className="w-16 h-16 rounded object-cover border"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-500">No image</span>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => { setEditCategoryModal(false); setEditCategoryFile(null); }} className="px-4 py-2 rounded-lg border">Cancel</button>
+              <button onClick={handleUpdateCategory} className="px-4 py-2 rounded-lg bg-orange-600 text-white font-black">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
       {editBannerModal && editBanner && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
@@ -853,14 +1218,29 @@ export default function Admin() {
               value={editBanner.link || ""}
               onChange={(e) => setEditBanner({ ...editBanner, link: e.target.value })}
             />
-            <input
-              className="w-full p-3 rounded-lg border border-slate-200"
-              placeholder="Image URL"
-              value={editBanner.image}
-              onChange={(e) => setEditBanner({ ...editBanner, image: e.target.value })}
-            />
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-500 uppercase">Banner Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setEditBannerFile(e.target.files?.[0] || null)}
+              />
+              <div className="flex items-center gap-2">
+                {editBannerFile ? (
+                  <span className="text-xs font-bold text-green-600">New file selected</span>
+                ) : editBanner.image ? (
+                  <img
+                    src={editBanner.image.startsWith("http") ? editBanner.image : `/uploads/${editBanner.image.split("/").pop() || ""}`}
+                    alt="Current"
+                    className="w-16 h-16 rounded object-cover border"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-500">No image</span>
+                )}
+              </div>
+            </div>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setEditBannerModal(false)} className="px-4 py-2 rounded-lg border">Cancel</button>
+              <button onClick={() => { setEditBannerModal(false); setEditBannerFile(null); }} className="px-4 py-2 rounded-lg border">Cancel</button>
               <button onClick={handleUpdateBanner} className="px-4 py-2 rounded-lg bg-orange-600 text-white font-black">Save</button>
             </div>
           </div>

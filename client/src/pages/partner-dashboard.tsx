@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Store, Package, Home, CheckCircle2, Plus, LogOut, Loader2, Pencil } from "lucide-react";
+import { Store, Package, Home, CheckCircle2, Plus, LogOut, Loader2, Pencil, Menu } from "lucide-react";
 
 export default function PartnerDashboard() {
   const [, setLocation] = useLocation();
@@ -40,9 +40,12 @@ export default function PartnerDashboard() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [selectedEditCategory, setSelectedEditCategory] = useState("General");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const orange = "#f97316";
 
   const fetchData = async () => {
     try {
+      setLoading(true);
       const res = await fetch("/api/shops/mine", { headers });
       const data = await res.json();
       setShop(data);
@@ -56,8 +59,11 @@ export default function PartnerDashboard() {
       if (data?.id) {
         const pRes = await fetch(`/api/products?shopId=${data.id}&includeAll=true`, { headers });
         if (pRes.ok) setProducts(await pRes.json());
+      } else {
+        setProducts([]);
       }
     } catch (e) { console.error("Fetch failed"); }
+    finally { setLoading(false); }
   };
 
   const fetchCategories = async () => {
@@ -284,26 +290,68 @@ export default function PartnerDashboard() {
       });
   };
 
+  const renderSkeleton = () => (
+    <div className="space-y-4 animate-pulse">
+      <div className="h-20 bg-slate-200 rounded-xl" />
+      <div className="h-40 bg-slate-200 rounded-xl" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="h-24 bg-slate-200 rounded-xl" />
+        <div className="h-24 bg-slate-200 rounded-xl" />
+        <div className="h-24 bg-slate-200 rounded-xl" />
+      </div>
+    </div>
+  );
+
   if (!profileReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-orange-600 h-10 w-10" />
+        <Loader2 className="animate-spin" style={{ color: orange, height: 40, width: 40 }} />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      <aside className="w-64 bg-white border-r p-6 space-y-4">
-        <div className="font-bold flex items-center gap-2 mb-6"><Store className="text-orange-600"/> Partner Panel</div>
-        <Button variant={activeTab === 'dashboard' ? "default" : "ghost"} className="w-full justify-start gap-2" onClick={() => setActiveTab('dashboard')}><Home size={18}/> Dashboard</Button>
-        <Button variant={activeTab === 'products' ? "default" : "ghost"} className="w-full justify-start gap-2" onClick={() => setActiveTab('products')}><Package size={18}/> Products</Button>
+      {/* Mobile header */}
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-white border-b flex items-center justify-between px-4 py-3 shadow-sm">
+        <div className="font-black text-slate-800 flex items-center gap-2">
+          <Store color={orange} size={20} /> Partner Panel
+        </div>
+        <button
+          aria-label="Toggle menu"
+          onClick={() => setSidebarOpen((s) => !s)}
+          className="p-2 rounded-lg border text-slate-700"
+        >
+          <Menu size={18} />
+        </button>
+      </div>
+
+      <aside
+        className={`w-64 bg-white border-r p-6 space-y-4 md:static fixed top-14 left-0 h-[calc(100%-56px)] md:h-auto z-20 transition-transform duration-200 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
+        <div className="hidden md:flex font-bold items-center gap-2 mb-6"><Store style={{ color: orange }} /> Partner Panel</div>
+        <Button
+          variant={activeTab === 'dashboard' ? "default" : "ghost"}
+          className="w-full justify-start gap-2"
+          style={activeTab === 'dashboard' ? { backgroundColor: orange, color: "#fff" } : {}}
+          onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+        ><Home size={18}/> Dashboard</Button>
+        <Button
+          variant={activeTab === 'products' ? "default" : "ghost"}
+          className="w-full justify-start gap-2"
+          style={activeTab === 'products' ? { backgroundColor: orange, color: "#fff" } : {}}
+          onClick={() => { setActiveTab('products'); setSidebarOpen(false); }}
+        ><Package size={18}/> Products</Button>
         <Button variant="ghost" className="w-full justify-start gap-2 text-red-600" onClick={handleLogout}><LogOut size={18}/> Logout</Button>
       </aside>
 
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-8 pt-16 md:pt-8">
         {activeTab === 'dashboard' && (
           <div className="space-y-4">
+            {loading ? renderSkeleton() : (
+            <>
             <div className="bg-white p-6 rounded-xl border shadow-sm">
               <p className="text-sm text-slate-500 font-medium">Shop Status</p>
               <div className="text-xl font-bold flex items-center gap-2 mt-2 text-green-600">
@@ -316,7 +364,7 @@ export default function PartnerDashboard() {
                   <p className="text-sm font-bold text-orange-700">You are currently a customer.</p>
                   <p className="text-xs text-orange-600">Click below to become a seller and add products.</p>
                 </div>
-                <Button className="bg-orange-600" onClick={becomeSeller} disabled={loading}>
+                <Button className="bg-orange-600" style={{ backgroundColor: orange }} onClick={becomeSeller} disabled={loading}>
                   {loading ? <Loader2 className="animate-spin" /> : "Become a Seller"}
                 </Button>
               </div>
@@ -354,7 +402,7 @@ export default function PartnerDashboard() {
                 }}
               />
               <div className="flex justify-end">
-                <Button className="bg-orange-600" onClick={saveProfile} disabled={loading}>
+                <Button className="bg-orange-600" style={{ backgroundColor: orange }} onClick={saveProfile} disabled={loading}>
                   {loading ? <Loader2 className="animate-spin" /> : "Save Profile"}
                 </Button>
               </div>
@@ -377,6 +425,8 @@ export default function PartnerDashboard() {
                 </p>
               </div>
             </div>
+            </>
+            )}
           </div>
         )}
 
@@ -386,7 +436,7 @@ export default function PartnerDashboard() {
               <h2 className="text-2xl font-bold">Aapke Products</h2>
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-green-600"><Plus size={18} className="mr-2"/> Naya Item</Button>
+                  <Button className="bg-orange-600" style={{ backgroundColor: orange }}><Plus size={18} className="mr-2"/> Naya Item</Button>
                 </DialogTrigger>
                 <DialogContent className="bg-white">
                   <DialogHeader>
@@ -433,37 +483,57 @@ export default function PartnerDashboard() {
             </div>
             <p className="text-xs font-bold text-orange-700">New items need Admin approval before they appear on the site.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {products.map(p => (
-                <div
-                  key={p.id}
-                  className="bg-white p-4 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition"
-                  onClick={() => openEdit(p)}
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-40 bg-slate-200 rounded-xl" />
+                ))}
+              </div>
+            ) : products.length === 0 ? (
+              <div className="bg-white border rounded-xl p-8 text-center space-y-3 shadow-sm">
+                <p className="text-lg font-bold text-slate-800">No products yet</p>
+                <p className="text-sm text-slate-600">Add your first item to start selling.</p>
+                <Button
+                  className="bg-orange-600"
+                  style={{ backgroundColor: orange }}
+                  onClick={() => setIsDialogOpen(true)}
                 >
-                  {(
-                    (Array.isArray(p.images) && p.images[0]) ||
-                    p.imageUrl
-                  ) && (
-                    <img
-                      src={(Array.isArray(p.images) && p.images[0]) || p.imageUrl}
-                      alt={p.name}
-                      className="w-full h-32 object-cover rounded mb-2"
-                    />
-                  )}
-                  <p className="font-bold">{p.name}</p>
-                  <p className="text-green-600">₹{p.price}</p>
-                  <div className="mt-2 flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => { e.stopPropagation(); openEdit(p); }}
-                    >
-                      <Pencil size={14} className="mr-1" /> Edit
-                    </Button>
+                  Start Adding Products
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {products.map(p => (
+                  <div
+                    key={p.id}
+                    className="bg-white p-4 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition"
+                    onClick={() => openEdit(p)}
+                  >
+                    {(
+                      (Array.isArray(p.images) && p.images[0]) ||
+                      p.imageUrl
+                    ) && (
+                      <img
+                        src={(Array.isArray(p.images) && p.images[0]) || p.imageUrl}
+                        alt={p.name}
+                        className="w-full h-32 object-cover rounded mb-2"
+                      />
+                    )}
+                    <p className="font-bold">{p.name}</p>
+                    <p className="text-green-600">₹{p.price}</p>
+                    <div className="mt-2 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); openEdit(p); }}
+                      >
+                        <Pencil size={14} className="mr-1" /> Edit
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             <Dialog
               open={isEditDialogOpen}

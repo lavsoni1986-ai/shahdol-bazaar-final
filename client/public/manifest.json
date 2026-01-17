@@ -1,10 +1,12 @@
 {
-  "name": "ShahdolBazaar",
+  "name": "Shahdol Bazaar",
   "short_name": "ShahdolBazaar",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#f97316",
+  "scope": "/",
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "/maskable_icon_x192.png",

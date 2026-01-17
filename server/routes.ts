@@ -1,15 +1,37 @@
 import express, { type Express, type Request, type Response } from "express";
-import fs from "fs";
-import path from "path";
-import multer, { type StorageEngine } from "multer";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { type Server } from "http";
 import { storage } from "./storage.js";
-import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, products, users, shops, categories } from "../shared/schema.js";
+import { insertShopSchema, insertProductSchema, insertOfferSchema, insertCategorySchema, insertOrderSchema, insertReviewSchema, products, users, shops, categories, orders, reviews } from "../shared/schema.js";
 import { z } from "zod";
 import { db } from "./db.js";
 import { ilike, or, and, eq, sql } from "drizzle-orm";
+import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+
+const hashPassword = (password: string): string => {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+};
+
+const verifyPassword = (password: string, stored: string): boolean => {
+  if (!stored) return false;
+  const parts = stored.split(":");
+  if (parts.length !== 2) {
+    // legacy plaintext support
+    return stored === password;
+  }
+  const [salt, storedHash] = parts;
+  const hash = scryptSync(password, salt, 64);
+  const hashBuf = Buffer.from(storedHash, "hex");
+  if (hashBuf.length !== hash.length) return false;
+  return timingSafeEqual(hash, hashBuf);
+};
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  const setNoStore = (res: Response) => res.setHeader("Cache-Control", "no-store, max-age=0");
   // --- 0. DEV UTILITY: CLEAN DATABASE (products, shops, users) ---
   // Placed first so it is always registered.
   const cleanupHandler = async (_req: Request, res: Response) => {
@@ -20,7 +42,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       await db.delete(users);
       await db.insert(users).values({
         username: "admin",
-        password: "shahdol123",
+        password: hashPassword("shahdol123"),
         role: "admin",
         isAdmin: true,
         shopName: null as any,
@@ -47,17 +69,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.status(500).json({ status: "error", message: "DB unavailable" });
     }
   });
-  const uploadDir = path.resolve(process.cwd(), "public", "uploads");
-  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
-  app.use("/uploads", express.static(uploadDir));
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
 
-  const uploadStorage: StorageEngine = multer.diskStorage({
-    destination: (_req: Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) =>
-      cb(null, uploadDir),
-    filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
-      const filename = `${Date.now()}-${file.originalname}`;
-      cb(null, filename.replace(/\s+/g, "_"));
-    },
+  const uploadStorage = new CloudinaryStorage({
+    cloudinary,
+    params: async () => ({
+      folder: process.env.CLOUDINARY_UPLOAD_FOLDER || "shahdol-bazaar",
+      resource_type: "image",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    }),
   });
 
   const upload = multer({
@@ -93,15 +117,46 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 0b. FETCH LOGGED-IN OWNER SHOP (used by Partner Dashboard) ---
   // --- 1. LOGIN ---
   app.post("/api/login", async (req, res) => {
-    const { username, password } = req.body;
-    const user = await storage.getUserByUsername(username);
-    if (!user || user.password !== password) return res.status(401).json({ message: "Invalid" });
-    res.json(user);
+    try {
+      const { username, password } = req.body;
+      const user = await storage.getUserByUsername(username);
+      if (!user || !verifyPassword(password, user.password as any)) return res.status(401).json({ message: "Invalid" });
+      res.json(user);
+    } catch (e: any) {
+      console.error("Login failed", e?.message);
+      return res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // --- 1b. REGISTER ---
+  app.post("/api/register", async (req, res) => {
+    try {
+      const { username, password, role = "customer" } = req.body || {};
+      const existing = await storage.getUserByUsername(username);
+      if (existing) return res.status(400).json({ message: "User already exists" });
+
+      const hashed = hashPassword(password);
+      const created = await storage.createUser({
+        username,
+        password: hashed,
+        role,
+        isAdmin: role === "admin",
+        shopName: null,
+        shopAddress: null,
+        mapsLink: null,
+      } as any);
+
+      return res.status(201).json(created);
+    } catch (e: any) {
+      console.error("Register failed", e?.message);
+      return res.status(400).json({ message: "Register failed" });
+    }
   });
 
   // --- 2. FETCH ALL PRODUCTS (FOR HOME & ADMIN) ---
   app.get("/api/products", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const shopId = Number(req.query?.shopId);
       const search = typeof req.query?.search === "string" ? req.query.search : null;
       const includeAll = String(req.query?.includeAll || "").toLowerCase() === "true";
@@ -155,6 +210,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2c. FETCH ALL SHOPS (ADMIN SELLER LIST) ---
   app.get("/api/shops", async (_req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const shops = await storage.getShops();
       console.log("Sending shops count:", shops.length);
       return res.json({ data: shops });
@@ -167,6 +223,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2a. ADMIN/ALL PRODUCTS WITH FILTERS (supports approved/status) ---
   app.get("/api/products/all", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const search = typeof req.query?.search === "string" ? req.query.search : null;
       const approvedParam = req.query?.approved;
       const statusParam = typeof req.query?.status === "string" ? req.query.status : null;
@@ -195,6 +252,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 2b. FETCH SINGLE PRODUCT ---
   app.get("/api/products/:id", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) {
         return res.status(400).json({ message: "Invalid product id" });
@@ -243,7 +301,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const files = (req as any).files as Express.Multer.File[] | undefined;
       if (!files || files.length === 0) return res.status(400).json({ message: "No files" });
-      const urls = files.map((f) => `/uploads/${f.filename}`);
+      const urls = files.map((f) => (f as any)?.path || (f as any)?.secure_url || f.filename);
       return res.status(201).json({ urls });
     } catch (e) {
       return res.status(500).json({ message: "Upload failed" });
@@ -256,16 +314,52 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(banners);
   });
 
-  app.post("/api/banners", async (req, res) => {
-    const created = await storage.createBanner(req.body);
-    res.status(201).json(created);
+  app.post("/api/banners", upload.single("image"), async (req, res) => {
+    try {
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const image = file
+        ? (file as any)?.path || (file as any)?.secure_url || ""
+        : typeof req.body?.image === "string"
+          ? req.body.image
+          : "";
+      if (!image) return res.status(400).json({ message: "Image required" });
+
+      const payload = {
+        image,
+        title: typeof req.body?.title === "string" ? req.body.title : "",
+        link: typeof req.body?.link === "string" ? req.body.link : "/",
+      };
+
+      const created = await storage.createBanner(payload);
+      res.status(201).json(created);
+    } catch (e: any) {
+      console.error("Create banner failed", e?.message);
+      return res.status(400).json({ message: "Create failed" });
+    }
   });
 
-  app.patch("/api/banners/:id", async (req, res) => {
+  app.patch("/api/banners/:id", upload.single("image"), async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
-      const updated = await storage.updateBanner(id, req.body);
+
+      const existing = (await storage.getBanners()).find((b) => b.id === id);
+      if (!existing) return res.status(404).json({ message: "Banner not found" });
+
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const image = file
+        ? (file as any)?.path || (file as any)?.secure_url || existing.image
+        : typeof req.body?.image === "string" && req.body.image
+          ? req.body.image
+          : existing.image;
+
+      const payload = {
+        title: typeof req.body?.title === "string" ? req.body.title : existing.title,
+        link: typeof req.body?.link === "string" ? req.body.link : existing.link,
+        image,
+      };
+
+      const updated = await storage.updateBanner(id, payload);
       return res.json(updated);
     } catch (e: any) {
       console.error("Update banner failed", e?.message);
@@ -292,6 +386,138 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.delete("/api/offers/:id", async (req, res) => {
     await storage.deleteOffer(Number(req.params.id));
     res.json({ success: true });
+  });
+
+  // --- 6b. ORDERS ---
+  app.post("/api/orders", async (req: Request, res: Response) => {
+    try {
+      const parsed = insertOrderSchema.parse({
+        productId: Number(req.body?.productId),
+        shopId: Number(req.body?.shopId) || 1,
+        customerName: String(req.body?.customerName || "Customer"),
+        customerPhone: String(req.body?.customerPhone || "0000000000"),
+        customerAddress: String(req.body?.customerAddress || "Shahdol"),
+        quantity: Number(req.body?.quantity) || 1,
+        totalPrice: String(req.body?.totalPrice || "0"),
+        status: req.body?.status || "pending",
+      });
+      const created = await storage.createOrder(parsed);
+
+      // --- WhatsApp notification (placeholder) ---
+      const whatsappNumber = process.env.WHATSAPP_ALERT_NUMBER || "YOUR_WHATSAPP_NUMBER";
+      const message = `Naya Order! Customer: ${parsed.customerName}, Amount: ₹${parsed.totalPrice}, Status: ${parsed.status}`;
+      // Replace this with real provider call; keeping safe log for now
+      try {
+        await fetch(process.env.WHATSAPP_WEBHOOK_URL || "", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: whatsappNumber, message }),
+        });
+      } catch (notifyErr) {
+        console.log("WhatsApp notify (placeholder):", { to: whatsappNumber, message });
+      }
+
+      return res.status(201).json(created);
+    } catch (e: any) {
+      console.error("Order create failed", e?.message);
+      return res.status(400).json({ message: e?.message || "Order create failed" });
+    }
+  });
+
+  app.get("/api/orders", async (req: Request, res: Response) => {
+    try {
+      const includeAll = String(req.query?.includeAll || "").toLowerCase() === "true";
+      const phone = typeof req.query?.phone === "string" ? req.query.phone.trim() : "";
+      if (!includeAll && !phone) {
+        return res.status(400).json({ message: "Phone required" });
+      }
+      let rows = await db.select().from(orders);
+      if (!includeAll) {
+        rows = rows.filter((o: any) => (o.customerPhone || "").trim() === phone);
+      }
+      return res.json(rows);
+    } catch (e: any) {
+      console.error("Orders fetch failed", e?.message);
+      return res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  app.patch("/api/orders/:id", async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+      const nextStatus = typeof req.body?.status === "string" ? req.body.status : null;
+      if (!nextStatus) return res.status(400).json({ message: "Status required" });
+      const [updated] = await db.update(orders).set({ status: nextStatus }).where(eq(orders.id, id)).returning();
+      return res.json(updated);
+    } catch (e: any) {
+      console.error("Order update failed", e?.message);
+      return res.status(500).json({ message: "Update failed" });
+    }
+  });
+
+  // --- REVIEWS ---
+  app.post("/api/reviews", async (req: Request, res: Response) => {
+    try {
+      const parsed = insertReviewSchema.parse({
+        ...req.body,
+        isApproved: false,
+      });
+      const [created] = await db.insert(reviews).values(parsed as any).returning();
+      return res.status(201).json(created);
+    } catch (e: any) {
+      console.error("Create review failed", e?.message);
+      return res.status(400).json({ message: e?.message || "Review create failed" });
+    }
+  });
+
+  app.get("/api/reviews/:productId", async (req: Request, res: Response) => {
+    try {
+      const productId = Number(req.params.productId);
+      if (!Number.isInteger(productId) || productId <= 0) return res.status(400).json({ message: "Invalid product id" });
+      const rows = await db.select().from(reviews).where(and(eq(reviews.productId, productId), eq(reviews.isApproved, true)));
+      return res.json(rows);
+    } catch (e: any) {
+      console.error("Fetch reviews failed", e?.message);
+      return res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  app.get("/api/reviews", async (req: Request, res: Response) => {
+    try {
+      const onlyPending = String(req.query.pending || "").toLowerCase() === "true";
+      const rows = onlyPending
+        ? await db.select().from(reviews).where(eq(reviews.isApproved, false))
+        : await db.select().from(reviews);
+      return res.json(rows);
+    } catch (e: any) {
+      console.error("Fetch all reviews failed", e?.message);
+      return res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  app.patch("/api/reviews/:id/approve", async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+      const [updated] = await db.update(reviews).set({ isApproved: true }).where(eq(reviews.id, id)).returning();
+      return res.json(updated);
+    } catch (e: any) {
+      console.error("Approve review failed", e?.message);
+      return res.status(500).json({ message: "Approve failed" });
+    }
+  });
+
+  app.delete("/api/reviews/:id", async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+      await db.delete(reviews).where(eq(reviews.id, id));
+      return res.json({ success: true });
+    } catch (e: any) {
+      console.error("Delete review failed", e?.message);
+      return res.status(500).json({ message: "Delete failed" });
+    }
   });
 
   // --- 7. PARTNER SHOP ROUTES ---
@@ -376,7 +602,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!existing) return res.status(404).json({ message: "Product not found" });
 
       const file = (req as any).file as Express.Multer.File | undefined;
-      const uploadedUrl = file ? `/uploads/${file.filename}` : undefined;
+      const uploadedUrl = file ? (file as any)?.path || (file as any)?.secure_url : undefined;
       const imageUrl = uploadedUrl ?? req.body?.imageUrl ?? existing.imageUrl ?? "";
 
       const payload = {
@@ -449,37 +675,71 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- 10. CATEGORIES ---
   app.get("/api/categories", async (_req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const data = await storage.getCategories();
       return res.json(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Categories fetch failed", e);
-      return res.status(500).json({ message: "Failed to fetch categories" });
+      return res.status(500).json({
+        message: "Failed to fetch categories",
+        error: e?.message || e,
+      });
     }
   });
 
   app.post("/api/categories", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const parsed = insertCategorySchema.parse({
         name: (req.body?.name || "").trim(),
-        imageUrl: req.body?.imageUrl || undefined,
+        imageUrl: typeof req.body?.imageUrl === "string" ? req.body.imageUrl.trim() : undefined,
       });
       const created = await storage.createCategory(parsed);
       return res.status(201).json(created);
     } catch (e: any) {
-      console.error("Create category failed", e?.message);
-      return res.status(400).json({ message: e?.message || "Invalid category" });
+      console.error("Create category failed", e);
+      return res.status(400).json({ message: e?.message || "Invalid category", error: e });
+    }
+  });
+
+  app.patch("/api/categories/:id", upload.single("image"), async (req: Request, res: Response) => {
+    try {
+      setNoStore(res);
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+
+      const existing = (await storage.getCategories()).find((c) => c.id === id);
+      if (!existing) return res.status(404).json({ message: "Category not found" });
+
+      const file = (req as any).file as Express.Multer.File | undefined;
+      const incomingName = typeof req.body?.name === "string" ? req.body.name.trim() : existing.name;
+      const incomingImageUrl =
+        file
+          ? (file as any)?.path || (file as any)?.secure_url || null
+          : typeof req.body?.imageUrl === "string" && req.body.imageUrl.trim()
+            ? req.body.imageUrl.trim()
+            : existing.imageUrl ?? null;
+
+      if (!incomingName) return res.status(400).json({ message: "Name required" });
+
+      const updated = await storage.updateCategory(id, { name: incomingName, imageUrl: incomingImageUrl ?? null });
+      return res.json(updated);
+    } catch (e: any) {
+      console.error("Update category failed", e?.message);
+      return res.status(400).json({ message: e?.message || "Update failed" });
     }
   });
 
   app.delete("/api/categories/:id", async (req: Request, res: Response) => {
     try {
+      setNoStore(res);
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
       await storage.deleteCategory(id);
       return res.json({ success: true });
     } catch (e: any) {
-      console.error("Delete category failed", e?.message);
-      return res.status(400).json({ message: "Delete failed" });
+      console.error("Delete category failed", e);
+      return res.status(400).json({ message: "Delete failed", error: e?.message || e });
     }
   });
 

@@ -7,8 +7,8 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// ✅ HARDCODED API URL for production fix
-const BASE_URL = "https://shahdol-bazaar-v2.onrender.com/api";
+const ENV_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+const BASE_URL = ENV_BASE || "";
 
 export async function apiRequest(
   method: string,

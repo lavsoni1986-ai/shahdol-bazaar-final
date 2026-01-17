@@ -123,6 +123,8 @@ function ProductCard({
   const [showOrderDialog, setShowOrderDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customerData, setCustomerData] = useState({ name: "", phone: "", address: "" });
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
+  const [upiStatus, setUpiStatus] = useState("");
 
   const tags = ["Bestseller", "Limited Offer", ""];
   const randomTag = tags[Math.floor(Math.random() * tags.length)];
@@ -154,14 +156,21 @@ function ProductCard({
           customerAddress: customerData.address,
           quantity: 1,
           totalPrice: product.price,
-          status: "pending",
+          status: paymentMethod === "upi" ? "payment_pending_verification" : "pending",
+          paymentMethod,
         }),
       });
 
       if (res.ok) {
-        toast.success("Order Placed Successfully! 📦");
+        toast.success(
+          paymentMethod === "upi"
+            ? "Payment verification in progress. Your order will be confirmed shortly."
+            : "Order Placed Successfully! 📦"
+        );
         setShowOrderDialog(false);
         setCustomerData({ name: "", phone: "", address: "" });
+        setPaymentMethod("cod");
+        setUpiStatus("");
       } else {
         throw new Error("Failed to place order");
       }
@@ -268,6 +277,42 @@ function ProductCard({
                   <Input required placeholder="Full Name" value={customerData.name} onChange={(e) => setCustomerData({...customerData, name: e.target.value})} />
                   <Input required type="tel" maxLength={10} placeholder="Mobile Number" value={customerData.phone} onChange={(e) => setCustomerData({...customerData, phone: e.target.value})} />
                   <Input required placeholder="Full Address" value={customerData.address} onChange={(e) => setCustomerData({...customerData, address: e.target.value})} />
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-slate-800">Payment Method</p>
+                    <div className="flex gap-3">
+                      <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} />
+                        Cash on Delivery
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <input type="radio" checked={paymentMethod === "upi"} onChange={() => setPaymentMethod("upi")} />
+                        Pay via UPI QR
+                      </label>
+                    </div>
+                    {paymentMethod === "upi" && (
+                      <div className="rounded-xl border bg-orange-50 border-orange-200 p-3 space-y-3">
+                        <p className="text-sm font-bold text-orange-800">Scan & Pay (UPI)</p>
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=lav@upi&pn=ShahdolBazaar&am=${product.price}&cu=INR`)}`}
+                          alt="UPI QR"
+                          className="w-40 h-40 rounded-lg border mx-auto"
+                        />
+                        <p className="text-xs text-slate-600 text-center">
+                          Pay to: lav@upi • Amount: ₹{product.price}
+                        </p>
+                        <Button
+                          type="button"
+                          className="w-full bg-orange-600"
+                          onClick={() => setUpiStatus("Payment verification in progress. Your order will be confirmed shortly.")}
+                        >
+                          I have paid
+                        </Button>
+                        {upiStatus && (
+                          <div className="text-xs font-bold text-orange-700 text-center">{upiStatus}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <Button type="submit" className="w-full bg-orange-600 h-12 text-lg font-bold" disabled={isSubmitting}>
                     {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "Confirm Order"}
                   </Button>
@@ -549,9 +594,9 @@ export default function Home() {
                     } ${isActive ? "" : "hover:scale-105"}`}
                   >
                     {imageSrc ? (
-                      <img src={imageSrc} alt={cat.name} className="h-full w-full object-cover" />
+                      <img src={imageSrc} alt={`${cat.name} - Shahdol Bazaar | Shahdol Bazar | Shahdol Bajaar`} className="h-full w-full object-cover" />
                     ) : visual.img ? (
-                      <img src={visual.img} alt={cat.name} className="h-full w-full object-cover" />
+                      <img src={visual.img} alt={`${cat.name} - Shahdol Bazaar | Shahdol Bazar | Shahdol Bajaar`} className="h-full w-full object-cover" />
                     ) : (
                       <div className="h-full w-full bg-slate-50 flex items-center justify-center text-[#e4488f]">
                         <IconComp size={24} />
@@ -597,7 +642,7 @@ export default function Home() {
                           <div className="w-full h-full cursor-pointer">
                             <img
                               src={slide.image}
-                              alt={slide.title}
+                              alt={`${slide.title} - Shahdol Bazaar | Shahdol Bazar | Shahdol Bajaar`}
                               className="w-full h-full object-cover hover:opacity-90 transition-opacity"
                             />
                             <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent pointer-events-none" />
@@ -617,6 +662,7 @@ export default function Home() {
                                     productsSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
                                   }
                                 }}
+                                aria-label={`${slide.cta} - Shahdol Bazaar | Shahdol Bazar | Shahdol Bajaar`}
                               >
                                 {slide.cta}
                               </Button>
@@ -627,6 +673,7 @@ export default function Home() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                   }}
+                                  aria-label={`${slide.cta} - Shahdol Bazaar | Shahdol Bazar | Shahdol Bajaar`}
                                 >
                                   {slide.cta}
                                 </Button>
