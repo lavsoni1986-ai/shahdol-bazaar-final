@@ -4,6 +4,8 @@ import { Star, Megaphone } from "lucide-react";
 type Offer = {
   id: number;
   content: string;
+  type?: string;
+  isActive?: boolean;
 };
 
 export default function NewsTicker() {
@@ -11,16 +13,28 @@ export default function NewsTicker() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // ✅ FIXED: Fetching from local path instead of external Render URL
+    // ✅ Fetch Global News only (type: GLOBAL_NEWS)
     fetch('/api/offers')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
       .then(data => {
-        // API array return karti hai, use state mein set karein
-        setOffers(Array.isArray(data) ? data : []);
+        // UI Safety: Ensure data is an array before filtering
+        // Handle null, undefined, or non-array responses
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          setOffers([]);
+          setLoading(false);
+          return;
+        }
+        // Filter for GLOBAL_NEWS type only
+        const globalNews = data.filter((o: Offer) => o.type === 'GLOBAL_NEWS' && o.isActive);
+        setOffers(globalNews);
         setLoading(false);
       })
       .catch(err => {
         console.error("Ticker fetch error:", err);
+        setOffers([]);
         setLoading(false);
       });
   }, []);
@@ -34,7 +48,7 @@ export default function NewsTicker() {
         {/* News Label */}
         <div className="flex-shrink-0 flex items-center gap-2 bg-black text-yellow-400 px-3 py-1 rounded-md text-xs font-bold uppercase mr-6 z-10 shadow-md">
           <Megaphone size={14} className="animate-bounce" />
-          Market News
+          🌍 Shahdol Updates
         </div>
         
         {/* Scrolling Container */}

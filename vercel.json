@@ -10,6 +10,10 @@
       "destination": "/api/index"
     },
     {
+      "source": "/schools",
+      "destination": "/index.html"
+    },
+    {
       "source": "/admin(.*)",
       "destination": "/index.html"
     },
@@ -66,5 +70,13 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
+  "regions": ["iad1", "sfo1", "hnd1", "syd1", "fra1", "lhr1"],
+  "crons": []
 }

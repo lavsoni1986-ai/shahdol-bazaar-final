@@ -17,8 +17,8 @@ export function getPublicUrl(): string {
   // Fallback for SSR/Node environments
   // Check environment variables
   const envUrl = 
-    process.env.VITE_PUBLIC_URL || 
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null ||
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+    process.env.VITE_PUBLIC_URL ||
     process.env.NEXT_PUBLIC_URL ||
     process.env.PUBLIC_URL;
   

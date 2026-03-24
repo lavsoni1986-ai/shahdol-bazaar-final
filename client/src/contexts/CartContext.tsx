@@ -1,12 +1,16 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from "react";
+import { toast } from "sonner";
+import { normalizeSellerId } from "../../../shared/seller-utils";
 
 export interface CartItem {
   id: string | number;
+  productId: number;
   name: string;
   price: string;
   quantity: number;
   imageUrl?: string;
   shopId: number;
+  vendorId?: number; // Optional vendorId as alternative to shopId
   shopName?: string;
   shopPhone?: string;
 }
@@ -46,7 +50,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items]);
 
-  const addToCart = (item: Omit<CartItem, "quantity">) => {
+  const addToCart = useCallback((item: Omit<CartItem, "quantity">) => {
+    // Normalize seller ID to prevent NaN issues
+    const normalizedShopId = normalizeSellerId({ shopId: item.shopId, vendorId: item.vendorId });
+    
     setItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       if (existing) {
@@ -56,15 +63,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
         );
       }
       // Add new item with quantity 1
-      return [...prev, { ...item, quantity: 1 }];
+      const newItem = { ...item, shopId: normalizedShopId ?? item.shopId, quantity: 1 };
+      toast.success(`"${item.name}" added to cart`);
+      return [...prev, newItem];
     });
-  };
+  }, []);
 
-  const removeFromCart = (id: string | number) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
-  };
+  const removeFromCart = useCallback((id: string | number) => {
+    // Find the item to show its name in toast
+    const item = items.find(i => i.id === id);
+    const itemName = item?.name || 'Item';
+    
+    setItems((prev) => {
+      const filtered = prev.filter((item) => item.id !== id);
+      if (filtered.length < prev.length) {
+        // Item was removed
+        toast.info(`"${itemName}" removed from cart`);
+      }
+      return filtered;
+    });
+  }, [items]);
 
-  const updateQuantity = (id: string | number, quantity: number) => {
+  const updateQuantity = useCallback((id: string | number, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(id);
       return;
@@ -72,35 +92,38 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, quantity } : item))
     );
-  };
+  }, [removeFromCart]);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setItems([]);
-  };
+  }, []);
 
-  const getTotalItems = () => {
+  const getTotalItems = useCallback(() => {
     return items.reduce((sum, item) => sum + item.quantity, 0);
-  };
+  }, [items]);
 
-  const getTotalPrice = () => {
+  const getTotalPrice = useCallback(() => {
     return items.reduce((sum, item) => {
       const price = parseFloat(item.price) || 0;
       return sum + price * item.quantity;
     }, 0);
-  };
+  }, [items]);
+
+  const value = useMemo(
+    () => ({
+      items,
+      addToCart,
+      removeFromCart,
+      updateQuantity,
+      clearCart,
+      getTotalItems,
+      getTotalPrice,
+    }),
+    [items, addToCart, removeFromCart, updateQuantity, clearCart, getTotalItems, getTotalPrice]
+  );
 
   return (
-    <CartContext.Provider
-      value={{
-        items,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        clearCart,
-        getTotalItems,
-        getTotalPrice,
-      }}
-    >
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );

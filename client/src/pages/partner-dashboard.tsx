@@ -1,599 +1,379 @@
-import React, { useState, useEffect } from "react";
+// ============================================
+// SHAHDOL BAZAAR - PARTNER OS V1.0 (WIRED)
+// 100% CONNECTED TO BACKEND APIs
+// ============================================
+import React, { useEffect, useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import { useLocation } from "wouter";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Store, Package, Home, CheckCircle2, Plus, LogOut, Loader2, Pencil, Menu } from "lucide-react";
+import { toast } from "sonner";
+import { 
+  Store, Package, ShoppingBag, Settings, 
+  Plus, TrendingUp, Clock, Menu, X, LogOut, Trash2, XCircle
+} from "lucide-react";
 
 export default function PartnerDashboard() {
+  const { isAuthenticated, user, logout, loading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const [user] = useState(() => JSON.parse(localStorage.getItem("user") || "{}"));
-  const headers = { "Content-Type": "application/json", "x-user-id": user.id?.toString() || "1" };
-
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products'>('dashboard');
-  const [shop, setShop] = useState<any>(null);
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [eName, setEName] = useState("");
-  const [ePrice, setEPrice] = useState("");
-  const [eDescription, setEDescription] = useState("");
-  const [editFiles, setEditFiles] = useState<File[]>([]);
-  const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
-  const [shopName, setShopName] = useState("");
-  const [shopAddress, setShopAddress] = useState("");
-  const [mapsLink, setMapsLink] = useState("");
-  const [contactNumber, setContactNumber] = useState("");
-  const [profileReady, setProfileReady] = useState(false);
-
-  // Form States
-  const [pName, setPName] = useState("");
-  const [pPrice, setPPrice] = useState("");
-  const [pDescription, setPDescription] = useState("");
-  const [pCategory, setPCategory] = useState("General");
-  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [files, setFiles] = useState<File[]>([]);
-  const [selectedEditCategory, setSelectedEditCategory] = useState("General");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "orders" | "settings">("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const orange = "#f97316";
 
-  const fetchData = async () => {
+  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newProduct, setNewProduct] = useState({ name: "", price: "", category: "", description: "", imageUrl: "" });
+  const [uploading, setUploading] = useState(false);
+  const [storeSettings, setStoreSettings] = useState({ shopName: "", address: "", phone: "" });
+
+  const loadVendorData = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/shops/mine", { headers });
-      const data = await res.json();
-      setShop(data);
-      if (data) {
-        setShopName(data?.name || "");
-        setShopAddress(data?.address || "");
-        setMapsLink(data?.mapsLink || "");
-        setContactNumber(data?.contactNumber || data?.mobile || "");
-        setPDescription((prev) => prev); // no-op just keeping state
-      }
-      if (data?.id) {
-        const pRes = await fetch(`/api/products?shopId=${data.id}&includeAll=true`, { headers });
-        if (pRes.ok) setProducts(await pRes.json());
-      } else {
-        setProducts([]);
-      }
-    } catch (e) { console.error("Fetch failed"); }
-    finally { setLoading(false); }
-  };
+      const [prodRes, ordRes] = await Promise.all([
+        fetch('/api/vendor/products'),
+        fetch('/api/vendor/orders')
+      ]);
+      
+      const pData = await prodRes.json();
+      const oData = await ordRes.json();
 
-  const fetchCategories = async () => {
-    try {
-      const res = await fetch("/api/categories");
-      const data = await res.json();
-      if (Array.isArray(data)) setCategories(data);
-    } catch (e) {
-      console.error("Category fetch failed");
+      if (Array.isArray(pData)) setProducts(pData);
+      if (Array.isArray(oData)) setOrders(oData);
+    } catch (err) {
+      toast.error("Failed to sync with Command Center");
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); fetchCategories(); }, [activeTab]);
-
-  const handleFileSelect = async (fileList: FileList | null) => {
-    if (!fileList) return;
-    const selected = Array.from(fileList);
-    setFiles(selected);
-    const previews = await Promise.all(
-      selected.map(
-        (file) =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(file);
-          }),
-      ),
-    );
-    setImagePreviews(previews);
-  };
-
-  // Hydrate profile fields after user is available
   useEffect(() => {
-    setShopName(user?.shopName || "");
-    setShopAddress(user?.shopAddress || "");
-    setMapsLink(user?.mapsLink || "");
-    setContactNumber(user?.contactNumber || "");
-    setProfileReady(true);
-  }, []);
-
-  const openEdit = (product: any) => {
-    setEditingProduct(product);
-    setEName(product?.name ?? "");
-    setEPrice(String(product?.price ?? ""));
-    setEDescription(product?.description ?? "");
-    setSelectedEditCategory(product?.category || "General");
-    const existing =
-      (Array.isArray(product?.images) && product?.images[0]) || product?.imageUrl || "";
-    setEditImagePreviews(existing ? [existing] : []);
-    setEditFiles([]);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleEditFileSelect = async (fileList: FileList | null) => {
-    if (!fileList) return;
-    const selected = Array.from(fileList);
-    setEditFiles(selected);
-    const previews = await Promise.all(
-      selected.map(
-        (file) =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(file);
-          }),
-      ),
-    );
-    setEditImagePreviews(previews);
-  };
-
-  const toAbsolute = (url?: string) => {
-    if (!url) return "";
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    const normalized = url.startsWith("/") ? url : `/${url}`;
-    return `${window.location.origin}${normalized}`;
-  };
-
-  const saveEdit = async () => {
-    if (!editingProduct?.id) return;
-    try {
-      setLoading(true);
-      const formData = new FormData();
-      formData.append("name", eName);
-      formData.append("price", ePrice);
-      formData.append("description", eDescription);
-      formData.append("category", selectedEditCategory || editingProduct?.category || "General");
-
-      const existingImage =
-        (Array.isArray(editingProduct.images) && editingProduct.images[0]) ||
-        editingProduct.imageUrl ||
-        "";
-
-      if (editFiles.length > 0) {
-        formData.append("image", editFiles[0]);
-      } else if (existingImage) {
-        formData.append("imageUrl", existingImage);
-      }
-
-      const res = await fetch(`/api/products/${editingProduct.id}`, {
-        method: "PATCH",
-        headers: { "x-user-id": headers["x-user-id"] },
-        body: formData,
+    if (authLoading) return;
+    
+    if (!isAuthenticated) {
+      setLocation("/auth?role=merchant");
+    } else if (user?.role === "CUSTOMER" || user?.role === "customer") {
+      toast.error("Access Denied: You are not a registered merchant.");
+      setLocation("/");
+    } else {
+      setStoreSettings({
+        shopName: (user as any)?.shopName || "",
+        address: (user as any)?.shopAddress || "",
+        phone: ""
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || "Update failed");
-      }
-      toast({ title: "Updated!" });
-      setIsEditDialogOpen(false);
-      setEditingProduct(null);
-      await fetchData();
-    } catch (e) {
-      toast({ title: "Update failed", variant: "destructive" });
-    } finally {
-      setLoading(false);
+      loadVendorData();
     }
-  };
+  }, [isAuthenticated, authLoading, user]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    setLocation("/auth");
-  };
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newProduct.imageUrl) {
+      toast.error("कृपया प्रोडक्ट की फोटो अपलोड करें!");
+      return;
+    }
 
-  const saveProfile = async () => {
     try {
-      setLoading(true);
-      const res = await fetch("/api/user/profile", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": headers["x-user-id"],
-        },
-        body: JSON.stringify({ shopName, shopAddress, mapsLink, contactNumber }),
+      const res = await fetch('/api/vendor/products', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newProduct,
+          price: parseFloat(newProduct.price),
+          status: "PENDING"
+        })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Profile update failed");
-      localStorage.setItem("user", JSON.stringify({ ...user, ...data }));
-      toast({ title: "Dukan ki details save ho gayi!" });
-      await fetchData();
-    } catch (e: any) {
-      toast({ title: "Error", description: e?.message || "Update failed", variant: "destructive" });
-    } finally {
-      setLoading(false);
+      
+      if (!res.ok) throw new Error(data.message);
+      
+      toast.success("प्रोडक्ट रिव्यु के लिए भेज दिया गया है! 🚀");
+      setShowAddModal(false);
+      setNewProduct({ name: "", price: "", category: "", description: "", imageUrl: "" });
+      loadVendorData();
+    } catch (err: any) {
+      toast.error(err.message || "सबमिशन फेल हो गया!");
     }
   };
 
-  const becomeSeller = async () => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("images", file);
+
+    setUploading(true);
     try {
-      setLoading(true);
-      const payload = {
-        name: "Temp Shop",
-        category: "General",
-        description: "Auto-created for testing",
-        address: "Shahdol",
-        phone: "0000000000",
-        mobile: "0000000000",
-      };
-      const res = await fetch("/api/partner/shop/create-default", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      });
-      const resJson = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(resJson?.message || "Failed to create shop / seller");
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const result = await res.json();
+      if (result.urls && result.urls[0]) {
+        setNewProduct({ ...newProduct, imageUrl: result.urls[0] });
+        toast.success("फोटो अपलोड हो गई! 📸");
       }
-      // update local user role
-      const updatedUser = { ...user, role: "seller" };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setShop(resJson || null);
-      toast({ title: "You are now a Seller" });
-      await fetchData();
-    } catch (e: any) {
-      toast({ title: "Error", description: e?.message || "Become seller failed", variant: "destructive" });
+    } catch (err) {
+      toast.error("Cloudinary Sync Failed!");
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
 
-  const addProduct = async (e?: React.MouseEvent<HTMLButtonElement>) => {
-    e?.preventDefault();
-    setLoading(true);
-    console.log("Submitting form (simplified)...");
-
-    // Minimal defaults to avoid any blocking
-    const shopId = Number(shop?.id) && Number(shop?.id) > 0 ? Number(shop?.id) : 1;
-    const payload = {
-      name: pName || "Test Product",
-      price: Number(pPrice) || 0,
-      category: pCategory || "General",
-      description: pDescription || "",
-      imageUrl: "", // allow empty to keep request simple
-      shopId,
-    };
-
-    console.log("Sending minimal payload to API...", payload);
-
-    fetch("/api/products", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Product create failed (${res.status})`);
-        window.alert("Waiting for Admin Approval");
-        toast({ title: "Product submitted", description: "Waiting for Admin Approval" });
-        setIsDialogOpen(false);
-        setPName("");
-        setPPrice("");
-        setPDescription("");
-        setImagePreviews([]);
-        setFiles([]);
-        fetchData();
-      })
-      .catch((err) => {
-        console.error("CRITICAL API FAILURE:", err);
-        toast({ title: "Error", description: err?.message || "Error", variant: "destructive" });
-        alert("Error: " + (err?.message || "Unknown"));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+  const handleDeleteProduct = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+    try {
+      const res = await fetch(`/api/vendor/products/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      toast.success("Product Deleted 🗑️");
+      loadVendorData();
+    } catch (err) {
+      toast.error("Failed to delete product");
+    }
   };
 
-  const renderSkeleton = () => (
-    <div className="space-y-4 animate-pulse">
-      <div className="h-20 bg-slate-200 rounded-xl" />
-      <div className="h-40 bg-slate-200 rounded-xl" />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="h-24 bg-slate-200 rounded-xl" />
-        <div className="h-24 bg-slate-200 rounded-xl" />
-        <div className="h-24 bg-slate-200 rounded-xl" />
-      </div>
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/vendor/update', {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(storeSettings)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      
+      toast.success("Store Settings Saved! ✅");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update settings");
+    }
+  };
+
+  const tabButton = (key: typeof activeTab, label: string, Icon: any) => (
+    <button
+      onClick={() => { setActiveTab(key); setSidebarOpen(false); }}
+      className={`w-full flex items-center gap-3 px-4 py-3 md:py-3.5 rounded-xl font-bold transition-all border ${
+        activeTab === key 
+          ? "text-orange-400 border-orange-500/50 bg-orange-500/5 [box-shadow:inset_0_0_15px_rgba(249,115,22,0.1)] drop-shadow-[0_0_10px_rgba(249,115,22,0.5)]" 
+          : "border-transparent text-gray-500 hover:text-white hover:bg-white/5"
+      }`}
+    >
+      <Icon className="w-5 h-5" />
+      <span className="text-sm">{label}</span>
+    </button>
+  );
+
+  if (authLoading || loading) return (
+    <div className="min-h-screen bg-[#030003] flex items-center justify-center">
+      <div className="w-10 h-10 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
     </div>
   );
 
-  if (!profileReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin" style={{ color: orange, height: 40, width: 40 }} />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Mobile header */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-white border-b flex items-center justify-between px-4 py-3 shadow-sm">
-        <div className="font-black text-slate-800 flex items-center gap-2">
-          <Store color={orange} size={20} /> Partner Panel
-        </div>
-        <button
-          aria-label="Toggle menu"
-          onClick={() => setSidebarOpen((s) => !s)}
-          className="p-2 rounded-lg border text-slate-700"
-        >
-          <Menu size={18} />
-        </button>
-      </div>
+    <div className="min-h-screen bg-[#030003] text-slate-200 flex flex-col md:flex-row font-['Plus_Jakarta_Sans']">
+      
+      {sidebarOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      <aside
-        className={`w-64 bg-white border-r p-6 space-y-4 md:static fixed top-14 left-0 h-[calc(100%-56px)] md:h-auto z-20 transition-transform duration-200 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        }`}
-      >
-        <div className="hidden md:flex font-bold items-center gap-2 mb-6"><Store style={{ color: orange }} /> Partner Panel</div>
-        <Button
-          variant={activeTab === 'dashboard' ? "default" : "ghost"}
-          className="w-full justify-start gap-2"
-          style={activeTab === 'dashboard' ? { backgroundColor: orange, color: "#fff" } : {}}
-          onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
-        ><Home size={18}/> Dashboard</Button>
-        <Button
-          variant={activeTab === 'products' ? "default" : "ghost"}
-          className="w-full justify-start gap-2"
-          style={activeTab === 'products' ? { backgroundColor: orange, color: "#fff" } : {}}
-          onClick={() => { setActiveTab('products'); setSidebarOpen(false); }}
-        ><Package size={18}/> Products</Button>
-        <Button variant="ghost" className="w-full justify-start gap-2 text-red-600" onClick={handleLogout}><LogOut size={18}/> Logout</Button>
+      <aside className={`w-64 max-w-[80%] bg-black/80 md:bg-black/40 backdrop-blur-3xl border-r border-white/10 p-4 flex flex-col fixed md:relative h-full max-h-screen overflow-y-auto z-50 transition-transform md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="mb-10 px-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg shadow-[0_0_20px_rgba(249,115,22,0.4)]">
+              <Store className="w-6 h-6 text-black" />
+            </div>
+            <div>
+              <h2 className="font-black text-white text-lg tracking-tighter uppercase leading-none">Partner OS</h2>
+              <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest mt-1">{user?.username || "My Store"}</p>
+            </div>
+          </div>
+          <button className="md:hidden text-gray-500 hover:text-white" onClick={() => setSidebarOpen(false)}><X className="w-6 h-6" /></button>
+        </div>
+        
+        <nav className="space-y-1 flex-1 overflow-y-auto pr-2 pb-4 [&::-webkit-scrollbar]:hidden">
+          {tabButton("dashboard", "Dashboard", TrendingUp)}
+          {tabButton("products", "My Inventory", Package)}
+          {tabButton("orders", "Live Orders", ShoppingBag)}
+          {tabButton("settings", "Store Settings", Settings)}
+        </nav>
+
+        <button onClick={() => logout()} className="mt-4 flex items-center gap-3 px-4 py-3 md:py-4 rounded-xl font-bold text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all group border-t border-white/10 pt-6">
+          <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="text-sm">Sign Out</span>
+        </button>
       </aside>
 
-      <main className="flex-1 p-8 pt-16 md:pt-8">
-        {activeTab === 'dashboard' && (
-          <div className="space-y-4">
-            {loading ? renderSkeleton() : (
-            <>
-            <div className="bg-white p-6 rounded-xl border shadow-sm">
-              <p className="text-sm text-slate-500 font-medium">Shop Status</p>
-              <div className="text-xl font-bold flex items-center gap-2 mt-2 text-green-600">
-                <CheckCircle2 size={24}/> Active
-              </div>
-            </div>
-            {user.role !== "seller" && (
-              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-bold text-orange-700">You are currently a customer.</p>
-                  <p className="text-xs text-orange-600">Click below to become a seller and add products.</p>
-                </div>
-                <Button className="bg-orange-600" style={{ backgroundColor: orange }} onClick={becomeSeller} disabled={loading}>
-                  {loading ? <Loader2 className="animate-spin" /> : "Become a Seller"}
-                </Button>
-              </div>
-            )}
+      <main className="flex-1 p-4 md:p-10 w-full overflow-y-auto h-screen relative">
+        
+        {activeTab === "dashboard" && (
+          <div className="animate-in fade-in duration-500">
+            <header className="mb-10">
+              <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter mb-2">Welcome, {user?.username || "Partner"}</h1>
+              <p className="text-gray-500 text-xs md:text-sm font-medium">Here's what's happening in your store today.</p>
+            </header>
 
-            <div className="bg-white p-6 rounded-xl border shadow-sm space-y-3">
-              <h3 className="text-lg font-bold">Shop Profile</h3>
-              <Input
-                placeholder="Shop Name"
-                value={shopName || ""}
-                onChange={(e) => {
-                  console.log("Typing shop name:", e.target.value);
-                  setShopName(e.target.value);
-                }}
-              />
-              <Textarea
-                placeholder="Shop Address"
-                value={shopAddress || ""}
-                onChange={(e) => {
-                  console.log("Typing shop address:", e.target.value);
-                  setShopAddress(e.target.value);
-                }}
-              />
-              <Input
-                placeholder="WhatsApp Number"
-                value={contactNumber || ""}
-                onChange={(e) => setContactNumber(e.target.value)}
-              />
-              <Input
-                placeholder="Google Maps Link (optional)"
-                value={mapsLink || ""}
-                onChange={(e) => {
-                  console.log("Typing maps link:", e.target.value);
-                  setMapsLink(e.target.value);
-                }}
-              />
-              <div className="flex justify-end">
-                <Button className="bg-orange-600" style={{ backgroundColor: orange }} onClick={saveProfile} disabled={loading}>
-                  {loading ? <Loader2 className="animate-spin" /> : "Save Profile"}
-                </Button>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-10">
+              {[
+                { label: "Today's Orders", val: orders.length, icon: ShoppingBag, color: "text-blue-500", bg: "bg-blue-500/10" },
+                { label: "Active Products", val: products.length, icon: Package, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+                { label: "Total Earnings", val: "₹0", icon: TrendingUp, color: "text-orange-500", bg: "bg-orange-500/10" }
+              ].map((s, i) => (
+                <div key={i} className="glass-card-3d p-5 md:p-6 border border-white/5 relative group overflow-hidden rounded-2xl">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">{s.label}</p>
+                      <p className="text-3xl font-black text-white tracking-tighter">{s.val}</p>
+                    </div>
+                    <div className={`p-3 rounded-2xl ${s.bg} ${s.color} border border-white/5`}><s.icon className="w-6 h-6" /></div>
+                  </div>
+                  <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500/20 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+                </div>
+              ))}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white border rounded-xl p-4 shadow-sm">
-                <p className="text-xs uppercase text-slate-500 font-bold">Total Products</p>
-                <p className="text-2xl font-bold mt-2">{products.length}</p>
-              </div>
-              <div className="bg-white border rounded-xl p-4 shadow-sm">
-                <p className="text-xs uppercase text-slate-500 font-bold">Approved Items</p>
-                <p className="text-2xl font-bold mt-2">
-                  {products.filter(p => p?.approved === true || p?.status === "approved").length}
-                </p>
-              </div>
-              <div className="bg-white border rounded-xl p-4 shadow-sm">
-                <p className="text-xs uppercase text-slate-500 font-bold">Pending Items</p>
-                <p className="text-2xl font-bold mt-2">
-                  {products.filter(p => p?.approved === false || p?.status === "pending").length}
-                </p>
-              </div>
+
+            <div className="glass-card-3d p-6 md:p-8 border border-white/10 rounded-2xl">
+               <h3 className="text-sm font-black text-white uppercase mb-6 tracking-widest border-b border-white/5 pb-4">Quick Actions</h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button onClick={() => { setActiveTab("products"); setShowAddModal(true); }} className="flex items-center gap-4 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 transition-all group text-left">
+                     <div className="p-3 bg-orange-500 rounded-lg group-hover:scale-110 transition-transform"><Plus className="w-6 h-6 text-black" /></div>
+                     <div>
+                       <h4 className="text-orange-500 font-bold text-sm">Add New Product</h4>
+                       <p className="text-xs text-gray-400 mt-1">Upload items to your catalog</p>
+                     </div>
+                  </button>
+               </div>
             </div>
-            </>
-            )}
           </div>
         )}
 
-        {activeTab === 'products' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Aapke Products</h2>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-orange-600" style={{ backgroundColor: orange }}><Plus size={18} className="mr-2"/> Naya Item</Button>
-                </DialogTrigger>
-                <DialogContent className="bg-white">
-                  <DialogHeader>
-                    <DialogTitle>Product Details</DialogTitle>
-                    <DialogDescription className="sr-only">Add a new product to your shop</DialogDescription>
-                  </DialogHeader>
-                  {/* Keep this as a simple div so no implicit form validation interferes */}
-                  <div className="space-y-4 py-4">
-                    <Input placeholder="Item Name" value={pName} onChange={e => setPName(e.target.value)} />
-                    <Input placeholder="Price (₹)" type="number" value={pPrice} onChange={e => setPPrice(e.target.value)} />
-                    <Textarea placeholder="Description" value={pDescription} onChange={e => setPDescription(e.target.value)} />
-                    <select
-                      className="w-full border rounded-md px-3 py-2 text-sm"
-                      value={pCategory}
-                      onChange={(e) => setPCategory(e.target.value)}
-                    >
-                      {(categories.length ? categories : [{ id: 0, name: "General" }]).map((cat) => (
-                        <option key={cat.id} value={cat.name}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="space-y-2">
-                      <Input type="file" accept="image/*" multiple onChange={e => handleFileSelect(e.target.files)} />
-                      {imagePreviews.length > 0 && (
-                        <div className="flex gap-2 flex-wrap">
-                          {imagePreviews.map((src, idx) => (
-                            <img key={idx} src={src} alt="preview" className="w-16 h-16 rounded object-cover border" />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      className="w-full bg-orange-600"
-                      onClick={addProduct}
-                      disabled={loading}
-                    >
-                      {loading ? "Processing..." : "Item Bachien"}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+        {activeTab === "products" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-white uppercase tracking-tighter">My Inventory</h2>
+              </div>
+              <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 bg-orange-600 text-black px-5 py-2.5 rounded-xl font-black text-sm uppercase hover:scale-105 transition-all shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+                <Plus className="w-4 h-4" /> Add Product
+              </button>
             </div>
-            <p className="text-xs font-bold text-orange-700">New items need Admin approval before they appear on the site.</p>
-            
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-40 bg-slate-200 rounded-xl" />
-                ))}
-              </div>
-            ) : products.length === 0 ? (
-              <div className="bg-white border rounded-xl p-8 text-center space-y-3 shadow-sm">
-                <p className="text-lg font-bold text-slate-800">No products yet</p>
-                <p className="text-sm text-slate-600">Add your first item to start selling.</p>
-                <Button
-                  className="bg-orange-600"
-                  style={{ backgroundColor: orange }}
-                  onClick={() => setIsDialogOpen(true)}
-                >
-                  Start Adding Products
-                </Button>
-              </div>
+
+            {products.length === 0 ? (
+               <div className="glass-card-3d border border-white/10 p-16 text-center rounded-2xl">
+                  <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+                    <Package className="text-gray-600 w-8 h-8" />
+                  </div>
+                  <h4 className="text-white font-black uppercase tracking-widest text-sm">Inventory Empty</h4>
+                  <p className="text-gray-500 text-xs md:text-sm mt-2 mb-6">You haven't added any products to your store yet.</p>
+               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {products.map(p => (
-                  <div
-                    key={p.id}
-                    className="bg-white p-4 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition"
-                    onClick={() => openEdit(p)}
-                  >
-                    {(
-                      (Array.isArray(p.images) && p.images[0]) ||
-                      p.imageUrl
-                    ) && (
-                      <img
-                        src={(Array.isArray(p.images) && p.images[0]) || p.imageUrl}
-                        alt={p.name}
-                        className="w-full h-32 object-cover rounded mb-2"
-                      />
-                    )}
-                    <p className="font-bold">{p.name}</p>
-                    <p className="text-green-600">₹{p.price}</p>
-                    <div className="mt-2 flex justify-end">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); openEdit(p); }}
-                      >
-                        <Pencil size={14} className="mr-1" /> Edit
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Dialog
-              open={isEditDialogOpen}
-              onOpenChange={(open) => {
-                setIsEditDialogOpen(open);
-                if (!open) {
-                  setEditingProduct(null);
-                  setEditFiles([]);
-                  setEditImagePreviews([]);
-                }
-              }}
-            >
-              <DialogContent className="bg-white">
-                <DialogHeader>
-                  <DialogTitle>Edit Product</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <Input placeholder="Item Name" value={eName} onChange={e => setEName(e.target.value)} />
-                  <Input placeholder="Price (₹)" type="number" value={ePrice} onChange={e => setEPrice(e.target.value)} />
-                  <Textarea placeholder="Description" value={eDescription} onChange={e => setEDescription(e.target.value)} />
-                  <select
-                    className="w-full border rounded-md px-3 py-2 text-sm"
-                    value={selectedEditCategory}
-                    onChange={(ev) => setSelectedEditCategory(ev.target.value)}
-                  >
-                    {(categories.length ? categories : [{ id: 0, name: "General" }]).map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.name}
-                      </option>
+               <div className="glass-card-3d border border-white/10 overflow-x-auto shadow-2xl rounded-xl">
+                 <table className="w-full min-w-[700px] text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white/5 text-[10px] md:text-[11px] font-black uppercase text-gray-500 tracking-widest border-b border-white/10">
+                      <th className="py-4 md:py-5 px-4 md:px-6">Product Item</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6">Status</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {products.map(p => (
+                      <tr key={p.id} className="hover:bg-white/[0.02] transition-all group">
+                        <td className="py-4 md:py-5 px-4 md:px-6">
+                          <div>
+                            <p className="text-xs md:text-sm font-black text-white">{p.name || p.title}</p>
+                            <p className="text-[10px] md:text-xs text-emerald-500 font-black mt-0.5">₹{p.price}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 md:py-5 px-4 md:px-6">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${p.approved ? "text-emerald-500 bg-emerald-500/10" : "text-orange-500 bg-orange-500/10 animate-pulse"}`}>
+                            {p.approved ? "Live" : "Pending Admin Approval"}
+                          </span>
+                        </td>
+                        <td className="py-4 md:py-5 px-4 md:px-6 text-right">
+                          <button onClick={() => handleDeleteProduct(p.id)} className="p-2 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                        </td>
+                      </tr>
                     ))}
-                  </select>
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-slate-500">Change Image</p>
-                      <Input type="file" accept="image/*" multiple onChange={e => handleEditFileSelect(e.target.files)} />
-                      <div className="flex gap-2 flex-wrap">
-                        {editImagePreviews.length > 0
-                          ? editImagePreviews.map((src, idx) => (
-                              <img key={idx} src={src} alt="preview" className="w-16 h-16 rounded object-cover border" />
-                            ))
-                          : (editingProduct?.imageUrl || (Array.isArray(editingProduct?.images) && editingProduct?.images[0])) && (
-                              <img
-                                src={toAbsolute((Array.isArray(editingProduct?.images) && editingProduct?.images[0]) || editingProduct?.imageUrl)}
-                                alt={editingProduct?.name}
-                                className="w-16 h-16 rounded object-cover border"
-                              />
-                            )}
-                      </div>
-                    </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-                    <Button className="bg-orange-600" onClick={saveEdit} disabled={loading}>
-                      {loading ? <Loader2 className="animate-spin" /> : "Save"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                  </tbody>
+                </table>
+               </div>
+            )}
           </div>
         )}
+
+        {activeTab === "orders" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <header className="mb-6">
+                <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Live Orders</h2>
+             </header>
+             <div className="glass-card-3d border border-white/10 p-16 text-center rounded-2xl">
+                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+                  <Clock className="text-gray-600 w-8 h-8" />
+                </div>
+                <h4 className="text-white font-black uppercase tracking-widest text-sm">No Pending Orders</h4>
+             </div>
+          </div>
+        )}
+
+        {activeTab === "settings" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl">
+             <header className="mb-6">
+                <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Store Settings</h2>
+             </header>
+             <form onSubmit={handleSaveSettings} className="glass-card-3d border border-white/10 p-6 md:p-8 rounded-2xl space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Store Name</label>
+                    <input type="text" value={storeSettings.shopName} onChange={e => setStoreSettings({...storeSettings, shopName: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:border-orange-500/50 text-white" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Complete Address</label>
+                    <textarea value={storeSettings.address} onChange={e => setStoreSettings({...storeSettings, address: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:border-orange-500/50 text-white min-h-[100px]"></textarea>
+                  </div>
+                  <button type="submit" className="w-full bg-orange-600 text-black py-3 rounded-xl font-black text-sm uppercase hover:bg-orange-500 transition-all shadow-[0_0_15px_rgba(249,115,22,0.3)] mt-4">
+                    Save Changes
+                  </button>
+                </div>
+             </form>
+          </div>
+        )}
+
+        {showAddModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+            <form onSubmit={handleAddProduct} className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+              <button type="button" onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><XCircle className="w-6 h-6" /></button>
+              <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-6">Add New Product</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Product Name</label>
+                  <input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 px-3 text-sm text-white" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Price (₹)</label>
+                  <input required type="number" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 px-3 text-sm text-white" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Category</label>
+                  <input required type="text" value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 px-3 text-sm text-white" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Product Photo</label>
+                  <div className="flex gap-4 items-center mt-2">
+                    {newProduct.imageUrl && <img src={newProduct.imageUrl} className="w-16 h-16 rounded-lg object-cover border border-orange-500/50" />}
+                    <input type="file" onChange={handleImageUpload} accept="image/*" className="text-xs text-gray-400 file:bg-orange-600 file:text-black file:rounded-lg file:border-0 file:px-4 file:py-2" />
+                  </div>
+                  {uploading && <p className="text-[10px] text-orange-500 animate-pulse mt-2">Processing in Cloudinary...</p>}
+                </div>
+                <button type="submit" className="w-full bg-orange-600 text-black py-3 rounded-xl font-black text-sm uppercase mt-4 hover:scale-[1.02] transition-transform">
+                  Submit for Approval
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
       </main>
+
+      <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden fixed bottom-6 right-6 p-4 bg-orange-500 text-black rounded-full shadow-2xl z-50">
+        <Menu className="w-6 h-6" />
+      </button>
+
     </div>
   );
 }

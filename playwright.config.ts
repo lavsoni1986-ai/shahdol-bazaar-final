@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { globalSetup } from './tests/global-setup';
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -14,6 +15,9 @@ export default defineConfig({
   /* Parallel tests ke liye workers */
   workers: process.env.CI ? 1 : undefined,
   
+  /* Global setup for district context */
+  globalSetup: './tests/global-setup.ts',
+  
   /* Reports generate karne ke liye settings */
   reporter: [
     ['html'],
@@ -23,8 +27,13 @@ export default defineConfig({
 
   /* Sabhi tests ke liye common settings */
   use: {
-    /* Aapka actual Vercel URL yahan set kar diya gaya hai */
-    baseURL: 'https://shahdol-bazaar-final-di481o095-lavsoni1986-ais-projects.vercel.app',
+    /* Local development server - change to Vercel URL for production testing */
+    baseURL: 'http://localhost:5174',
+
+    /* SOVEREIGN FIX: Add district context header for all requests */
+    extraHTTPHeaders: {
+      'X-District-Slug': 'shahdol',
+    },
 
     /* Fail hone par trace, screenshot aur video save karega */
     trace: 'on-first-retry',

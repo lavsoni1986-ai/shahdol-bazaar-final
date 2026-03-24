@@ -1,14 +1,43 @@
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || randomBytes(64).toString('hex');
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || randomBytes(64).toString('hex');
+// Throw error in production if JWT_SECRET is not set
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required in production');
+}
+if (isProduction && !process.env.REFRESH_TOKEN_SECRET) {
+  throw new Error('REFRESH_TOKEN_SECRET environment variable is required in production');
+}
+
+// In development, allow fallback to random secrets (for ease of setup)
+// In production, this will throw above if not set or empty
+const envJwtSecret = process.env.JWT_SECRET;
+const envRefreshSecret = process.env.REFRESH_TOKEN_SECRET;
+
+// STRICT: In production, reject empty strings
+if (isProduction) {
+  if (!envJwtSecret || envJwtSecret.trim() === '') {
+    throw new Error('JWT_SECRET environment variable is required in production (empty string not allowed)');
+  }
+  if (!envRefreshSecret || envRefreshSecret.trim() === '') {
+    throw new Error('REFRESH_TOKEN_SECRET environment variable is required in production (empty string not allowed)');
+  }
+}
+
+const JWT_SECRET = envJwtSecret || randomBytes(64).toString('hex');
+const REFRESH_TOKEN_SECRET = envRefreshSecret || randomBytes(64).toString('hex');
 
 export interface JWTPayload {
   userId: number;
+  id?: number; // Alias for userId (for backward compatibility)
   username: string;
   role: 'SUPER_ADMIN' | 'CITY_ADMIN' | 'MERCHANT' | 'CUSTOMER';
   shopId?: number | null;
+  districtId?: number | null; // Required for CITY_ADMIN role
+  districtSlug?: string | null; // District slug for tenant context
+  isAdmin?: boolean; // Admin flag for legacy compatibility
 }
 
 export interface TokenPair {

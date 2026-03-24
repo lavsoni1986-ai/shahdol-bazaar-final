@@ -6,6 +6,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth, getClientRoleRedirectPath } from "@/contexts/AuthContext";
 import {
   Card,
   CardContent,
@@ -22,370 +23,370 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Loader2 } from "lucide-react";
+import { Store, Loader2, ShoppingBag } from "lucide-react";
 
-// ✅ Schema Validation Rules
 const authSchema = z.object({
-  username: z.string().min(3, "Username kam se kam 3 akshar ka hona chahiye"),
-  password: z.string().min(6, "Password kam se kam 6 akshar ka hona chahiye"),
+  username: z.string()
+    .trim()
+    .min(3, "Username must be at least 3 characters")
+    .regex(/^[^\s]+$/, "Username cannot contain spaces"),
+  password: z.string()
+    .min(4, "Password must be at least 4 characters"),
+  districtId: z.string().min(1, "District is required"),
 });
 
+const getAuthMode = (): string => {
+  if (typeof window === 'undefined') return "customer";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const roleParam = params.get("role");
+    return roleParam === "partner" || roleParam === "vendor" ? "partner" : "customer";
+  } catch (e) {
+    return "customer";
+  }
+};
+
+const getInitialTab = (): string => {
+  if (typeof window === 'undefined') return "login";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("mode") === "register" ? "register" : "login";
+  } catch (e) {
+    return "login";
+  }
+};
+
 export default function AuthPage() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("login");
+  const { isAuthenticated, user, loading: authLoading } = useAuth();
+  
+  // Track active tab only for knowing which API to hit, NOT for controlling the Tabs component!
+  // Use constant default - initialize from URL in useEffect
+  const [activeTab, setActiveTab] = useState<string>("login");
+  
+  // Initialize tab from URL on mount only
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") === "register") {
+      setActiveTab("register");
+    }
+  }, []);
   const [loading, setLoading] = useState(false);
+  
+  const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const [districts, setDistricts] = useState<any[]>([]);
+  const [fetching, setFetching] = useState(false);
+  
+  const authMode = getAuthMode();
 
   const form = useForm<z.infer<typeof authSchema>>({
     resolver: zodResolver(authSchema),
-    defaultValues: { username: "", password: "" },
+    defaultValues: { username: "", password: "", districtId: "" },
+    mode: "onSubmit",
   });
 
-  // Use ref to prevent infinite redirect loops
-  const hasCheckedAuth = useRef(false);
-  const hasRedirected = useRef(false);
-
-  // Check if user is already logged in and redirect appropriately
   useEffect(() => {
-    // Prevent multiple redirect checks
-    if (hasCheckedAuth.current || hasRedirected.current) {
-      return;
-    }
-
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
+    const fetchDistricts = async () => {
       try {
-        const userData = JSON.parse(userStr);
-        // Check for admin (handle both legacy "admin" and new "SUPER_ADMIN" role)
-        const isAdmin = userData.isAdmin === true || 
-                       userData.role === "admin" || 
-                       userData.role === "SUPER_ADMIN" ||
-                       userData.username === "admin";
-        const userRole = userData.role || "customer";
+        setFetching(true);
+        console.log("🛰️ Fetching districts from /api/districts...");
+        const res = await fetch('/api/districts');
+        const result = await res.json();
         
-        // Get return URL from query params
-        const params = new URLSearchParams(window.location.search);
-        const returnUrl = params.get("return");
-        
-        // Prevent redirect loop - don't redirect if already on the target page
-        const currentPath = window.location.pathname;
-        
-        if (returnUrl && returnUrl !== currentPath && returnUrl !== "/auth") {
-          hasRedirected.current = true;
-          setLocation(returnUrl);
-        } else if ((isAdmin || userRole === "admin" || userRole === "SUPER_ADMIN") && currentPath !== "/admin") {
-          hasRedirected.current = true;
-          setLocation("/admin");
-        } else if (userRole === "seller" && !currentPath.startsWith("/partner")) {
-          hasRedirected.current = true;
-          setLocation("/partner");
+        // 🛡️ CRITICAL FIX: Check for result.data because backend sends { success: true, data: [...] }
+        if (result.success && Array.isArray(result.data)) {
+          setDistricts(result.data);
+          console.log("✅ Districts Synced:", result.data);
+        } else {
+          console.error("⚠️ Backend sent unexpected format:", result);
         }
-        // Otherwise stay on auth page
-      } catch (e) {
-        // Invalid user data, stay on auth page
-        console.error("Error parsing user data:", e);
+      } catch (err) {
+        console.error("❌ Network Error while fetching districts:", err);
+      } finally {
+        setFetching(false);
       }
-    }
+    };
+    fetchDistricts();
+  }, []);
+
+  const hasCheckedAuth = useRef(false);
+
+  // Initial Auth Check - Use Hard Redirect to avoid React Router loops
+  // GUARD: Don't run if we're in the middle of a login/register submission
+  const isSubmittingRef = useRef(false);
+  
+  useEffect(() => {
+    // Skip if not on auth page, already checked, or currently submitting
+    if (location !== "/auth" || authLoading || hasCheckedAuth.current || isSubmittingRef.current) return;
     
-    hasCheckedAuth.current = true;
-  }, []); // Empty dependency array - only run once on mount
+    // Only rely on isAuthenticated from AuthContext - don't check localStorage!
+    if (isAuthenticated && user) {
+      hasCheckedAuth.current = true;
+      // ✅ Use utility function for role-based redirect
+      const target = getClientRoleRedirectPath(user);
+      console.log("🛠️ [DEBUG] Login Redirect Target:", target);
+      setLocation(target);
+    }
+  }, [location, isAuthenticated, user, authLoading, setLocation]);
 
-  // ✅ Agar sab sahi hai to ye chalega
   const onSubmit = async (data: z.infer<typeof authSchema>) => {
-    console.log("🔵 Button Clicked! Data:", data); // Debugging
+    console.log("🔵 [AUTH] [SUBMIT] Form submitted for:", activeTab);
     setLoading(true);
+    isSubmittingRef.current = true; // Guard: prevent useEffect from redirecting during submission
+    
     try {
-      const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-      const url = `${API_BASE || ""}/api/${activeTab === "login" ? "login" : "register"}`;
-      console.log("🔵 Calling API:", url); // Debugging
-
+      const url = `/api/auth/${activeTab === "login" ? "login" : "register"}`;
+      const userRole = authMode === "partner" ? "seller" : "customer";
+      
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, role: "customer" }),
+        credentials: "include",
+        body: JSON.stringify({ 
+          username: data.username.trim(), 
+          password: data.password,
+          role: userRole,
+          districtId: data.districtId
+        }),
       });
 
-      const result = await response.json();
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get("retry-after") || '900', 10);
+        setRateLimitRemaining(retryAfter);
+        setIsRateLimited(true);
+        toast({
+          variant: "destructive",
+          title: "बहुत ज्यादा कोशिशें!",
+          description: `कृपया ${Math.ceil(retryAfter / 60)} मिनट बाद कोशिश करें।`,
+        });
+        setLoading(false);
+        return;
+      }
+      
+      const contentType = response.headers.get("content-type");
+      let result;
+      
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        throw new Error(`Server error: ${response.status}`);
+      }
 
       if (!response.ok) {
-        throw new Error(result.message || "Something went wrong");
-      }
-
-      // Success
-      console.log("🟢 [AUTH] Login API Response:", JSON.stringify(result, null, 2));
-      
-      // Handle JWT login response format: { accessToken, user: {...} }
-      // Or legacy format: { id, username, role, ... }
-      const userData = result.user || result; // Support both formats
-      const accessToken = result.accessToken || null;
-      
-      // DEBUG: Log user data from API
-      console.log("🔵 [AUTH] User data from API:", {
-        username: userData.username,
-        role: userData.role,
-        isAdmin: userData.isAdmin,
-        fullUserData: userData
-      });
-      
-      // CLEAR LOCALSTORAGE FIRST to avoid old role conflicts
-      console.log("🧹 [AUTH] Clearing localStorage to remove old session data");
-      localStorage.clear();
-      console.log("✅ [AUTH] localStorage cleared");
-      
-      // Store accessToken if present (JWT format)
-      if (accessToken) {
-        localStorage.setItem('accessToken', accessToken);
-        console.log("✅ [AUTH] Access token stored in localStorage");
+        throw new Error(result.message || `Request failed: ${response.status}`);
       }
       
-      // Check if admin user (handle both legacy "admin" role and new "SUPER_ADMIN" role)
-      const isAdminUser = 
-        userData.username === "admin" || 
-        userData.role === "admin" || 
-        userData.role === "SUPER_ADMIN" ||
-        userData.isAdmin === true;
+      // Token is in httpOnly cookie - browser handles it automatically via credentials: 'include'
+      // NO localStorage token storage - pure cookie-based authentication
+      const userData = result.user || result;
       
-      console.log("🔵 [AUTH] Admin check result:", {
-        username: userData.username,
-        role: userData.role,
-        isAdmin: userData.isAdmin,
-        isAdminUser: isAdminUser
-      });
+      if (!userData) {
+        throw new Error('Login failed: No user data received');
+      }
       
-      // Prepare final user object
-      let finalUser = {
-        ...userData,
-        // Normalize role for backward compatibility
-        role: isAdminUser ? "admin" : (userData.role === "MERCHANT" ? "seller" : userData.role),
+      const isAdminUser = userData.role?.toLowerCase() === "admin" || userData.role === "SUPER_ADMIN" || userData.role === "superadmin" || userData.isAdmin === true;
+      const isVendorUser = userData.role?.toLowerCase() === "seller" || userData.role === "MERCHANT" || userData.isVendor === true;
+      
+      const userToStore = {
+        id: userData.id, username: userData.username,
+        role: userData.role, 
         isAdmin: isAdminUser,
+        isVendor: isVendorUser
       };
-      
-      // If username is 'admin', explicitly set admin flags
-      if (userData.username === "admin") {
-        finalUser = {
-          ...finalUser,
-          username: "admin",
-          role: "admin",
-          isAdmin: true,
-        };
-        console.log("🔵 [AUTH] Admin user detected - setting admin flags");
-      }
-      
-      // STORAGE SYNC: Save user to localStorage IMMEDIATELY (after clearing old data)
-      // For admin users, ensure username is explicitly set to 'admin'
-      const userToStore = userData.username === "admin" || isAdminUser
-        ? {
-            ...finalUser,
-            ...userData,
-            username: "admin",
-            role: "admin",
-            isAdmin: true,
-          }
-        : finalUser;
-      
+
+      // Store user data in localStorage (token is in httpOnly cookie)
       localStorage.setItem("user", JSON.stringify(userToStore));
       
-      // Verify it was saved
-      const verifySaved = localStorage.getItem("user");
-      console.log("✅ [AUTH] User session saved to localStorage:", verifySaved);
-      console.log("✅ [AUTH] Parsed saved user:", JSON.parse(verifySaved || "{}"));
-
-      // IMMEDIATE ADMIN REDIRECT: Check admin first, before return URL
-      // Handle both "admin" and "SUPER_ADMIN" roles
-      const shouldRedirectToAdmin = 
-        isAdminUser || 
-        finalUser.isAdmin === true || 
-        finalUser.role === "admin" || 
-        finalUser.role === "SUPER_ADMIN" ||
-        userData.role === "SUPER_ADMIN" ||
-        userData.username === "admin";
-      
-      console.log("🔵 [AUTH] Admin redirect check:", {
-        isAdminUser,
-        finalUserRole: finalUser.role,
-        finalUserIsAdmin: finalUser.isAdmin,
-        userDataRole: userData.role,
-        userDataUsername: userData.username,
-        shouldRedirectToAdmin
-      });
-      
-      if (shouldRedirectToAdmin) {
-        console.log("🔵 [AUTH] ✅ ADMIN USER DETECTED - FORCING HARD REDIRECT TO /admin");
-        
-        // Ensure admin session is saved correctly
-        const adminSession = {
-          ...userData,
-          username: "admin",
-          role: "admin",
-          isAdmin: true,
-        };
-        localStorage.setItem('user', JSON.stringify(adminSession));
-        
-        // Verify localStorage was set correctly
-        const savedAdmin = localStorage.getItem('user');
-        console.log("✅ [AUTH] Admin session verified in localStorage:", savedAdmin);
-        
-        // Show toast briefly before redirect
-        toast({
-          title: "Admin Login Successful!",
-          description: "Redirecting to admin dashboard...",
-        });
-        
-        // HARD REFRESH: Use window.location.href for immediate hard redirect
-        // This ensures full page reload and clears any stale React state
-        console.log("🔄 [AUTH] Performing IMMEDIATE HARD REDIRECT to /admin");
-        window.location.href = '/admin';
-        return; // Exit early - don't continue with other redirects
-      }
-
-      toast({
-        title: activeTab === "login" ? "Welcome Back!" : "Account Created!",
-        description: "Dashboard khul raha hai...",
-      });
-
-      // Set redirect flag to prevent useEffect from running again
-      hasRedirected.current = true;
-
-      // Redirect based on role - check return URL first
-      const params = new URLSearchParams(window.location.search);
-      const returnUrl = params.get("return");
-      
-      const userRole = finalUser.role || "customer";
-      
-      console.log("🔵 [AUTH] User role:", userRole, "returnUrl:", returnUrl);
-      
-      // Determine redirect URL
-      let redirectUrl = "/partner"; // default
-      
-      if (returnUrl && returnUrl !== "/auth" && returnUrl !== window.location.pathname) {
-        redirectUrl = returnUrl;
-      } else if (userRole === "seller" || userRole === "MERCHANT") {
-        redirectUrl = "/partner";
+      const districtIdFromUser = Number((userToStore as any)?.districtId);
+      if (Number.isInteger(districtIdFromUser) && districtIdFromUser > 0) {
+        localStorage.setItem("districtId", String(districtIdFromUser));
+      } else if (!localStorage.getItem("districtId")) {
+        localStorage.setItem("districtId", "3");
       }
       
-      // Prevent redirect loops - don't redirect to the same page
-      if (redirectUrl !== window.location.pathname) {
-        console.log("🔵 [AUTH] Redirecting to:", redirectUrl);
-        // Use window.location.href for hard redirect (prevents React re-renders)
-        window.location.href = redirectUrl;
-      }
+      // ✅ Use utility function for role-based redirect - pass userToStore with computed isAdmin property
+      const target = getClientRoleRedirectPath(userToStore);
+      console.log("🛠️ [DEBUG] Login Redirect Target:", target);
+      
+      window.location.href = target; 
+      // Do NOT set loading to false here, let the browser handle the navigation
+      
     } catch (error: any) {
-      console.error("🔴 Error:", error);
+      console.error("❌ [AUTH] Error:", error);
       toast({
         variant: "destructive",
         title: "Gadbad ho gayi",
-        description: error.message,
+        description: error.message || "Login failed. Please try again.",
       });
-    } finally {
-      setLoading(false);
+      setLoading(false); 
     }
   };
 
-  // ✅ Agar Validation Fail hui to ye chalega (NEW)
-  const onError = (errors: any) => {
-    console.log("🟡 Validation Errors:", errors);
-    toast({
-      variant: "destructive",
-      title: "Form Adhoora Hai!",
-      description: "Kripya Username (3+) aur Password (6+) sahi bharein.",
-    });
-  };
+  const isPartnerMode = authMode === "partner";
+  const IconComponent = isPartnerMode ? Store : ShoppingBag;
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center bg-slate-50 p-6">
-      <Card className="w-full max-w-md shadow-2xl border-none rounded-[2rem] overflow-hidden">
-        <CardHeader className="bg-orange-500 text-white text-center pb-8">
-          <div className="mx-auto bg-white/20 p-3 rounded-2xl w-fit mb-4">
-            <Store size={32} />
+    <div className="min-h-screen bg-deep orange-nebula-gradient flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Subtle orange gradient pulse */}
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-900/20 via-transparent to-transparent animate-orange-pulse pointer-events-none" />
+      
+      <div className="w-full max-w-md relative z-10">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-orange-600/20 backdrop-blur-md mb-4 border border-orange-500/30 shadow-[0_0_30px_rgba(249,115,22,0.3)]">
+            <IconComponent className="w-10 h-10 text-orange-500" />
           </div>
-          <CardTitle className="text-2xl font-black italic uppercase">
-            Partner Portal
-          </CardTitle>
-          <CardDescription className="text-orange-100 font-bold">
-            Apni dukan manage karein
-          </CardDescription>
-        </CardHeader>
+          <h1 className="text-4xl font-black tracking-tight text-white">
+            {isPartnerMode ? "Partner Portal" : "Shahdol Bazaar"}
+          </h1>
+          <p className="text-slate-400 mt-2 font-medium">
+            {isPartnerMode ? "अपना स्टोर मैनेज करें" : "Your local marketplace"}
+          </p>
+        </div>
 
-        <CardContent className="p-8">
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
-            <TabsList className="grid grid-cols-2 mb-8 bg-slate-100 p-1 rounded-xl">
-              <TabsTrigger value="login" className="rounded-lg font-bold">
-                Login
-              </TabsTrigger>
-              <TabsTrigger value="register" className="rounded-lg font-bold">
-                Register
-              </TabsTrigger>
-            </TabsList>
+        {/* FIX: Use state value for stability - prevent function call on every render */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="register">Register</TabsTrigger>
+          </TabsList>
 
-            <Form {...form}>
-              {/* ✅ Error Handler Added here */}
-              <form
-                onSubmit={form.handleSubmit(onSubmit, onError)}
-                className="space-y-6"
-              >
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-bold text-slate-700 uppercase text-xs tracking-wider">
-                        Username
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="shopname"
-                          {...field}
-                          className="rounded-xl h-12"
-                        />
-                      </FormControl>
-                      <FormMessage className="text-red-500 font-bold text-xs" />
-                    </FormItem>
-                  )}
-                />
+          <TabsContent value="login">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle>Welcome Back!</CardTitle>
+                <CardDescription>अपना खाता खोलें और जारी रखें</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Username</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Username" {...field} className="bg-white/5 border-white/10 text-white placeholder:text-white/40" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Password" {...field} className="bg-white/5 border-white/10 text-white placeholder:text-white/40" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {isRateLimited && rateLimitRemaining !== null && (
+                      <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4 text-center backdrop-blur-md">
+                        <p className="text-red-400 font-medium mb-2">⚠️ बहुत ज्यादा कोशिशें!</p>
+                        <div className="text-3xl font-black text-red-400">
+                          {Math.floor(rateLimitRemaining / 60)}:{String(rateLimitRemaining % 60).padStart(2, '0')}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <Button type="submit" className="w-full btn-neon-primary" disabled={loading || isRateLimited}>
+                      {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> कृपया प्रतीक्षा करें...</> : "Login"}
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-bold text-slate-700 uppercase text-xs tracking-wider">
-                        Password
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="******"
-                          {...field}
-                          className="rounded-xl h-12"
-                        />
-                      </FormControl>
-                      <FormMessage className="text-red-500 font-bold text-xs" />
-                    </FormItem>
-                  )}
-                />
-
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-6 rounded-xl shadow-lg uppercase tracking-widest transition-all active:scale-95"
-                >
-                  {loading ? (
-                    <Loader2 className="animate-spin" />
-                  ) : activeTab === "login" ? (
-                    "Login Now"
-                  ) : (
-                    "Create Account"
-                  )}
-                </Button>
-              </form>
-            </Form>
-          </Tabs>
-        </CardContent>
-      </Card>
+          <TabsContent value="register">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle>Create Account</CardTitle>
+                <CardDescription>
+                  {isPartnerMode ? "अपना स्टोर बनाएं और बिक्री शुरू करें" : "Join Shahdol Bazaar today"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="districtId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Select District</FormLabel>
+                          <FormControl>
+                            <select 
+                              {...field}
+                              className="w-full bg-white/5 border border-white/10 text-white rounded-xl py-3 px-4 text-sm focus:border-orange-500/50 appearance-none cursor-pointer"
+                              onChange={(e) => form.setValue("districtId", e.target.value)}
+                            >
+                              <option value="" className="bg-black">-- चुनें अपना जिला --</option>
+                              {districts.map((d) => (
+                                <option key={d.id} value={d.id.toString()} className="bg-black">
+                                  {d.name}
+                                </option>
+                              ))}
+                            </select>
+                          </FormControl>
+                          {fetching && <p className="text-[10px] text-orange-500 animate-pulse">Loading cities...</p>}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Username</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Choose a username" {...field} className="bg-white/5 border-white/10 text-white placeholder:text-white/40" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Create a password" {...field} className="bg-white/5 border-white/10 text-white placeholder:text-white/40" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" className="w-full btn-neon-primary" disabled={loading}>
+                      {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> कृपया प्रतीक्षा करें...</> : "Create Account"}
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+        
+        <div className="text-center mt-6 text-sm text-slate-500">
+          <p>By continuing, you agree to our</p>
+          <div className="flex justify-center gap-2 mt-1">
+            <a href="/terms" className="hover:underline text-orange-400">Terms</a>
+            <span>&middot;</span>
+            <a href="/privacy" className="hover:underline text-orange-400">Privacy</a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,294 +1,241 @@
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, X, MessageCircle, Bus, Store, ShoppingCart, Home as HomeIcon, Grid, ClipboardList, User } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Store, ShoppingCart, Home as HomeIcon, User, LogOut, Package, Search, Sparkles, Menu, MapPin, Brain } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { useAuth, getClientRoleRedirectPath } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { Cart } from "@/components/Cart";
 import { toast } from "sonner";
-import { Footer } from "@/components/footer";
+import { useDistrict } from "@/contexts/DistrictContext";
+import { SearchBar } from "@/components/search-bar";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
+import ShahdolAIAssistant from "@/components/ShahdolAIAssistant";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [location] = useLocation();
+  const isAdminOrVendor = location.startsWith('/admin') || location.startsWith('/vendor');
+  const [scrollY, setScrollY] = useState(0);
   const { getTotalItems } = useCart();
-
-  const myWhatsAppNumber = "919753239303";
-  const myEmail = "shaholbazaar2.0@gmail.com";
-  const myName = "Lav Kumar Soni";
+  const { currentDistrict } = useDistrict();
+  const { isAuthenticated, user, logout } = useAuth();
   const cartItemCount = getTotalItems();
-  let profileDest = "/customer-dashboard";
-  try {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      const u = JSON.parse(userStr);
-      if (u?.role === "admin" || u?.isAdmin) profileDest = "/admin";
-      else if (u?.role === "seller") profileDest = "/partner";
-    }
-  } catch {}
+  const districtName = currentDistrict?.name || "Shahdol";
 
-  // Route change hote hi menu band karne ke liye
   useEffect(() => {
-    setIsMenuOpen(false);
-  }, [location]);
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-  const handleComingSoon = (e: React.MouseEvent) => {
-    e.preventDefault();
-    toast.info("Bus Timetable: Work in progress! 🚧", {
-      description: "Hum jald hi sateek timings update karenge.",
-    });
-  };
+  const headerOpacity = Math.max(0, 1 - scrollY / 200);
+  const headerScale = Math.max(0.85, 1 - scrollY / 500);
+
+  const [, setLocation] = useLocation();
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    toast.success("Logged out successfully");
+    setLocation("/");
+  }, [logout, setLocation]);
+
+  const navItems = [
+    { href: "/", icon: HomeIcon, label: "Home" },
+    { href: "/marketplace", icon: Store, label: "Shops" },
+    { href: "/ai/concierge", icon: Sparkles, label: "AI" },
+    { href: "/cart", icon: ShoppingCart, label: "Cart", hasCart: true },
+    { href: "/auth", icon: User, label: "Profile" },
+  ];
+
+  // Center AI button index
+  const aiCenterIndex = 2;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background font-sans">
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes blink {
-          0% { opacity: 1; }
-          50% { opacity: 0.3; }
-          100% { opacity: 1; }
-        }
-        .animate-blink {
-          animation: blink 1.5s ease-in-out infinite;
-        }
-      `}} />
-      {/* --- HEADER SECTION --- */}
-      <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur shadow-sm">
-        <div className="container mx-auto px-4 h-16 md:h-20 flex items-center justify-between gap-4">
-          <Link href="/">
-            <img
-              src="/logo.webp"
-              alt="ShahdolBazaar"
-              width="180"
-              height="60"
-              style={{ aspectRatio: '180 / 60' }}
-              className="h-10 md:h-14 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
-            />
-          </Link>
+    <div className="relative w-full flex flex-col font-sans bg-[#030003]">
+      {/* HEADER - Strike 161 Full Functional */}
+      <header className="h-16 px-4 md:px-6 flex justify-between items-center border-b border-white/5 bg-black/40 backdrop-blur-xl fixed w-full top-0 z-[100]" style={{
+          opacity: headerOpacity,
+          transform: `scale(${headerScale})`,
+          transformOrigin: 'top center',
+        }}>
+        {/* Left: Sidebar Trigger */}
+        <div className="flex justify-start">
+          <Sheet>
+            <SheetTrigger asChild>
+              <button className="p-2 hover:bg-white/5 rounded-full transition-colors active:scale-90">
+                <Menu className="w-6 h-6 text-white" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="left" className="bg-[#0a0a0a]/98 backdrop-blur-3xl border-r border-white/10 text-white w-[300px] p-0 flex flex-col">
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-6 text-sm font-bold">
-            <button
-              onClick={handleComingSoon}
-              className={`flex items-center gap-1 cursor-pointer transition-colors bg-transparent p-0 border-none font-bold ${
-                location === "/bus"
-                  ? "text-orange-600"
-                  : "text-slate-500 hover:text-orange-600"
-              }`}
-            >
-              <Bus size={16} /> Bus Timetable 
-              <span className="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded text-[10px] font-black uppercase animate-blink border border-amber-200">
-                Coming Soon
-              </span>
-            </button>
+              {/* 🏷️ BRAND HEADER */}
+              <div className="p-6 border-b border-white/5 bg-gradient-to-br from-orange-500/10 to-transparent">
+                <SheetTitle className="text-xl font-black tracking-tighter italic uppercase">
+                  <span className="text-white">SHAHDOL</span>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">BAZAAR</span>
+                </SheetTitle>
+                <SheetDescription className="text-gray-500 text-[10px] uppercase tracking-[0.2em] mt-1">Sovereign OS v4.0</SheetDescription>
+              </div>
 
-            <Link href="/about">
-              <span
-                className={`cursor-pointer transition-colors ${
-                  location === "/about"
-                    ? "text-orange-600"
-                    : "text-slate-500 hover:text-orange-600"
-                }`}
-              >
-                About Us
-              </span>
-            </Link>
+              {/* 🗺️ NAVIGATION */}
+              <nav className="flex-1 flex flex-col p-4 gap-2 overflow-y-auto">
+                {[
+                  { href: "/", label: "🏠 Home" },
+                  { href: "/services", label: "🔧 Essential Services" },
+                  { href: "/about", label: "📈 About Us" },
+                  { href: "/contact", label: "📞 Contact Us" },
+                  { href: "/terms", label: "📜 Terms & Conditions" }
+                ].map((link) => (
+                  <Link 
+                    key={link.href} 
+                    href={link.href} 
+                    className={`flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-sm ${
+                      location === link.href ? "bg-orange-500/10 text-orange-500 border border-orange-500/20" : "hover:bg-white/5 text-gray-400"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
 
-            <Link href="/contact">
-              <span
-                className={`cursor-pointer transition-colors ${
-                  location === "/contact"
-                    ? "text-orange-600"
-                    : "text-slate-500 hover:text-orange-600"
-                }`}
-              >
-                Contact Us
-              </span>
-            </Link>
-
-            <button
-              onClick={() => {
-                const userStr = localStorage.getItem("user");
-                let dest = "/auth";
-                if (userStr) {
-                  try {
-                    const u = JSON.parse(userStr);
-                    if (u?.role === "seller") dest = "/partner";
-                    else if (u?.role === "admin" || u?.isAdmin) dest = "/admin";
-                    else dest = "/customer-dashboard";
-                  } catch {}
-                }
-                window.location.href = dest;
-              }}
-              className={`flex items-center gap-2 px-3 py-2 rounded-full border ${
-                location === "/partner" || location.startsWith("/partner/")
-                  ? "border-orange-500 text-orange-600 bg-orange-50"
-                  : "border-slate-200 text-slate-600 hover:border-orange-400 hover:text-orange-600"
-              }`}
-            >
-              <Store size={16} /> Sell on Shahdol Bazaar
-            </button>
-
-            <Link href={profileDest}>
-              <span
-                className={`flex items-center gap-2 px-3 py-2 rounded-full border ${
-                  location === profileDest
-                    ? "border-orange-500 text-orange-600 bg-orange-50"
-                    : "border-slate-200 text-slate-600 hover:border-orange-400 hover:text-orange-600"
-                }`}
-              >
-                <User size={16} /> Profile
-              </span>
-            </Link>
-
-            {/* Cart Icon */}
-            <button
-              onClick={() => setIsCartOpen(true)}
-              aria-label="Open Cart"
-              className="relative p-2 text-slate-500 hover:text-orange-600 transition-colors"
-            >
-              <ShoppingCart size={20} />
-              {cartItemCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                  {cartItemCount > 9 ? "9+" : cartItemCount}
-                </span>
-              )}
-            </button>
-          </nav>
-
-          {/* Mobile: Cart and Menu */}
-          <div className="md:hidden flex items-center gap-2">
-            <button
-              onClick={() => setIsCartOpen(true)}
-              aria-label="Open Shopping Cart"
-              className="relative p-2 text-slate-600"
-            >
-              <ShoppingCart size={24} />
-              {cartItemCount > 0 && (
-                <span className="absolute top-0 right-0 bg-orange-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                  {cartItemCount > 9 ? "9+" : cartItemCount}
-                </span>
-              )}
-            </button>
-            <button
-              className="p-2 text-slate-600"
-              aria-label="Toggle Navigation Menu"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
+              {/* 🏪 FOOTER ACTION */}
+              <div className="p-6 border-t border-white/5 mb-6">
+                <Link href="/vendor/register" className="flex items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-red-600 hover:scale-[1.02] active:scale-95 text-white transition-all font-black shadow-lg shadow-orange-900/40">
+                  🏪 Start Selling
+                </Link>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
 
-        {/* Mobile Nav Menu */}
-        {isMenuOpen && (
-          <div className="md:hidden border-t p-4 space-y-4 bg-white animate-in slide-in-from-top duration-200">
-            <nav className="flex flex-col gap-4">
-              <button
-                onClick={handleComingSoon}
-                className={`text-sm font-bold flex items-center gap-2 cursor-pointer bg-transparent p-0 border-none text-left ${
-                  location === "/bus" ? "text-orange-600" : "text-slate-600"
-                }`}
-              >
-                <Bus size={18} /> Bus Timetable
-                <span className="ml-auto px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded text-[10px] font-black uppercase animate-blink border border-amber-200">
-                  Coming Soon
-                </span>
-              </button>
+        {/* Center: Hero Logo */}
+        <div className="flex justify-center pl-4 sm:pl-0">
+          <Link href="/" className="flex flex-col items-center group overflow-visible">
+            <span className="text-lg sm:text-xl md:text-2xl font-black tracking-wider leading-none italic uppercase pr-8 inline-block overflow-visible relative">
+              <span className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">SHAHDOL</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600 drop-shadow-[0_0_12px_rgba(249,115,22,0.6)]">BAZAAR</span>
+            </span>
+            <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-orange-500/20 to-transparent group-hover:via-orange-500 transition-all duration-500"></div>
+          </Link>
+        </div>
 
-              <Link href="/about">
-                <span
-                  className={`text-sm font-bold cursor-pointer ${
-                    location === "/about" ? "text-orange-600" : "text-slate-600"
-                  }`}
-                >
-                  About Us
-                </span>
-              </Link>
-
-              <Link href="/contact">
-                <span
-                  className={`text-sm font-bold cursor-pointer ${
-                    location === "/contact" ? "text-orange-600" : "text-slate-600"
-                  }`}
-                >
-                  Contact Us
-                </span>
-              </Link>
-
-              <Link href="/auth">
-                <span
-                  className={`text-sm font-bold cursor-pointer ${
-                    location === "/auth" ? "text-orange-600" : "text-slate-600"
-                  }`}
-                >
-                  Partner Login
-                </span>
-              </Link>
-
-              <Link href="/partner">
-                <span
-                  className={`text-sm font-bold flex items-center gap-2 cursor-pointer ${
-                    location === "/partner" || location.startsWith("/partner/")
-                      ? "text-orange-600"
-                      : "text-slate-600"
-                  }`}
-                >
-                  <Store size={18} /> Sell on Shahdol Bazaar
-                </span>
-              </Link>
-
-              <Link href={profileDest}>
-                <span
-                  className={`text-sm font-bold flex items-center gap-2 cursor-pointer ${
-                    location === profileDest ? "text-orange-600" : "text-slate-600"
-                  }`}
-                >
-                  <User size={18} /> Profile
-                </span>
-              </Link>
-            </nav>
-          </div>
-        )}
+        {/* Right: Profile */}
+        <div className="flex justify-end">
+          <button 
+            onClick={() => setLocation('/auth')}
+            title="User Profile"
+            className="p-2 bg-white/5 rounded-full border border-white/10 hover:bg-orange-500/20 transition-all active:scale-95 cursor-pointer"
+          >
+            <User size={18} className="text-gray-300" />
+          </button>
+        </div>
       </header>
 
-      {/* --- PAGE CONTENT --- */}
-      <main className="flex-1">{children}</main>
+      {/* STICKY SEARCH BAR - FLOATING AI CORE - Strike 115: Scroll-Triggered */}
+{/* STICKY SEARCH BAR - FLOATING AI CORE - Strike 142: Fixed Flow */}
+{!isAdminOrVendor && (
+<div
+  className={`fixed top-[64px] left-0 w-full z-[90] flex justify-center transition-all duration-300 py-3 px-4 ${
+    scrollY > 200 ? 'opacity-100 translate-y-0 bg-[#050505]/98 backdrop-blur-3xl border-b border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)]' : 'opacity-0 -translate-y-10 pointer-events-none'
+  }`}
+>
+  <div className="relative z-[90] w-full max-w-xl">
+    <SearchBar
+      placeholder="Ask AI anything in Shahdol..."
+      onFocus={() => setIsSearchFocused(true)}
+      onBlur={() => setIsSearchFocused(false)}
+    />
+  </div>
+</div>
+)}
+
+      {/* MAIN CONTENT */}
+      <main className={`flex-1 w-full max-w-6xl mx-auto px-0 sm:px-6 lg:px-8 relative z-10 pt-[88px] transition-all duration-300 ${isAdminOrVendor ? 'pb-8' : 'pb-[120px]'}`}>
+        {children}
+      </main>
+
+      {/* BOTTOM NAV */}
+      {!isAdminOrVendor && (
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#030003]/90 backdrop-blur-xl border-t border-white/10 z-[80]">
+        <div className="flex justify-around items-center py-2">
+          {navItems.map((item, index) => {
+            const Icon = item.icon;
+            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+            const isAIActive = item.label === "Shops" && location === "/marketplace";
+            {/* 🛡️ SOVEREIGN AI ORB - GUARANTEED CLICKABLE */}
+            const isCenterAI = index === aiCenterIndex;
+            return isCenterAI ? (
+              <div key={item.label} className="relative -top-5 flex flex-col items-center justify-center w-16 z-[9999] pointer-events-auto">
+                {/* KILL INVISIBLE SHIELD: pointer-events-none on the glow */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-16 h-16 rounded-full bg-orange-500/20 blur-xl animate-pulse"></div>
+                </div>
+                
+                {/* THE ACTUAL BUTTON: Forced pointer-events-auto and max z-index */}
+                <button
+                  type="button"
+                  onClick={(e) => { 
+                    e.preventDefault(); 
+                    e.stopPropagation(); 
+                    window.dispatchEvent(new CustomEvent('open-shahdol-ai')); 
+                  }}
+                  className="relative z-[10000] w-14 h-14 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-[0_0_30px_rgba(249,115,22,0.7)] border-[2px] border-white/10 hover:scale-105 transition-transform cursor-pointer pointer-events-auto"
+                >
+                  <Sparkles className="w-6 h-6 text-white pointer-events-none" />
+                </button>
+                
+                <span className="text-[11px] font-black text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)] uppercase tracking-widest absolute -bottom-5 w-full text-center pointer-events-none">
+                  AI
+                </span>
+              </div>
+            ) : (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-col items-center gap-1 px-3 py-1 min-w-[60px] hover:scale-105 active:scale-95 transition ${
+                  isActive || isAIActive 
+                    ? "text-orange-500 drop-shadow-[0_0_10px_rgba(249,115,22,0.5)]" 
+                    : "text-gray-400"
+                }`}
+              >
+                <div className="relative">
+                  <Icon size={20} />
+                  {item.hasCart && cartItemCount > 0 && (
+                    <span className="absolute -top-1 -right-2 bg-orange-600 text-white text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                      {cartItemCount > 99 ? '99+' : cartItemCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs font-medium text-gray-400">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+      )}
 
       {/* Cart Sidebar */}
       <Cart open={isCartOpen} onOpenChange={setIsCartOpen} />
 
-      {/* Floating WhatsApp */}
-      <FloatingWhatsApp />
-
-      {/* --- FOOTER SECTION --- */}
-      <Footer />
-
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-lg">
-        <div className="grid grid-cols-4 text-center text-xs font-bold text-slate-600">
-          <Link href="/" className={`py-2 flex flex-col items-center gap-1 ${location === "/" ? "text-[#e4488f]" : ""}`}>
-            <HomeIcon size={18} />
-            <span>Home</span>
-          </Link>
-          <Link href="/category/women-fashion" className={`py-2 flex flex-col items-center gap-1 ${location.startsWith("/category") ? "text-[#e4488f]" : ""}`}>
-            <Grid size={18} />
-            <span>Categories</span>
-          </Link>
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className="py-2 flex flex-col items-center gap-1 text-slate-600"
-          >
-            <ShoppingCart size={18} />
-            <span>Cart</span>
-          </button>
-          <Link href="/customer-dashboard" className={`py-2 flex flex-col items-center gap-1 ${location === "/customer-dashboard" ? "text-[#e4488f]" : ""}`}>
-            <User size={18} />
-            <span>Profile</span>
-          </Link>
-        </div>
-      </nav>
+      {/* Floating AI & WA - Direct render, no wrapper */}
+      {!isAdminOrVendor && (
+      <div className="fixed bottom-20 right-4 md:bottom-24 md:right-8 z-[9999] flex flex-col gap-4 items-end">
+        <ShahdolAIAssistant />
+        <FloatingWhatsApp />
+      </div>
+      )}
     </div>
   );
 }
-
