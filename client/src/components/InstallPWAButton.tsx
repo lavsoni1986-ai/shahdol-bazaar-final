@@ -133,7 +133,7 @@ const InstallPWAButton: React.FC = () => {
         </button>
       )}
 
-      <style jsx>{`
+      <style>{`
         @keyframes slide-down {
           from {
             transform: translateY(-100%);

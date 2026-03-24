@@ -1,209 +1,118 @@
-import {
-  Users,
-  Target,
-  ShieldCheck,
-  Rocket,
-  MessageSquare,
-  Heart,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import React from "react";
+import confetti from 'canvas-confetti'; // अगर यह इंस्टॉल नहीं है तो 'npm install canvas-confetti' करें
+import { ShieldCheck, MapPin, Users, Zap } from "lucide-react";
 
 export default function About() {
-  return (
-    <div className="min-h-screen bg-white">
-      {/* 1. PREMIUM HERO SECTION */}
-      <section className="relative py-24 bg-slate-900 overflow-hidden">
-        {/* Decorative background blur */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-orange-500 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-[120px] translate-x-1/2 translate-y-1/2"></div>
-        </div>
+  
+  const handleJoinClick = () => {
+    // 🎉 पटाखों वाला इफेक्ट
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#f97316', '#ffffff', '#22c55e']
+    });
 
-        <div className="max-w-4xl mx-auto px-6 relative z-10 text-center">
-          <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 text-orange-600 px-4 py-2 rounded-full mb-8">
-            <Heart size={16} fill="currentColor" />
-            <span className="text-xs font-black uppercase tracking-widest">
-              Proudly Local
-            </span>
-          </div>
-          <h1 className="text-5xl md:text-7xl font-black text-white mb-8 tracking-tight">
-            Shahdol Ka <span className="text-orange-600">Apna</span> <br />
-            Digital Bazaar
+    // 2 सेकंड बाद व्हाट्सएप पर भेजें
+    setTimeout(() => {
+      window.open("https://wa.me/919753239303?text=नमस्ते लव भाई, मैं शहडोल बाज़ार पर अपना स्टोर रजिस्टर करना चाहता हूँ।", "_blank");
+    }, 1000);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-orange-500 selection:text-white">
+      {/* 1. Cinematic Hero Section */}
+      <section className="relative h-[80vh] flex items-center justify-center overflow-hidden border-b border-white/10">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#f9731633_0%,transparent_50%)]"></div>
+        <div className="container mx-auto px-4 relative z-10 text-center">
+          <span className="inline-block py-1 px-3 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-xs font-bold tracking-widest uppercase mb-6 animate-pulse">
+            Established 2026
+          </span>
+          <h1 className="text-6xl md:text-8xl font-black tracking-tighter mb-8 bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">
+            SHAHDOL<br/>BAZAAR
           </h1>
-          <p className="text-slate-400 text-lg md:text-xl font-medium leading-relaxed max-w-2xl mx-auto">
-            Hum Shahdol ke har chhote aur bade vyapari ko digital pehchan de
-            rahe hain. Hamara maqsad local vyapar ko adhunik aur asaan banana
-            hai.
+          <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto font-light leading-relaxed">
+            Hum sirf ek marketplace nahi, balki Shahdol Sambhag ki digital legacy hain. 
+            Vindhya ki mitti se lekar digital world tak ka ek naya safar.
           </p>
         </div>
       </section>
 
-      {/* 2. OUR STORY & MISSION */}
-      <section className="max-w-6xl mx-auto px-6 py-24">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
-          <div className="relative">
-            <div className="bg-slate-100 rounded-[3rem] overflow-hidden aspect-square flex items-center justify-center p-12">
-              <img
-                src="/logo.webp"
-                alt="ShahdolBazaar"
-                width="400"
-                height="130"
-                style={{ aspectRatio: '400 / 130' }}
-                className="w-full h-auto object-contain opacity-90"
-              />
-            </div>
-            {/* Floating badge */}
-            <div className="absolute -bottom-6 -right-6 bg-white p-8 rounded-[2rem] shadow-xl border border-slate-50 hidden md:block">
-              <p className="text-4xl font-black text-orange-600">100%</p>
-              <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">
-                Local Trust
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2 text-orange-600 mb-4">
-              <Target size={24} />
-              <span className="font-black uppercase tracking-widest text-sm">
-                Hamara Maqsad
-              </span>
-            </div>
-            <h2 className="text-4xl font-black text-slate-900 mb-8 tracking-tight italic">
-              "Gandhi Chowk se Mobile Screen tak."
+      {/* 2. The Identity (Sambhag Pride) */}
+      <section className="py-32 container mx-auto px-4">
+        <div className="grid lg:grid-cols-12 gap-16 items-center">
+          <div className="lg:col-span-7">
+            <h2 className="text-4xl font-black mb-8 leading-tight">
+              Shahdol: Ek Jila Nahi,<br/>
+              <span className="text-orange-500">Ek Gauravshali Sambhag Hai.</span>
             </h2>
-            <div className="space-y-6 text-slate-600 text-lg leading-relaxed">
-              <p>
-                ShahdolBazaar ka janm ek saral soch se hua:{" "}
-                <span className="text-slate-900 font-bold">
-                  "Shahdol ke local businesses ko digital taqat kaise di jaye?"
-                </span>
-              </p>
-              <p>
-                Aaj ke digital daur mein, bade e-commerce platforms ki wajah se
-                local dukanen kahin peeche chhoot rahi thi. Humne ek aisa
-                platform banaya jahan Shahdol ka har vyapari apni dukan ko
-                online la sake.
-              </p>
-              <p>
-                Hamara mission sirf dukanen list karna nahi, balki local economy
-                ko majboot karna aur grahakon ko unki bharosemand dukanon se
-                seedha jodna hai.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. KEY VALUES SECTION */}
-      <section className="bg-slate-50 py-24 border-y border-slate-100">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-black text-slate-900 mb-4">
-              Hum Alag Kyun Hain?
-            </h2>
-            <p className="text-slate-500 font-medium">
-              ShahdolBazaar par aapka bharosa hamari kamyabi hai.
+            <p className="text-xl text-slate-400 leading-relaxed mb-8">
+              Shree Ram Hospital se lekar local market tak, Shahdol Sambhag (Anuppur, Umaria) 
+              ki har ek dhadkan ab aapke phone par hai. Humne is platform ko Shahdol ke 
+              vyapariyon ko ek "World-Class" digital pehchan dene ke liye banaya hai.
             </p>
+            <div className="grid grid-cols-2 gap-8 border-t border-white/10 pt-12">
+              <div>
+                <h4 className="text-3xl font-black text-white">Sambhag</h4>
+                <p className="text-slate-500 text-sm mt-2">Division Pride: Shahdol, Anuppur, Umaria</p>
+              </div>
+              <div>
+                <h4 className="text-3xl font-black text-white">DSSL</h4>
+                <p className="text-slate-500 text-sm mt-2">Military Grade Digital Safety</p>
+              </div>
+            </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Value 1 */}
-            <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition-all duration-500 group">
-              <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
-                <ShieldCheck size={32} />
+          <div className="lg:col-span-5 relative">
+            <div className="aspect-square bg-gradient-to-br from-orange-500 to-red-600 rounded-3xl rotate-3 flex items-center justify-center p-1 shadow-2xl shadow-orange-500/20">
+              <div className="bg-[#050505] w-full h-full rounded-[1.4rem] flex flex-col items-center justify-center text-center p-8">
+                <MapPin size={48} className="text-orange-500 mb-6" />
+                <h3 className="text-2xl font-black italic">Shahdol Marketplace</h3>
+                <p className="text-slate-500 mt-4 text-sm font-medium">Headquartered in Shahdol, MP</p>
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                Verified Listings
-              </h3>
-              <p className="text-slate-500 leading-relaxed">
-                Hum har dukan aur business ki jankari ko verify karte hain taaki
-                aapko hamesha sahi aur sateek address mile.
-              </p>
-            </div>
-
-            {/* Value 2 */}
-            <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition-all duration-500 group">
-              <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
-                <MessageSquare size={32} />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                Zero Commission
-              </h3>
-              <p className="text-slate-500 leading-relaxed">
-                Koi beech-bicholiya nahi. Seedha WhatsApp par dukan-dar se
-                judiye aur best deals paiye bina kisi extra charge ke.
-              </p>
-            </div>
-
-            {/* Value 3 */}
-            <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition-all duration-500 group">
-              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
-                <Rocket size={32} />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                Shahdol First
-              </h3>
-              <p className="text-slate-500 leading-relaxed">
-                Humara platform sirf Shahdol ke liye dedicated hai. Hum local
-                branding aur local shops ko badhava dene mein vishwas rakhte
-                hain.
-              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 4. JOIN US / CTA */}
-      <section className="max-w-6xl mx-auto px-6 py-24 text-center">
-        <div className="bg-slate-900 rounded-[3rem] p-12 md:p-24 text-white relative overflow-hidden shadow-2xl">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500 rounded-full blur-[100px] opacity-20 translate-x-1/2 -translate-y-1/2"></div>
-
-          <div className="relative z-10">
-            <h2 className="text-4xl md:text-6xl font-black mb-8 leading-tight">
-              Aapka Business, <br />
-              <span className="text-orange-600">Hamari Digital Pehchan.</span>
-            </h2>
-            <p className="text-slate-400 text-lg md:text-xl mb-12 max-w-2xl mx-auto">
-              Kya aap Shahdol mein vyapar karte hain? Aaj hi ShahdolBazaar se
-              judiye aur apne dukan ko online le jaiye.
-            </p>
-            <div className="bg-slate-800/50 p-8 rounded-3xl mb-12 border border-slate-700 max-w-xl mx-auto">
-              <h3 className="text-xl font-bold mb-4">Direct Contact</h3>
-              <p className="text-orange-600 font-black text-2xl mb-2">Lav Kumar Soni</p>
-              <p className="text-slate-300">Mobile: 9753239303</p>
-              <p className="text-slate-300">Email: shaholbazaar2.0@gmail.com</p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth">
-                <Button
-                  size="lg"
-                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-12 h-16 rounded-2xl shadow-lg shadow-orange-500/20 active:scale-95 transition-all"
-                >
-                  Register Your Shop
-                </Button>
-              </Link>
-
-              <Link href="/contact">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-slate-700 text-white hover:bg-slate-800 font-bold px-12 h-16 rounded-2xl transition-all"
-                >
-                  Contact Us
-                </Button>
-              </Link>
-            </div>
+      {/* 3. Features Grid - High Tech Feel */}
+      <section className="py-32 bg-white/5 border-y border-white/10">
+        <div className="container mx-auto px-4">
+          <div className="grid md:grid-cols-4 gap-8">
+            {[
+              { icon: <ShieldCheck />, title: "Digital Safety", desc: "DSSL Framework ke sath 100% fraud protection." },
+              { icon: <Zap />, title: "Hyperlocal", desc: "Shahdol ki galiyo se lekar hospitals tak ki direct access." },
+              { icon: <Users />, title: "Community", desc: "Local vyapariyon ko global reach dena hamara lakshya hai." },
+              { icon: <ShieldCheck />, title: "Trust", desc: "Verified listings aur transparent reviews." }
+            ].map((feature, i) => (
+              <div key={i} className="group p-8 rounded-2xl bg-[#0a0a0a] border border-white/5 hover:border-orange-500/50 transition-all duration-500">
+                <div className="text-orange-500 mb-6 group-hover:scale-110 transition-transform">{feature.icon}</div>
+                <h4 className="text-lg font-black mb-4">{feature.title}</h4>
+                <p className="text-slate-500 text-sm leading-relaxed">{feature.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* 5. FOOTER NOTE */}
-      <footer className="py-12 border-t border-slate-100 text-center">
-        <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.3em]">
-          ShahdolBazaar • Lead Your Business To Success
+      {/* 4. Final CTA - The "Working" Button */}
+      <section className="py-32 text-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-orange-600/5 blur-[120px] rounded-full"></div>
+        
+        <h2 className="text-3xl md:text-5xl font-black mb-12 relative z-10">
+          Shuru karein Shahdol ki <br/>Digital Kranti?
+        </h2>
+        
+        <button 
+          onClick={handleJoinClick}
+          className="relative z-10 px-12 py-5 bg-orange-600 hover:bg-orange-500 text-white font-black rounded-full transition-all shadow-[0_0_40px_rgba(249,115,22,0.3)] hover:shadow-[0_0_60px_rgba(249,115,22,0.5)] active:scale-95 border border-white/10"
+        >
+          JOIN AS MERCHANT
+        </button>
+        
+        <p className="mt-8 text-slate-500 text-sm font-medium relative z-10">
+          Verified by <span className="text-orange-500">DSSL Security Layer</span>
         </p>
-      </footer>
+      </section>
     </div>
   );
 }

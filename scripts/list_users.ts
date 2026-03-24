@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { db } from "../server/db";
+import { db } from "../server/storage";
 import { users } from "../shared/schema";
 
 async function listUsers() {

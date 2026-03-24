@@ -10,6 +10,14 @@ migrations/
 scripts/*.js
 !scripts/build.ts
 
+# Binary files
+*.zip
+*.tar.gz
+*.7z
+
+# Backup directories
+temp_restore/
+
 # Playwright
 /test-results/
 /playwright-report/

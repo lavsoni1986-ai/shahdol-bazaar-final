@@ -13,14 +13,15 @@ test.describe('User Registration & Login', () => {
     const password = 'Test123456';
 
     // Register customer
-    const { accessToken, user } = await registerUser(page, {
+    const { user } = await registerUser(page, {
       username,
       password,
       role: 'customer',
     });
 
-    // Verify registration successful
-    expect(accessToken).toBeTruthy();
+    // Verify registration successful - user data should be returned
+    // (token is in httpOnly cookie, not accessible via JavaScript)
+    expect(user).toBeTruthy();
     expect(user.username).toBe(username);
     expect(user.role).toBe('CUSTOMER');
 
@@ -33,14 +34,14 @@ test.describe('User Registration & Login', () => {
     const password = 'Merchant123456';
 
     // Register merchant
-    const { accessToken, user } = await registerUser(page, {
+    const { user } = await registerUser(page, {
       username,
       password,
       role: 'merchant',
     });
 
     // Verify registration successful
-    expect(accessToken).toBeTruthy();
+    expect(user).toBeTruthy();
     expect(user.username).toBe(username);
     expect(['MERCHANT', 'seller']).toContain(user.role);
 
@@ -57,18 +58,17 @@ test.describe('User Registration & Login', () => {
     await clearAuth(page);
 
     // Now test login
-    const { accessToken, user } = await loginUser(page, { username, password });
+    const { user } = await loginUser(page, { username, password });
 
-    // Verify login successful
-    expect(accessToken).toBeTruthy();
+    // Verify login successful - user data should be returned
+    expect(user).toBeTruthy();
     expect(user.username).toBe(username);
 
-    // Verify token is stored in localStorage
+    // Verify user is stored in localStorage
+    // (token is in httpOnly cookie, not accessible via JavaScript)
     await page.goto('/');
-    const storedToken = await page.evaluate(() => localStorage.getItem('accessToken'));
     const storedUser = await page.evaluate(() => localStorage.getItem('user'));
 
-    expect(storedToken).toBe(accessToken);
     expect(storedUser).toBeTruthy();
 
     const parsedUser = JSON.parse(storedUser!);
@@ -78,7 +78,7 @@ test.describe('User Registration & Login', () => {
   });
 
   test('TC 1.4: Login with Invalid Credentials', async ({ page }) => {
-    const response = await page.request.post('/api/login', {
+    const response = await page.request.post('/api/auth/login', {
       data: {
         username: 'nonexistent',
         password: 'wrongpassword',

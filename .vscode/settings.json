@@ -1,0 +1,14 @@
+{
+    "claudeCode.allowDangerouslySkipPermissions": true,
+    "css.customData": [
+        "${workspaceFolder}/.vscode/tailwindcss.json"
+    ],
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    "javascript.autoClosingTags": true,
+    "typescript.autoClosingTags": true,
+    "javascript.suggest.autoImports": true,
+    "typescript.suggest.autoImports": true
+}

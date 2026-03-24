@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import {
   Sheet,
@@ -19,10 +20,17 @@ interface CartProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Fetch shop details for phone number
-const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+// Fetch shop/vendor details - use relative path for Vite proxy
+const API_BASE = "";
 
 async function fetchShop(shopId: number) {
+  // Try vendor API first
+  const vendorUrl = `${API_BASE || ""}/api/vendors/id/${shopId}`;
+  const vendorRes = await fetch(vendorUrl);
+  if (vendorRes.ok) {
+    return vendorRes.json();
+  }
+  // Fallback to shops API
   const url = `${API_BASE || ""}/api/shops/${shopId}`;
   const res = await fetch(url);
   if (!res.ok) return null;
@@ -71,9 +79,12 @@ export function Cart({ open, onOpenChange }: CartProps) {
 
   const totalPrice = getTotalPrice();
 
+  const [, setLocation] = useLocation();
+  
   const handleProceedToCheckout = () => {
     if (items.length === 0) return;
-    setShowCheckoutForm(true);
+    onOpenChange(false); // Close cart
+    setLocation("/checkout"); // Navigate to checkout page
   };
 
   const handleWhatsAppCheckout = () => {

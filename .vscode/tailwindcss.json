@@ -1,0 +1,132 @@
+{
+  "version": 4,
+  "atRules": [
+    {
+      "name": "@custom-variant",
+      "description": "Define custom variants for Tailwind CSS",
+      "references": ["https://tailwindcss.com/docs/upgrade-guide#custom-variant"]
+    },
+    {
+      "name": "@theme",
+      "description": "Define theme variables for Tailwind CSS v4 (CSS-first configuration)",
+      "references": ["https://tailwindcss.com/docs/theme"]
+    },
+    {
+      "name": "@apply",
+      "description": "Apply Tailwind utility classes to custom CSS",
+      "references": ["https://tailwindcss.com/docs/functions-and-directives#apply"]
+    },
+    {
+      "name": "@layer",
+      "description": "Organize styles into layers (base, components, utilities)",
+      "references": ["https://tailwindcss.com/docs/functions-and-directives#layer"]
+    },
+    {
+      "name": "@import",
+      "description": "Import CSS files or modules",
+      "references": ["https://developer.mozilla.org/en-US/docs/Web/CSS/@import"]
+    },
+    {
+      "name": "@keyframes",
+      "description": "Define keyframe animations",
+      "references": ["https://developer.mozilla.org/en-US/docs/Web/CSS/@keyframes"]
+    },
+    {
+      "name": "@property",
+      "description": "Define custom CSS properties with type checking",
+      "references": ["https://developer.mozilla.org/en-US/docs/Web/CSS/@property"]
+    },
+    {
+      "name": "@source",
+      "description": "Tell Tailwind which files to scan for class names (Tailwind v4)",
+      "references": ["https://tailwindcss.com/docs/functions-and-directives#source"]
+    },
+    {
+      "name": "@config",
+      "description": "Specify a custom config file (Tailwind v4)",
+      "references": ["https://tailwindcss.com/docs/functions-and-directives#config"]
+    }
+  ],
+  "pseudoClasses": [
+    { "name": "dark", "description": "Target dark mode variant", "references": ["https://tailwindcss.com/docs/dark-mode"] },
+    { "name": "peer", "description": "Target sibling element when hovered", "references": ["https://tailwindcss.com/docs/hover-focus-and-other-states#peer"] },
+    { "name": "group", "description": "Style element based on parent group hover", "references": ["https://tailwindcss.com/docs/hover-focus-and-other-states#group-hover"] }
+  ],
+  "pseudoElements": [
+    { "name": "before", "description": "Style before pseudo element", "references": ["https://developer.mozilla.org/en-US/docs/Web/CSS/::before"] },
+    { "name": "after", "description": "Style after pseudo element", "references": ["https://developer.mozilla.org/en-US/docs/Web/CSS/::after"] },
+    { "name": "placeholder", "description": "Style placeholder text", "references": ["https://tailwindcss.com/docs/hover-focus-and-other-states#placeholder"] },
+    { "name": "selection", "description": "Style selected text", "references": ["https://tailwindcss.com/docs/hover-focus-and-other-states#selection"] }
+  ],
+  "cssFunctions": [
+    {
+      "name": "theme",
+      "description": "Access theme values in CSS (Tailwind v4)",
+      "references": ["https://tailwindcss.com/docs/functions-and-directives#theme"]
+    },
+    {
+      "name": "theme.get",
+      "description": "Get theme values in CSS (Tailwind v4)",
+      "references": ["https://tailwindcss.com/docs/functions-and-directives#theme"]
+    }
+  ],
+  "theme": {
+    "colors": [
+      "primary",
+      "secondary",
+      "muted",
+      "accent",
+      "destructive",
+      "card",
+      "popover",
+      "background",
+      "foreground",
+      "border",
+      "input",
+      "ring"
+    ],
+    "spacing": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "14",
+      "16",
+      "20",
+      "24",
+      "28",
+      "32",
+      "36",
+      "40",
+      "44",
+      "48",
+      "52",
+      "56",
+      "60",
+      "64",
+      "72",
+      "80",
+      "96"
+    ],
+    "borderRadius": [
+      "none",
+      "sm",
+      "DEFAULT",
+      "md",
+      "lg",
+      "xl",
+      "2xl",
+      "3xl",
+      "full"
+    ]
+  }
+}

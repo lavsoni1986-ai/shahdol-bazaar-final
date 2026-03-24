@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,18 +57,6 @@ const shahdolAreas = [
   "Other",
 ];
 
-// Shop Categories
-const shopCategories = [
-  "Kirana Store",
-  "Mobile & Electronics",
-  "Cloth House",
-  "MEDICAL",
-  "Restaurant & Cafe",
-  "Saloons & Parlour",
-  "Hardware & Paints",
-  "Other",
-];
-
 const shopFormSchema = z.object({
   name: z.string().min(2, "Shop name kam se kam 2 characters ka ho"),
   category: z.string().min(1, "Category chunnana zaroori hai"),
@@ -92,9 +80,29 @@ export default function SellerOnboarding() {
 
   const user = JSON.parse(localStorage.getItem("user") || "null");
 
+  // Fetch categories from API
+  const { data: categoriesData } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/categories");
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      const json = await res.json();
+      return json.categories || [];
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
+  const shopCategories = categoriesData?.map((cat: any) => cat.name) || [
+    "Health & Wellness",
+    "Food & Beverages",
+    "Fashion & Apparel",
+    "Electronics",
+    "Services",
+  ];
+
   useEffect(() => {
     if (!user) {
-      setLocation("/auth?return=/seller-onboarding");
+      setLocation("/auth?role=partner&return=/seller-onboarding");
       return;
     }
     // If user is already a seller, redirect to dashboard
@@ -139,8 +147,9 @@ export default function SellerOnboarding() {
 
       console.log('Sending payload:', payload);
 
-      const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-      const res = await fetch(`${API_BASE || ""}/api/seller/apply`, {
+      // Use relative path for Vite proxy - let it handle /api routing
+      const API_BASE = "";
+      const res = await fetch(`${API_BASE}/api/seller/apply`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify(payload),
@@ -363,7 +372,7 @@ export default function SellerOnboarding() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="bg-white border shadow-xl z-[100]">
-                          {shopCategories.map((c) => (
+                          {shopCategories.map((c: string) => (
                             <SelectItem key={c} value={c}>
                               {c}
                             </SelectItem>

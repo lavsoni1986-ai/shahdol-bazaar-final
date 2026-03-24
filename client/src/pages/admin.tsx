@@ -1,1319 +1,562 @@
-// Version 1.0.1 - Final Build Fix
+// ============================================
+// SHAHDOL BAZAAR - SOVEREIGN COMMAND CENTER V5.0
+// FLAWLESS RESPONSIVE & MOBILE-FIRST ARCHITECTURE
+// ============================================
 import React, { useEffect, useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { Pencil, Trash2, Menu, Check, X } from "lucide-react";
-
-type Offer = { id?: number; content: string; isActive: boolean };
-type Product = { id: number; name: string; price: string; category: string; description?: string; approved?: boolean; status?: string; imageUrl?: string; images?: string[] };
-type Shop = { id: number; name: string; approved?: boolean; isVerified?: boolean; category?: string; contactNumber?: string; mobile?: string; phone?: string };
-type Banner = { id?: number; image: string; title?: string; link?: string };
-type Category = { id: number; name: string; imageUrl?: string | null };
-type Review = { id: number; productId: number; customerName: string; rating: number; comment: string; isApproved?: boolean };
-const brandOrange = "#f97316";
+import { 
+  Pencil, Trash2, Menu, Check, ShieldCheck, 
+  Search, Package, TrendingUp, ShieldAlert, 
+  LogOut, LayoutDashboard, ShoppingCart, 
+  MessageSquare, Layers, Zap, Image, RefreshCw, Eye, X
+} from "lucide-react";
 
 export default function Admin() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loggedIn, setLoggedIn] = useState(false);
-
+  const { isAuthenticated, isSuperAdmin, loading: authLoading, logout, user } = useAuth();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"overview" | "sellers" | "products" | "news" | "banners" | "orders" | "reviews" | "categories">("overview");
 
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
-  const [liveProducts, setLiveProducts] = useState<Product[]>([]);
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  // --- Real Sync States ---
+  const [offers, setOffers] = useState<any[]>([]);
+  const [pendingProducts, setPendingProducts] = useState<any[]>([]);
+  const [liveProducts, setLiveProducts] = useState<any[]>([]);
+  const [shops, setShops] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
-  const [pendingReviews, setPendingReviews] = useState<Review[]>([]);
-  const [newCategory, setNewCategory] = useState("");
-  const [categoryFile, setCategoryFile] = useState<File | null>(null);
-  const [editCategoryModal, setEditCategoryModal] = useState(false);
-  const [editCategory, setEditCategory] = useState<Category | null>(null);
-  const [editCategoryFile, setEditCategoryFile] = useState<File | null>(null);
-
-  const [showOfferCreate, setShowOfferCreate] = useState(false);
-  const [newOffer, setNewOffer] = useState<string>("");
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
-  const [bannerTitle, setBannerTitle] = useState("");
-  const [bannerLink, setBannerLink] = useState("/");
-  const [bannerLoading, setBannerLoading] = useState(false);
+  const [banners, setBanners] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [ordersLoading, setOrdersLoading] = useState(false);
 
-  const [editProductModal, setEditProductModal] = useState(false);
-  const [editProduct, setEditProduct] = useState<Product | null>(null);
-  const [editProductFile, setEditProductFile] = useState<File | null>(null);
-  const [editBannerModal, setEditBannerModal] = useState(false);
-  const [editBanner, setEditBanner] = useState<Banner | null>(null);
-  const [editBannerFile, setEditBannerFile] = useState<File | null>(null);
-  const [editOfferModal, setEditOfferModal] = useState(false);
-  const [editOffer, setEditOffer] = useState<Offer | null>(null);
-
-  useEffect(() => {
-    if (loggedIn) {
-      loadAllData();
-    }
-  }, [loggedIn]);
-
-  async function loadAllData() {
+  const loadAllData = async () => {
     try {
       setLoading(true);
-      await Promise.all([
-        fetchOffers(),
-        fetchPendingProducts(),
-        fetchLiveProducts(),
-        fetchShops(),
-        fetchBanners(),
-        fetchCategories(),
-        fetchOrders(),
-        fetchPendingReviews(),
+      const [o, pp, lp, s, c, ord, b, r] = await Promise.all([
+        fetch('/api/offers').then(res => res.json()),
+        fetch('/api/admin/products/pending').then(res => res.json()),
+        fetch('/api/products/all?approved=true').then(res => res.json()),
+        fetch('/api/shops').then(res => res.json()),
+        fetch('/api/categories').then(res => res.json()),
+        fetch('/api/orders?includeAll=true').then(res => res.json()),
+        fetch('/api/banners').then(res => res.json()),
+        fetch('/api/reviews?pending=true').then(res => res.json())
       ]);
+
+      setOffers(Array.isArray(o) ? o : []);
+      setPendingProducts(Array.isArray(pp) ? pp : []);
+      setLiveProducts(Array.isArray(lp) ? lp : []);
+      setShops(Array.isArray(s) ? s.filter((shop: any) => shop.name.trim() !== "") : []);
+      setCategories(Array.isArray(c) ? c : []);
+      setOrders(Array.isArray(ord) ? ord : []);
+      setBanners(Array.isArray(b) ? b : []);
+      setReviews(Array.isArray(r) ? r : []);
+    } catch (err) {
+      toast.error("Critical Sync Failure ❌");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  function handleLogin() {
-    if (username === "admin" && password === "shahdol123") {
-      setLoggedIn(true);
-      toast.success("Identity Verified! Syncing with Neon...");
-    } else {
-      toast.error("Invalid credentials ❌");
+  // ==========================================
+  // 🔴 BACKEND ACTION HANDLERS (STRIKE 218)
+  // ==========================================
+
+  // 1. VENDOR ACTIONS
+  const handleApproveVendor = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/shops/${id}/approve`, { method: "PATCH" });
+      if (!res.ok) throw new Error("Failed to approve vendor");
+      toast.success("Vendor Verified Successfully! 🛡️");
+      loadAllData();
+    } catch (err) {
+      toast.error("Action Failed! Check Backend API.");
     }
-  }
+  };
 
-  async function fetchOffers() {
+  const handleDeleteVendor = async (id: number) => {
+    if (!confirm("Are you sure you want to completely ban this vendor?")) return;
     try {
-      const res = await fetch(`/api/offers`);
-      if (res.ok) setOffers(await res.json());
-    } catch (e) { console.error("Error fetching offers:", e); }
-  }
-
-  async function fetchPendingProducts() {
-    try {
-      // Get access token from localStorage
-      const accessToken = localStorage.getItem("accessToken");
-      const headers: HeadersInit = { "Content-Type": "application/json" };
-      if (accessToken) {
-        headers["Authorization"] = `Bearer ${accessToken}`;
-      }
-      
-      const res = await fetch(`/api/admin/products/pending`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        // API returns { data: [...] } format
-        const list = Array.isArray(data) ? data : (data.data || data.products || data.items || []);
-        setPendingProducts(list);
-      } else {
-        const error = await res.json().catch(() => ({ message: "Failed to fetch pending products" }));
-        console.error("Error fetching pending products:", error);
-      }
-    } catch (e) { 
-      console.error("Error fetching pending products:", e);
-      toast.error("Failed to fetch pending products");
+      const res = await fetch(`/api/shops/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete vendor");
+      toast.success("Vendor Banned & Removed! 🗑️");
+      loadAllData();
+    } catch (err) {
+      toast.error("Deletion Failed!");
     }
-  }
+  };
 
-  async function fetchLiveProducts() {
+  // 2. PRODUCT ACTIONS
+  const handleApproveProduct = async (id: number) => {
     try {
-      // Get access token from localStorage
-      const accessToken = localStorage.getItem("accessToken");
-      const headers: HeadersInit = { "Content-Type": "application/json" };
-      if (accessToken) {
-        headers["Authorization"] = `Bearer ${accessToken}`;
-      }
-      
-      // Use /api/products/all with approved filter for admin
-      const res = await fetch(`/api/products/all?approved=true`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : data.products || data.data || data.items || [];
-        // Filter out pending and deleted products
-        const live = list.filter((p: any) => {
-          const status = (p?.status || "").toLowerCase();
-          return status !== "pending" && status !== "deleted" && (p?.approved !== false);
-        });
-        setLiveProducts(live);
-      }
-    } catch (e) { 
-      console.error("Error fetching live products:", e);
-      toast.error("Failed to fetch live products");
+      const res = await fetch(`/api/admin/products/${id}/approve`, { method: "PATCH" });
+      if (!res.ok) throw new Error("Failed to approve product");
+      toast.success("Product is now LIVE! 🚀");
+      loadAllData();
+    } catch (err) {
+      toast.error("Action Failed!");
     }
-  }
+  };
 
-  async function fetchShops() {
+  const handleDeleteProduct = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      const res = await fetch(`/api/shops`);
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : data.data || [];
-        setShops(list);
-      }
-    } catch (e) { console.error("Error fetching shops:", e); }
-  }
-
-  async function fetchBanners() {
-    try {
-      const res = await fetch(`/api/banners`);
-      if (res.ok) setBanners(await res.json());
-    } catch (e) { console.error("Error fetching banners:", e); }
-  }
-
-  async function fetchCategories() {
-    try {
-      const res = await fetch(`/api/categories`);
-      if (res.ok) {
-        const data = await res.json();
-        setCategories(Array.isArray(data) ? data : []);
-      }
-    } catch (e) { console.error("Error fetching categories:", e); }
-  }
-
-  async function fetchOrders() {
-    try {
-      setOrdersLoading(true);
-      const res = await fetch(`/api/orders?includeAll=true`);
-      if (!res.ok) throw new Error("Failed to fetch orders");
-      const data = await res.json();
-      setOrders(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error("Error fetching orders:", e);
-    } finally {
-      setOrdersLoading(false);
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete product");
+      toast.success("Product Removed from Inventory! 🗑️");
+      loadAllData();
+    } catch (err) {
+      toast.error("Deletion Failed!");
     }
-  }
+  };
 
-  async function fetchPendingReviews() {
+  const handleRejectProduct = async (id: number) => {
+    const reason = prompt("रिजेक्शन का कारण बताएं (Reason for rejection):");
+    if (reason === null) return;
+
     try {
-      const res = await fetch(`/api/reviews?pending=true`);
-      if (res.ok) {
-        const data = await res.json();
-        setPendingReviews(Array.isArray(data) ? data : []);
-      }
-    } catch (e) { console.error("Error fetching reviews:", e); }
-  }
-
-  async function handleApproveReview(id: number) {
-    try {
-      const res = await fetch(`/api/reviews/${id}/approve`, { method: "PATCH" });
-      if (!res.ok) throw new Error("Approve failed");
-      toast.success("Review approved");
-      fetchPendingReviews();
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to approve");
-    }
-  }
-
-  async function handleDeleteReview(id: number) {
-    try {
-      const res = await fetch(`/api/reviews/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
-      toast.success("Review removed");
-      fetchPendingReviews();
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to delete");
-    }
-  }
-
-  async function handleAddCategory() {
-    if (!newCategory.trim()) return;
-    try {
-      let imageUrl: string | undefined;
-      if (categoryFile) {
-        const form = new FormData();
-        form.append("images", categoryFile);
-        const upload = await fetch(`/api/upload`, { method: "POST", headers: { "x-user-id": "1" }, body: form });
-        const uploadJson = await upload.json();
-        if (!upload.ok) throw new Error(uploadJson?.message || "Upload failed");
-        imageUrl = Array.isArray(uploadJson?.urls) ? uploadJson.urls[0] : uploadJson?.urls;
-      }
-
-      const res = await fetch(`/api/categories`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newCategory, imageUrl }),
+      const res = await fetch(`/api/admin/products/${id}/reject`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
       });
-      if (!res.ok) throw new Error("Create failed");
-      setNewCategory("");
-      setCategoryFile(null);
-      fetchCategories();
-      toast.success("Category added");
-    } catch (e: any) {
-      toast.error(e?.message || "Create failed");
+      if (res.ok) {
+        toast.error("प्रोडक्ट रिजेक्ट कर दिया गया।");
+        loadAllData();
+      }
+    } catch (err) {
+      toast.error("Action Failed!");
     }
-  }
+  };
 
-  async function handleDeleteCategory(id: number) {
-    const ok = window.confirm("Delete this category?");
-    if (!ok) return;
+  // 3. CATEGORY & NEWS ACTIONS
+  const handleDeleteCategory = async (id: number) => {
+    if (!confirm("Delete this category?")) return;
     try {
       const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
-      fetchCategories();
-      toast.success("Category deleted");
-    } catch (e: any) {
-      toast.error(e?.message || "Delete failed");
+      if (!res.ok) throw new Error("Failed to delete category");
+      toast.success("Category Removed! 🗑️");
+      loadAllData();
+    } catch (err) {
+      toast.error("Deletion Failed!");
     }
-  }
+  };
 
-  async function handleUpdateCategory() {
-    if (!editCategory?.id) return;
-    if (!editCategory.name.trim()) {
-      toast.error("Name is required");
-      return;
-    }
-    try {
-      const form = new FormData();
-      form.append("name", editCategory.name);
-      if (editCategoryFile) {
-        form.append("image", editCategoryFile);
-      } else if (editCategory.imageUrl) {
-        form.append("imageUrl", editCategory.imageUrl);
-      }
-
-      const res = await fetch(`/api/categories/${editCategory.id}`, {
-        method: "PATCH",
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Update failed");
-
-      toast.success("Category updated");
-      setEditCategoryModal(false);
-      setEditCategory(null);
-      setEditCategoryFile(null);
-      fetchCategories();
-    } catch (e: any) {
-      toast.error(e?.message || "Update failed");
-    }
-  }
-
-  async function handleUpdateProduct() {
-    if (!editProduct) return;
-    try {
-      const form = new FormData();
-      form.append("name", editProduct.name);
-      form.append("price", editProduct.price);
-      form.append("category", editProduct.category);
-      form.append("description", editProduct.description || "");
-      if (editProductFile) {
-        form.append("image", editProductFile);
-      } else if (editProduct.imageUrl) {
-        form.append("imageUrl", editProduct.imageUrl);
-      }
-
-      const res = await fetch(`/api/products/${editProduct.id}`, {
-        method: "PATCH",
-        headers: { "x-user-id": "1" },
-        body: form,
-      });
-      if (!res.ok) throw new Error("Update failed");
-      toast.success("Product updated");
-      setEditProductModal(false);
-      setEditProductFile(null);
-      fetchLiveProducts();
-      fetchPendingProducts();
-    } catch (e: any) {
-      toast.error(e?.message || "Update failed");
-    }
-  }
-
-  async function handleDeleteProduct(id?: number) {
-    if (!id) return;
-    const ok = window.confirm("Delete this product?");
-    if (!ok) return;
-    try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "deleted" }),
-      });
-      if (!res.ok) throw new Error("Delete failed");
-      toast.success("Product deleted");
-      fetchLiveProducts();
-      fetchPendingProducts();
-    } catch (e: any) {
-      toast.error(e?.message || "Delete failed");
-    }
-  }
-
-  async function handleToggleStock(p: Product) {
-    try {
-      const nextStatus = p.status === "out_of_stock" ? "available" : "out_of_stock";
-      const res = await fetch(`/api/products/${p.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      if (!res.ok) throw new Error("Toggle failed");
-      toast.success(`Stock: ${nextStatus}`);
-      fetchLiveProducts();
-    } catch (e: any) {
-      toast.error(e?.message || "Toggle failed");
-    }
-  }
-
-  async function handleApprove(id: number) {
-    try {
-      // Get access token from localStorage
-      const accessToken = localStorage.getItem("accessToken");
-      const headers: HeadersInit = { "Content-Type": "application/json" };
-      if (accessToken) {
-        headers["Authorization"] = `Bearer ${accessToken}`;
-      }
-      
-      const res = await fetch(`/api/admin/products/${id}/approve`, { 
-        method: "PATCH",
-        headers 
-      });
-      
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: "Approve failed" }));
-        throw new Error(error.message || "Approve failed");
-      }
-      
-      toast.success("Product approved!");
-      // Remove from pending list and refresh live products
-      setPendingProducts((prev) => prev.filter(p => p.id !== id));
-      fetchLiveProducts();
-      // Refresh pending list to ensure it's up to date
-      fetchPendingProducts();
-    } catch (e: any) {
-      console.error("Approve error:", e);
-      toast.error(e?.message || "Approve failed");
-    }
-  }
-
-  async function handleAddOffer() {
-    if (!newOffer.trim()) return;
-    try {
-      const res = await fetch(`/api/offers`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": "1" },
-        body: JSON.stringify({ content: newOffer, isActive: true, userId: 1 })
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Server error");
-      }
-      toast.success("News LIVE!");
-      setNewOffer("");
-      setShowOfferCreate(false);
-      fetchOffers();
-    } catch (e: any) {
-      toast.error(e?.message || "Post failed");
-    }
-  }
-
-  async function handleDeleteOffer(id?: number) {
-    if (!id) return;
-    const ok = window.confirm("Delete this news item?");
-    if (!ok) return;
+  const handleDeleteNews = async (id: number) => {
     try {
       const res = await fetch(`/api/offers/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
-      toast.success("Deleted");
-      setOffers((prev) => prev.filter(o => o.id !== id));
-    } catch (e: any) {
-      toast.error(e?.message || "Delete failed");
+      if (!res.ok) throw new Error("Failed to remove alert");
+      toast.success("Alert Removed! 🗑️");
+      loadAllData();
+    } catch (err) {
+      toast.error("Action Failed!");
     }
-  }
+  };
 
-  async function handleUpdateOffer() {
-    if (!editOffer?.id) return;
-    try {
-      const res = await fetch(`/api/offers/${editOffer.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: editOffer.content, isActive: editOffer.isActive }),
-      });
-      if (!res.ok) throw new Error("Update failed");
-      toast.success("Offer updated");
-      setEditOfferModal(false);
-      fetchOffers();
-    } catch (e: any) {
-      toast.error(e?.message || "Update failed");
-    }
-  }
+  useEffect(() => {
+    if (isAuthenticated && isSuperAdmin) loadAllData();
+    else if (!authLoading) setLocation("/auth");
+  }, [isAuthenticated, isSuperAdmin, authLoading]);
 
-  const renderStatsSkeleton = () => (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-pulse">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="bg-white border rounded-xl p-4 shadow-sm">
-          <div className="h-3 w-24 bg-slate-200 rounded mb-3" />
-          <div className="h-6 w-16 bg-slate-200 rounded" />
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderTableSkeleton = (cols: number) => (
-    <div className="bg-white border rounded-xl shadow-sm">
-      <div className="h-12 bg-slate-100 border-b" />
-      <div className="divide-y">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-12 bg-slate-50 animate-pulse" />
-        ))}
+  // --- UI Reusable Components ---
+  const SectionHeader = ({ title, count }: { title: string, count?: number }) => (
+    // FIX 7: HEADER FIX (OVERFLOW ISSUE)
+    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6 animate-in fade-in duration-500">
+      <div className="flex items-center gap-3">
+        <h2 className="text-2xl font-black text-white uppercase tracking-tighter">{title}</h2>
+        {count !== undefined && <span className="px-2 py-0.5 bg-orange-500/10 text-orange-500 rounded-md text-xs font-black border border-orange-500/20">{count}</span>}
+      </div>
+      <div className="relative group w-full md:w-64">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-orange-500 transition-colors" />
+        <input 
+          type="text" 
+          placeholder={`Search ${title.toLowerCase()}...`}
+          className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-orange-500/50 transition-all text-white"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
       </div>
     </div>
   );
 
-  async function handleCreateBanner() {
-    if (!bannerFile) return toast.error("Select an image");
-    try {
-      setBannerLoading(true);
-      const form = new FormData();
-      form.append("image", bannerFile);
-      form.append("title", String(bannerTitle || ""));
-      form.append("link", String(bannerLink || "/"));
-
-      const res = await fetch(`/api/banners`, { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Create failed");
-      toast.success("Banner saved!");
-      setBannerFile(null);
-      setBannerTitle("");
-      setBannerLink("/");
-      fetchBanners();
-    } catch (e: any) {
-      toast.error(e?.message || "Banner create failed");
-    } finally {
-      setBannerLoading(false);
-    }
-  }
-
-  async function handleDeleteBanner(id?: number) {
-    if (!id) return;
-    const ok = window.confirm("Delete this banner?");
-    if (!ok) return;
-    try {
-      const res = await fetch(`/api/banners/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
-      toast.success("Banner deleted");
-      setBanners((prev) => prev.filter((b) => b.id !== id));
-    } catch (e: any) {
-      toast.error(e?.message || "Delete failed");
-    }
-  }
-
-  async function handleUpdateBanner() {
-    if (!editBanner?.id) return;
-    try {
-      const form = new FormData();
-      form.append("title", String(editBanner.title || ""));
-      form.append("link", String(editBanner.link || "/"));
-      if (editBannerFile) {
-        form.append("image", editBannerFile);
-      } else if (editBanner.image) {
-        form.append("image", editBanner.image);
-      }
-
-      const res = await fetch(`/api/banners/${editBanner.id}`, { method: "PATCH", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Update failed");
-      toast.success("Banner updated");
-      setEditBannerModal(false);
-      setEditBannerFile(null);
-      fetchBanners();
-    } catch (e: any) {
-      toast.error(e?.message || "Update failed");
-    }
-  }
-
-  if (!loggedIn) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-        <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl border-4 border-white">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Admin Login</h2>
-            <p className="text-orange-600 font-bold text-[10px] uppercase tracking-widest mt-1">Neon DB Management</p>
-          </div>
-          <div className="space-y-4">
-            <input type="text" placeholder="Username" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-orange-500 font-bold" onChange={(e)=>setUsername(e.target.value)} />
-            <input type="password" placeholder="Password" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-orange-500 font-bold" onChange={(e)=>setPassword(e.target.value)} />
-            <button className="w-full bg-black text-white p-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-orange-600 transition-all active:scale-95" onClick={handleLogin}>Enter Dashboard</button>
-          </div>
-        </div>
+  const EmptyState = ({ message }: { message: string }) => (
+    <div className="p-10 md:p-20 text-center animate-in fade-in duration-500">
+      <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+        <Layers className="text-gray-600 w-8 h-8" />
       </div>
-    );
-  }
+      <h4 className="text-white font-black uppercase tracking-widest text-sm">No Data Detected</h4>
+      <p className="text-gray-500 text-xs md:text-sm mt-2">{message}</p>
+    </div>
+  );
 
-  const stats = [
-    { label: "Total Sellers", value: shops.length },
-    { label: "Live Products", value: liveProducts.length },
-    { label: "Pending Approvals", value: pendingProducts.length },
-    { label: "Total News Items", value: offers.length },
-    { label: "Orders", value: orders.length },
-    { label: "Pending Reviews", value: pendingReviews.length },
-  ];
-
-  const tabButton = (key: typeof activeTab, label: string) => (
+  const tabButton = (key: typeof activeTab, label: string, Icon: any) => (
     <button
-      className={`w-full text-left px-4 py-3 rounded-lg font-bold ${activeTab === key ? "text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
-      style={activeTab === key ? { backgroundColor: brandOrange } : {}}
-      onClick={() => { setActiveTab(key); setSidebarOpen(false); }}
+      onClick={() => { setActiveTab(key); setSidebarOpen(false); setSearchQuery(""); }}
+      // FIX 8: BUTTON FIX (Touch Friendly) - increased padding on mobile
+      className={`w-full flex items-center gap-3 px-4 py-3 md:py-3.5 rounded-xl font-bold transition-all border ${
+        activeTab === key 
+          ? "text-orange-400 border-orange-500/50 bg-orange-500/5 [box-shadow:inset_0_0_15px_rgba(249,115,22,0.1)] drop-shadow-[0_0_10px_rgba(249,115,22,0.5)]" 
+          : "border-transparent text-gray-500 hover:text-white hover:bg-white/5"
+      }`}
     >
-      {label}
+      <Icon className="w-5 h-5" />
+      <span className="text-sm">{label}</span>
     </button>
   );
 
-  return (
-    <>
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Mobile header */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-white border-b flex items-center justify-between px-4 py-3 shadow-sm">
-        <div className="font-black text-slate-800 flex items-center gap-2">
-          <span style={{ color: brandOrange }}>Admin</span> Panel
-        </div>
-        <button
-          aria-label="Toggle menu"
-          onClick={() => setSidebarOpen((s) => !s)}
-          className="p-2 rounded-lg border text-slate-700"
-        >
-          <Menu size={18} />
-        </button>
+  if (authLoading || loading) return (
+    <div className="min-h-screen bg-[#030003] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <RefreshCw className="w-10 h-10 text-orange-500 animate-spin" />
+        <p className="text-xs font-black uppercase text-orange-500 tracking-[0.2em] animate-pulse">Sovereign Link Active</p>
       </div>
+    </div>
+  );
 
-      <aside
-        className={`w-56 bg-white border-r p-4 space-y-2 md:static fixed top-14 left-0 h-[calc(100%-56px)] md:h-auto z-20 transition-transform duration-200 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        }`}
-      >
-        <p className="text-xs font-black uppercase text-slate-500 mb-2">Admin Panel</p>
-        {tabButton("overview", "Overview")}
-        {tabButton("sellers", "Manage Sellers")}
-        {tabButton("products", "Products")}
-        {tabButton("reviews", "Reviews")}
-        {tabButton("news", "News / Offers")}
-        {tabButton("orders", "Orders")}
-        {tabButton("banners", "Manage Banners")}
-        {tabButton("categories", "Manage Categories")}
+  // --- Search Filters ---
+  const filteredShops = shops.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredProducts = [...pendingProducts, ...liveProducts].filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredOrders = orders.filter(o => o.customerName?.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredCategories = categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  return (
+    // FIX 1: ROOT CONTAINER FIX (Browser handles scroll, no double scrollbars)
+    <div className="min-h-screen bg-[#030003] text-slate-200 flex flex-col md:flex-row font-['Plus_Jakarta_Sans']">
+      
+      {/* Mobile Overlay Background (Closes sidebar on click outside) */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* 🌌 SOVEREIGN SIDEBAR */}
+      {/* FIX 3: SIDEBAR RESPONSIVE FIX (max-w-[80%], proper scroll) */}
+      <aside className={`w-64 max-w-[80%] bg-black/80 md:bg-black/40 backdrop-blur-3xl border-r border-white/10 p-4 flex flex-col fixed md:relative h-full max-h-screen overflow-y-auto z-50 transition-transform md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="mb-10 px-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-500 rounded-lg shadow-[0_0_20px_rgba(249,115,22,0.4)]">
+              <ShieldCheck className="w-6 h-6 text-black" />
+            </div>
+            <div>
+              <h2 className="font-black text-white text-lg tracking-tighter uppercase leading-none">Shahdol</h2>
+              <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest mt-1">Admin OS v5.0</p>
+            </div>
+          </div>
+          {/* Mobile Close Button */}
+          <button className="md:hidden text-gray-500 hover:text-white" onClick={() => setSidebarOpen(false)}>
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        
+        <nav className="space-y-1 flex-1 overflow-y-auto pr-2 pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {tabButton("overview", "Dashboard", LayoutDashboard)}
+          {tabButton("sellers", "Vendors", ShieldCheck)}
+          {tabButton("products", "Inventory", Package)}
+          {tabButton("orders", "Orders", ShoppingCart)}
+          {tabButton("categories", "Categories", Layers)}
+          {tabButton("news", "News & Alerts", Zap)}
+          {tabButton("banners", "App Banners", Image)}
+          {tabButton("reviews", "Reviews", MessageSquare)}
+        </nav>
+
+        <button onClick={() => logout()} className="mt-4 flex items-center gap-3 px-4 py-3 md:py-4 rounded-xl font-bold text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all group border-t border-white/10 pt-6">
+          <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="text-sm">Sign Out</span>
+        </button>
       </aside>
 
-      <main className="flex-1 p-8 pt-16 md:pt-8 space-y-6">
-        {loading ? renderStatsSkeleton() : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {stats.map((s) => (
-            <div key={s.label} className="bg-white border rounded-xl p-4 shadow-sm">
-              <p className="text-xs uppercase text-slate-500 font-bold">{s.label}</p>
-              <p className="text-2xl font-black mt-2">{s.value}</p>
-            </div>
-          ))}
-        </div>
-        )}
-
+      {/* 🚀 MAIN CONTENT AREA */}
+      {/* FIX 2: MAIN CONTENT SCROLL FIX (w-full instead of h-full, removes double scrollbar) */}
+      <main className="flex-1 p-4 md:p-10 w-full">
+        
+        {/* ================= OVERVIEW TAB ================= */}
         {activeTab === "overview" && (
-          <div className="bg-white border rounded-xl p-6 shadow-sm">
-            <h2 className="text-xl font-black mb-4">Recent News</h2>
-            {offers.length === 0 ? (
-              <p className="text-slate-500 text-sm">No news published yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {offers.slice(0, 5).map((o) => (
-                  <li key={o.id} className="text-sm font-bold text-slate-800">{o.content}</li>
-                ))}
-              </ul>
-            )}
+          <div className="animate-in fade-in duration-500">
+            <header className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter mb-2">Command Center</h1>
+                <p className="text-gray-500 text-xs md:text-sm font-medium">Marketplace Pulse • District Shahdol (ID: 2)</p>
+              </div>
+              <button onClick={loadAllData} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-orange-500 transition-all self-start md:self-auto"><RefreshCw className="w-5 h-5" /></button>
+            </header>
+
+            {/* FIX 5: GRID FIX (sm:grid-cols-2 lg:grid-cols-4) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10">
+              {[
+                { label: "Total Vendors", val: shops.length, icon: ShieldCheck, color: "text-blue-500", bg: "bg-blue-500/10" },
+                { label: "Pending Items", val: pendingProducts.length + shops.filter(s => !s.approved).length, icon: ShieldAlert, color: "text-orange-500", bg: "bg-orange-500/10" },
+                { label: "Live Products", val: liveProducts.length, icon: Package, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+                { label: "Total Revenue", val: `₹${orders.reduce((a, b) => a + (b.totalPrice || 0), 0)}`, icon: TrendingUp, color: "text-purple-500", bg: "bg-purple-500/10" }
+              ].map((s, i) => (
+                <div key={i} className="glass-card-3d p-5 md:p-6 border border-white/5 relative group overflow-hidden">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      {/* FIX 6: TEXT SIZE AUTO SCALING (text-[10px] to text-xs) */}
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">{s.label}</p>
+                      <p className="text-2xl md:text-3xl font-black text-white tracking-tighter">{s.val}</p>
+                    </div>
+                    <div className={`p-2.5 md:p-3 rounded-2xl ${s.bg} ${s.color} border border-white/5`}><s.icon className="w-5 h-5 md:w-6 md:h-6" /></div>
+                  </div>
+                  <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500/20 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+              <div className="lg:col-span-2 space-y-6 md:space-y-8">
+                 <div className="glass-card-3d p-5 md:p-8 border border-white/10 h-64 md:h-72 flex flex-col justify-between">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-base md:text-lg font-black text-white uppercase flex items-center gap-2"><TrendingUp className="text-orange-500 w-5 h-5"/> Growth Pulse</h3>
+                      <span className="text-[10px] md:text-xs font-black text-orange-500 bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20">Real-time</span>
+                    </div>
+                    <div className="flex-1 flex items-end gap-1.5 md:gap-2 px-1 md:px-2">
+                      {[40, 75, 45, 95, 65, 85, 50, 90, 100, 60, 80, 110].map((h, i) => (
+                        <div key={i} className="flex-1 bg-white/5 rounded-t-lg relative group transition-all hover:bg-white/10">
+                          <div className="absolute bottom-0 w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-lg transition-all duration-1000 group-hover:brightness-125" style={{ height: `${(h/110)*100}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                 </div>
+              </div>
+              <div className="glass-card-3d p-5 md:p-6 border border-white/10">
+                 <h3 className="text-xs md:text-sm font-black text-white uppercase mb-5 md:mb-6 tracking-widest border-b border-white/5 pb-4">Live System Feed</h3>
+                 <div className="space-y-5 md:space-y-6">
+                    {offers.length > 0 ? offers.slice(0, 4).map((o, idx) => (
+                      <div key={idx} className="flex gap-4 group">
+                        <div className="flex flex-col items-center">
+                          <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]" />
+                          <div className="w-0.5 flex-1 bg-white/5 my-1 group-last:hidden" />
+                        </div>
+                        <div className="pb-3 md:pb-4">
+                          <p className="text-xs md:text-sm font-bold text-slate-200 leading-relaxed">{o.content}</p>
+                          <p className="text-[10px] text-gray-600 font-black uppercase mt-1 tracking-widest">Live Now</p>
+                        </div>
+                      </div>
+                    )) : <p className="text-gray-500 text-xs md:text-sm">No active alerts.</p>}
+                 </div>
+              </div>
+            </div>
           </div>
         )}
 
+        {/* ================= SELLERS TAB ================= */}
         {activeTab === "sellers" && (
-          <div className="bg-white border rounded-xl shadow-sm">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-lg font-black">Manage Sellers</h2>
-              <span className="text-xs font-black uppercase text-orange-600">{shops.length} total</span>
-            </div>
-            {loading ? renderTableSkeleton(5) : (
-            <table className="w-full text-left">
-              <thead className="bg-slate-50">
-                <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                  <th className="p-4">Shop</th>
-                  <th className="p-4">Category</th>
-                  <th className="p-4">Address</th>
-                  <th className="p-4">Contact</th>
-                  <th className="p-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {shops.length === 0 && (
-                  <tr><td colSpan={5} className="p-4 text-sm text-slate-500">No sellers found.</td></tr>
-                )}
-                {shops.map((s) => (
-                  <tr key={s.id}>
-                    <td className="p-4 font-bold text-slate-800">{s.name}</td>
-                    <td className="p-4 text-sm text-slate-500">{s.category || "—"}</td>
-                    <td className="p-4 text-sm text-slate-600">{(s as any)?.address || "—"}</td>
-                    <td className="p-4 text-sm text-slate-700">{s.contactNumber || s.mobile || s.phone || "—"}</td>
-                    <td className="p-4 text-sm">
-                      {(s.approved ?? true) ? <span className="text-green-600 font-bold">Approved</span> : <span className="text-orange-600 font-bold">Pending</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            )}
-          </div>
-        )}
-
-        {activeTab === "products" && (
-          <>
-          <div className="bg-white border rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between px-2 py-2 border-b">
-              <h2 className="text-lg font-black">Pending Products</h2>
-              <span className="text-xs font-black uppercase text-orange-600">{pendingProducts.length} awaiting approval</span>
-            </div>
-            {loading ? renderTableSkeleton(5) : (
-            <table className="w-full text-left">
-              <thead className="bg-slate-50">
-                <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                  <th className="p-4">Product</th>
-                  <th className="p-4">Category</th>
-                  <th className="p-4">Price</th>
-                  <th className="p-4">Preview</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {pendingProducts.length === 0 && (
-                  <tr><td colSpan={5} className="p-6 text-sm font-bold text-slate-500 text-center">No pending products 🎉</td></tr>
-                )}
-                {pendingProducts.map((p) => {
-                  const thumb = (Array.isArray(p.images) && p.images[0]) || p.imageUrl || "";
-                  const src = thumb
-                    ? (thumb.startsWith("http") ? thumb : `${window.location.origin}${thumb.startsWith("/") ? "" : "/"}${thumb}`)
-                    : "";
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 text-sm font-black text-slate-800">{p.name}</td>
-                      <td className="p-4 text-xs font-bold text-slate-500 uppercase">{p.category}</td>
-                      <td className="p-4 text-sm font-bold text-green-600">₹{p.price}</td>
-                      <td className="p-4">
-                        {src ? <img src={src} alt={p.name} className="w-12 h-12 rounded object-cover border" /> : <span className="text-xs text-slate-400">No image</span>}
-                      </td>
-                      <td className="p-4 text-right flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleApprove(p.id)}
-                          className="bg-orange-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-orange-700 active:scale-95"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => { setEditProduct(p); setEditProductModal(true); }}
-                          className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
-                          title="Edit"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProduct(p.id)}
-                          className="p-2 rounded-full border text-red-500 hover:border-red-200"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <SectionHeader title="Vendor Hub" count={shops.length} />
+            {filteredShops.length === 0 ? <EmptyState message="No matching vendors found." /> : (
+              // FIX 4: TABLE RESPONSIVE (overflow-x-auto on wrapper)
+              <div className="glass-card-3d border border-white/10 overflow-x-auto shadow-2xl rounded-xl">
+                {/* min-w-[700px] ensures it doesn't crush on mobile */}
+                <table className="w-full min-w-[700px] text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white/5 text-[10px] md:text-[11px] font-black uppercase text-gray-500 tracking-widest border-b border-white/10">
+                      <th className="py-4 md:py-5 px-4 md:px-6">Identity / Name</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6">Category / Info</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6">Status</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6 text-right">Direct Controls</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            )}
-          </div>
-          <div className="bg-white border rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between px-2 py-2 border-b">
-              <h2 className="text-lg font-black">Live Products</h2>
-              <span className="text-xs font-black uppercase text-orange-600">{liveProducts.length} live</span>
-            </div>
-            {loading ? renderTableSkeleton(5) : (
-            <table className="w-full text-left">
-              <thead className="bg-slate-50">
-                <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                  <th className="p-4">Product</th>
-                  <th className="p-4">Category</th>
-                  <th className="p-4">Price</th>
-                  <th className="p-4">Preview</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {liveProducts.length === 0 && (
-                  <tr><td colSpan={5} className="p-6 text-sm font-bold text-slate-500 text-center">No live products.</td></tr>
-                )}
-                {liveProducts.map((p) => {
-                  const thumb = (Array.isArray(p.images) && p.images[0]) || p.imageUrl || "";
-                  const src = thumb
-                    ? (thumb.startsWith("http") ? thumb : `${window.location.origin}${thumb.startsWith("/") ? "" : "/"}${thumb}`)
-                    : "";
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 text-sm font-black text-slate-800">{p.name}</td>
-                      <td className="p-4 text-xs font-bold text-slate-500 uppercase">{p.category}</td>
-                      <td className="p-4 text-sm font-bold text-green-600">₹{p.price}</td>
-                      <td className="p-4">
-                        {src ? <img src={src} alt={p.name} className="w-12 h-12 rounded object-cover border" /> : <span className="text-xs text-slate-400">No image</span>}
-                      </td>
-                      <td className="p-4 text-right flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleToggleStock(p)}
-                          className="px-3 py-1 rounded-full text-xs font-black border text-slate-600 hover:border-orange-200"
-                        >
-                          {p.status === "out_of_stock" ? "Mark In Stock" : "Toggle Stock"}
-                        </button>
-                        <button
-                          onClick={() => { setEditProduct(p); setEditProductModal(true); }}
-                          className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
-                          title="Edit"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProduct(p.id)}
-                          className="p-2 rounded-full border text-red-500 hover:border-red-200"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            )}
-          </div>
-          </>
-        )}
-
-        {activeTab === "orders" && (
-          <div className="bg-white border rounded-xl shadow-sm">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-lg font-black">Orders</h2>
-              <span className="text-xs font-black uppercase text-orange-600">{orders.length} total</span>
-            </div>
-            {ordersLoading ? renderTableSkeleton(5) : (
-              <table className="w-full text-left">
-                <thead className="bg-slate-50">
-                  <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                    <th className="p-4">ID</th>
-                    <th className="p-4">Customer</th>
-                    <th className="p-4">Phone</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Total</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {orders.length === 0 && (
-                    <tr><td colSpan={6} className="p-6 text-sm font-bold text-slate-500 text-center">No orders yet.</td></tr>
-                  )}
-                  {orders.map((o) => {
-                    const status = (o.status || "").toLowerCase();
-                    const isPendingPay = status === "payment_pending_verification";
-                    const isPaid = status === "paid" || status === "confirmed" || status === "completed";
-                    const isPending = status === "pending";
-                    const canCancel = isPending || isPendingPay;
-
-                    return (
-                      <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="p-4 text-sm font-black text-slate-800">#{o.id}</td>
-                        <td className="p-4 text-sm text-slate-700">{o.customerName || "—"}</td>
-                        <td className="p-4 text-sm text-slate-700">{o.customerPhone || "—"}</td>
-                        <td className="p-4 text-sm">
-                          <span className={`px-2 py-1 rounded-full text-xs font-black ${
-                            isPaid ? "bg-green-50 text-green-700" :
-                            isPendingPay ? "bg-orange-50 text-orange-700" : 
-                            "bg-slate-100 text-slate-700"
-                          }`}>
-                            {isPaid ? "Completed" : (o.status || "pending")}
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {filteredShops.map(s => (
+                      <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
+                        <td className="py-4 md:py-5 px-4 md:px-6">
+                          <div className="flex items-center gap-3 md:gap-4">
+                            <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center text-orange-500 font-black text-base md:text-lg shrink-0">
+                              {s.name[0]}
+                            </div>
+                            <div>
+                              <p className="text-xs md:text-sm font-black text-white group-hover:text-orange-500 transition-colors line-clamp-1">{s.name}</p>
+                              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">{s.contactNumber || "No Contact"}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 md:py-5 px-4 md:px-6 text-xs font-black text-gray-400 uppercase tracking-widest">{s.category || "Retail"}</td>
+                        <td className="py-4 md:py-5 px-4 md:px-6">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${s.approved ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-orange-500/10 text-orange-500 border border-orange-500/20"}`}>
+                            {s.approved ? "Verified ✓" : "Reviewing"}
                           </span>
                         </td>
-                        <td className="p-4 text-sm font-bold text-slate-900">₹{o.totalPrice}</td>
-                        <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {isPaid ? (
-                              <div className="flex items-center gap-1 text-green-600">
-                                <Check size={16} />
-                                <span className="text-xs font-bold">Completed</span>
-                              </div>
-                            ) : (
-                              <>
-                                {(isPendingPay || isPending) && (
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        const res = await fetch(`/api/orders/${o.id}`, {
-                                          method: "PATCH",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ status: "paid" }),
-                                        });
-                                        if (!res.ok) throw new Error("Update failed");
-                                        toast.success("Order Updated! Payment confirmed successfully ✅");
-                                        await fetchOrders(); // Auto-refresh
-                                      } catch (err: any) {
-                                        toast.error(err?.message || "Failed to confirm payment");
-                                      }
-                                    }}
-                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full text-xs font-black uppercase shadow active:scale-95 transition-all"
-                                    title="Confirm Payment"
-                                  >
-                                    <Check size={12} className="mr-1" />
-                                    Confirm
-                                  </button>
-                                )}
-                                {canCancel && (
-                                  <button
-                                    onClick={async () => {
-                                      if (!confirm(`Are you sure you want to cancel order #${o.id}?`)) return;
-                                      try {
-                                        const res = await fetch(`/api/orders/${o.id}`, {
-                                          method: "PATCH",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ status: "cancelled" }),
-                                        });
-                                        if (!res.ok) throw new Error("Cancel failed");
-                                        toast.success("Order Updated! Order cancelled successfully");
-                                        await fetchOrders(); // Auto-refresh
-                                      } catch (err: any) {
-                                        toast.error(err?.message || "Failed to cancel order");
-                                      }
-                                    }}
-                                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs font-black uppercase shadow active:scale-95 transition-all"
-                                    title="Cancel Order"
-                                  >
-                                    <X size={12} className="mr-1" />
-                                    Cancel
-                                  </button>
-                                )}
-                              </>
-                            )}
+                        <td className="py-4 md:py-5 px-4 md:px-6 text-right">
+                          <div className="flex justify-end gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                            {!s.approved && <button onClick={() => handleApproveVendor(s.id)} className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg hover:bg-emerald-500 hover:text-white transition-all"><Check className="w-4 h-4" /></button>}
+                            <button onClick={() => handleDeleteVendor(s.id)} className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
 
-        {activeTab === "reviews" && (
-          <div className="bg-white border rounded-xl shadow-sm">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-lg font-black">Pending Reviews</h2>
-              <span className="text-xs font-black uppercase text-orange-600">{pendingReviews.length} pending</span>
-            </div>
-            <table className="w-full text-left">
-              <thead className="bg-slate-50">
-                <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                  <th className="p-4">ID</th>
-                  <th className="p-4">Product</th>
-                  <th className="p-4">Customer</th>
-                  <th className="p-4">Rating</th>
-                  <th className="p-4">Comment</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {pendingReviews.length === 0 && (
-                  <tr><td colSpan={6} className="p-6 text-sm font-bold text-slate-500 text-center">No pending reviews.</td></tr>
-                )}
-                {pendingReviews.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 text-sm font-black text-slate-800">#{r.id}</td>
-                    <td className="p-4 text-sm text-slate-700">#{r.productId}</td>
-                    <td className="p-4 text-sm text-slate-700">{r.customerName}</td>
-                    <td className="p-4 text-sm text-orange-600">{"★".repeat(r.rating || 0)}</td>
-                    <td className="p-4 text-sm text-slate-700">{r.comment}</td>
-                    <td className="p-4 text-right space-x-2">
-                      <button
-                        onClick={() => handleApproveReview(r.id)}
-                        className="bg-orange-600 text-white px-3 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-orange-700 active:scale-95"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleDeleteReview(r.id)}
-                        className="bg-red-50 text-red-600 px-3 py-2 rounded-full text-xs font-black uppercase shadow hover:bg-red-100 active:scale-95"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {activeTab === "news" && (
-          <div className="space-y-6">
-            <div className="bg-white border rounded-xl shadow-sm">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="text-lg font-black">Publish News / Offers</h2>
-                <button onClick={() => setShowOfferCreate(!showOfferCreate)} className="bg-orange-600 text-white px-4 py-2 rounded-full font-black text-xs uppercase shadow active:scale-95">
-                  {showOfferCreate ? "Dismiss" : "+ New Alert"}
-                </button>
-              </div>
-              {showOfferCreate && (
-                <div className="p-6 space-y-4">
-                  <textarea value={newOffer} onChange={(e) => setNewOffer(e.target.value)} placeholder="Type live news updates here..." className="w-full p-4 rounded-xl border-2 border-slate-200 h-28 font-bold text-slate-700 outline-none focus:border-orange-500 transition-all bg-white" />
-                  <button onClick={handleAddOffer} className="bg-black text-white px-6 py-3 rounded-xl font-black uppercase shadow hover:bg-orange-600 transition-all active:scale-95">Publish Live</button>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white border rounded-xl shadow-sm">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="text-lg font-black">Published Content</h2>
-                <span className="text-xs font-black uppercase text-orange-600">{offers.length} live</span>
-              </div>
-              <table className="w-full text-left">
-                <thead className="bg-slate-50">
-                  <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                    <th className="p-4">Content</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {offers.length === 0 && (
-                    <tr><td colSpan={2} className="p-4 text-sm text-slate-500">No content yet.</td></tr>
-                  )}
-                  {offers.map((o) => (
-                    <tr key={o.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 text-sm font-black text-slate-800">{o.content}</td>
-                      <td className="p-4 text-right flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => { setEditOffer(o); setEditOfferModal(true); }}
-                          className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
-                          title="Edit"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOffer(o.id)}
-                          className="p-2 rounded-full border text-red-500 hover:border-red-200"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
+        {/* ================= PRODUCTS TAB ================= */}
+        {activeTab === "products" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <SectionHeader title="Inventory Control" count={filteredProducts.length} />
+            {filteredProducts.length === 0 ? <EmptyState message="No matching products found." /> : (
+              <div className="glass-card-3d border border-white/10 overflow-x-auto shadow-2xl rounded-xl">
+                <table className="w-full min-w-[700px] text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white/5 text-[10px] md:text-[11px] font-black uppercase text-gray-500 tracking-widest border-b border-white/10">
+                      <th className="py-4 md:py-5 px-4 md:px-6">Product Item</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6">Category</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6">Status</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6 text-right">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-            </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {filteredProducts.map(p => (
+                      <tr key={p.id} className="hover:bg-white/[0.02] transition-all group">
+                        <td className="py-4 md:py-5 px-4 md:px-6">
+                          <div className="flex items-center gap-3 md:gap-4">
+                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white/5 border border-white/10 overflow-hidden group-hover:border-orange-500/50 transition-all shrink-0">
+                              {p.imageUrl ? <img src={p.imageUrl} className="w-full h-full object-cover" /> : <Package className="w-full h-full p-2.5 md:p-3 text-gray-700" />}
+                            </div>
+                            <div>
+                              <p className="text-xs md:text-sm font-black text-white line-clamp-1">{p.name}</p>
+                              <p className="text-[10px] md:text-xs text-emerald-500 font-black mt-0.5">₹{p.price}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 md:py-5 px-4 md:px-6 text-[10px] md:text-xs font-black text-gray-500 uppercase">{p.category}</td>
+                        <td className="py-4 md:py-5 px-4 md:px-6">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${p.approved ? "text-emerald-500 bg-emerald-500/10" : "text-orange-500 bg-orange-500/10 animate-pulse"}`}>
+                            {p.approved ? "Live" : "Pending"}
+                          </span>
+                        </td>
+                        <td className="py-4 md:py-5 px-4 md:px-6 text-right">
+                          {!p.approved ? (
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => handleApproveProduct(p.id)} className="bg-emerald-500/20 text-emerald-500 p-2 rounded-lg hover:bg-emerald-500 hover:text-black transition-all">
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleRejectProduct(p.id)} className="bg-red-500/20 text-red-500 p-2 rounded-lg hover:bg-red-500 hover:text-black transition-all">
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button onClick={() => handleDeleteProduct(p.id)} className="p-2 md:p-2.5 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {activeTab === "banners" && (
-          <div className="space-y-6">
-            <div className="bg-white border rounded-xl shadow-sm">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="text-lg font-black">Manage Home Banners</h2>
-                <span className="text-xs font-black uppercase text-orange-600">{banners.length} live</span>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-500 uppercase">Banner Image</label>
-                    <input type="file" accept="image/*" onChange={(e) => setBannerFile(e.target.files?.[0] || null)} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-500 uppercase">Title</label>
-                    <input value={bannerTitle} onChange={(e) => setBannerTitle(e.target.value)} placeholder="Festive Mega Sale" className="w-full p-3 border rounded-lg font-bold text-sm" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-500 uppercase">Link</label>
-                    <input value={bannerLink} onChange={(e) => setBannerLink(e.target.value)} placeholder="/category/electronics" className="w-full p-3 border rounded-lg font-bold text-sm" />
-                  </div>
-                </div>
-                <button
-                  onClick={handleCreateBanner}
-                  disabled={bannerLoading}
-                  className="bg-orange-600 text-white px-6 py-3 rounded-xl font-black uppercase shadow hover:bg-orange-700 active:scale-95 disabled:opacity-50"
-                >
-                  {bannerLoading ? "Saving..." : "Save Banner"}
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white border rounded-xl shadow-sm">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="text-lg font-black">Current Banners</h2>
-              </div>
-              <table className="w-full text-left">
-                <thead className="bg-slate-50">
-                  <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                    <th className="p-4">Image</th>
-                    <th className="p-4">Title</th>
-                    <th className="p-4">Link</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {banners.length === 0 && (
-                    <tr><td colSpan={4} className="p-4 text-sm text-slate-500">No banners yet.</td></tr>
-                  )}
-                  {banners.map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4">
-                        <img src={b.image} alt={b.title} className="w-16 h-16 object-cover rounded border" />
-                      </td>
-                      <td className="p-4 text-sm font-black text-slate-800">{b.title}</td>
-                      <td className="p-4 text-sm text-slate-600">{b.link}</td>
-                      <td className="p-4 text-right flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => { setEditBanner(b); setEditBannerFile(null); setEditBannerModal(true); }}
-                          className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
-                          title="Edit"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBanner(b.id)}
-                          className="p-2 rounded-full border text-red-500 hover:border-red-200"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
+        {/* ================= ORDERS TAB ================= */}
+        {activeTab === "orders" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <SectionHeader title="Platform Orders" count={filteredOrders.length} />
+            {filteredOrders.length === 0 ? <EmptyState message="No orders registered in the system yet." /> : (
+              <div className="glass-card-3d border border-white/10 overflow-x-auto shadow-2xl rounded-xl">
+                <table className="w-full min-w-[700px] text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white/5 text-[10px] md:text-[11px] font-black uppercase text-gray-500 tracking-widest border-b border-white/10">
+                      <th className="py-4 md:py-5 px-4 md:px-6">Order ID</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6">Customer</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6">Amount</th>
+                      <th className="py-4 md:py-5 px-4 md:px-6 text-right">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {filteredOrders.map(o => (
+                      <tr key={o.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-4 md:py-5 px-4 md:px-6 font-bold text-white text-xs md:text-sm">#SB{o.id}</td>
+                        <td className="py-4 md:py-5 px-4 md:px-6 text-gray-400 font-bold text-xs md:text-sm">{o.customerName}</td>
+                        <td className="py-4 md:py-5 px-4 md:px-6 font-black text-emerald-500 text-xs md:text-sm">₹{o.totalPrice}</td>
+                        <td className="py-4 md:py-5 px-4 md:px-6 text-right">
+                          <span className="px-2.5 md:px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-bold text-orange-500 uppercase">
+                            {o.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
+        {/* ================= CATEGORIES TAB ================= */}
         {activeTab === "categories" && (
-          <div className="space-y-6">
-            <div className="bg-white border rounded-xl shadow-sm">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="text-lg font-black">Manage Categories</h2>
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <SectionHeader title="Manage Categories" count={filteredCategories.length} />
+            {filteredCategories.length === 0 ? <EmptyState message="No matching categories found." /> : (
+              // FIX 9: CATEGORY GRID FIX (sm:grid-cols-3)
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+                {filteredCategories.map(c => (
+                  <div key={c.id} className="glass-card-3d p-3 md:p-4 border border-white/10 group hover:border-orange-500/50 transition-all cursor-pointer relative overflow-hidden rounded-xl">
+                    <div className="aspect-square bg-white/5 rounded-xl mb-3 overflow-hidden border border-white/5">
+                      {c.imageUrl ? (
+                        <img src={c.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={c.name} />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center"><Layers className="text-gray-600 w-6 h-6 md:w-8 md:h-8" /></div>
+                      )}
+                    </div>
+                    <p className="text-white font-black uppercase text-[10px] md:text-xs text-center tracking-wide line-clamp-1">{c.name}</p>
+                    <button onClick={() => handleDeleteCategory(c.id)} className="absolute top-2 right-2 p-1.5 bg-red-500/80 text-white rounded-lg md:opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
+                  </div>
+                ))}
               </div>
-              <div className="p-6 space-y-4">
-                <div className="flex gap-2">
-                  <input
-                    className="w-full p-3 border rounded-lg font-bold text-sm"
-                    placeholder="Category name"
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                  />
-                  <input type="file" accept="image/*" onChange={(e) => setCategoryFile(e.target.files?.[0] || null)} />
-                  <button
-                    onClick={handleAddCategory}
-                    className="bg-orange-600 text-white px-4 py-2 rounded-lg font-black text-xs uppercase shadow active:scale-95"
-                  >
-                    Add
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {categories.length === 0 && <p className="text-sm text-slate-500">No categories yet.</p>}
-                  {categories.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between border rounded-lg px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        {c.imageUrl ? (
-                          <img
-                            src={c.imageUrl.startsWith("http") ? c.imageUrl : `/uploads/${c.imageUrl.split("/").pop() || ""}`}
-                            alt={c.name}
-                            className="w-10 h-10 rounded object-cover border"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded border bg-slate-50" />
-                        )}
-                        <span className="font-bold text-slate-800">{c.name}</span>
+            )}
+          </div>
+        )}
+
+        {/* ================= NEWS / ALERTS TAB ================= */}
+        {activeTab === "news" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <SectionHeader title="System Alerts & News" count={offers.length} />
+            {offers.length === 0 ? <EmptyState message="No news or alerts broadcasted." /> : (
+              <div className="glass-card-3d border border-white/10 overflow-hidden shadow-2xl rounded-xl">
+                <div className="divide-y divide-white/5">
+                  {offers.map(o => (
+                    <div key={o.id} className="p-4 md:p-6 hover:bg-white/[0.02] transition-colors flex justify-between items-center group">
+                      <div className="flex items-center gap-3 md:gap-4">
+                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-orange-500/10 flex items-center justify-center border border-orange-500/20 shrink-0">
+                          <Zap className="text-orange-500 w-4 h-4 md:w-5 md:h-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs md:text-sm font-bold text-white line-clamp-2 md:line-clamp-none">{o.content}</p>
+                          <p className="text-[10px] text-emerald-500 font-black uppercase mt-1">{o.isActive ? "Active Broadcast" : "Inactive"}</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => { setEditCategory(c); setEditCategoryFile(null); setEditCategoryModal(true); }}
-                          className="p-2 rounded-full border text-slate-600 hover:text-orange-600 hover:border-orange-200"
-                          title="Edit"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCategory(c.id)}
-                          className="p-2 rounded-full border text-red-500 hover:border-red-200"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <button onClick={() => handleDeleteNews(o.id)} className="p-2 bg-red-500/10 text-red-500 rounded-lg md:opacity-0 group-hover:opacity-100 transition-opacity ml-2"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
-      </main>
-    </div>
 
-      {editProductModal && editProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h3 className="text-lg font-black">Edit Product</h3>
-            <input
-              className="w-full p-3 rounded-lg border border-slate-200"
-              placeholder="Name"
-              value={editProduct.name}
-              onChange={(e) => setEditProduct({ ...editProduct, name: e.target.value })}
-            />
-            <input
-              className="w-full p-3 rounded-lg border border-slate-200"
-              placeholder="Price"
-              value={editProduct.price}
-              onChange={(e) => setEditProduct({ ...editProduct, price: e.target.value })}
-            />
-            <input
-              className="w-full p-3 rounded-lg border border-slate-200"
-              placeholder="Category"
-              value={editProduct.category}
-              onChange={(e) => setEditProduct({ ...editProduct, category: e.target.value })}
-            />
-            <textarea
-              className="w-full p-3 rounded-lg border border-slate-200 h-24"
-              placeholder="Description"
-              value={editProduct.description || ""}
-              onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })}
-            />
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-500 uppercase">Product Image</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setEditProductFile(e.target.files?.[0] || null)}
-              />
-              <div className="flex gap-2 items-center">
-                {editProductFile ? (
-                  <span className="text-xs text-green-600 font-bold">New image selected</span>
-                ) : (
-                  editProduct.imageUrl && (
-                    <img
-                      src={editProduct.imageUrl.startsWith("http") ? editProduct.imageUrl : `/uploads/${editProduct.imageUrl.split("/").pop() || ""}`}
-                      alt="Current"
-                      className="w-16 h-16 rounded object-cover border"
-                    />
-                  )
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setEditProductModal(false)} className="px-4 py-2 rounded-lg border">Cancel</button>
-              <button onClick={handleUpdateProduct} className="px-4 py-2 rounded-lg bg-orange-600 text-white font-black">Save</button>
-            </div>
+        {/* ================= BANNERS & REVIEWS TABS (Placeholders) ================= */}
+        {(activeTab === "banners" || activeTab === "reviews") && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <SectionHeader title={activeTab === "banners" ? "App Banners" : "Customer Reviews"} />
+            <EmptyState message={`No ${activeTab} available to manage at this moment.`} />
           </div>
-        </div>
-      )}
-      {editCategoryModal && editCategory && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h3 className="text-lg font-black">Edit Category</h3>
-            <input
-              className="w-full p-3 rounded-lg border border-slate-200"
-              placeholder="Name"
-              value={editCategory.name}
-              onChange={(e) => setEditCategory({ ...editCategory, name: e.target.value })}
-            />
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-500 uppercase">Category Image</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setEditCategoryFile(e.target.files?.[0] || null)}
-              />
-              <div className="flex items-center gap-2">
-                {editCategoryFile ? (
-                  <span className="text-xs font-bold text-green-600">New file selected</span>
-                ) : editCategory.imageUrl ? (
-                  <img
-                    src={editCategory.imageUrl.startsWith("http") ? editCategory.imageUrl : `/uploads/${editCategory.imageUrl.split("/").pop() || ""}`}
-                    alt={editCategory.name}
-                    className="w-16 h-16 rounded object-cover border"
-                  />
-                ) : (
-                  <span className="text-xs text-slate-500">No image</span>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => { setEditCategoryModal(false); setEditCategoryFile(null); }} className="px-4 py-2 rounded-lg border">Cancel</button>
-              <button onClick={handleUpdateCategory} className="px-4 py-2 rounded-lg bg-orange-600 text-white font-black">Save</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {editBannerModal && editBanner && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h3 className="text-lg font-black">Edit Banner</h3>
-            <input
-              className="w-full p-3 rounded-lg border border-slate-200"
-              placeholder="Title"
-              value={editBanner.title || ""}
-              onChange={(e) => setEditBanner({ ...editBanner, title: e.target.value })}
-            />
-            <input
-              className="w-full p-3 rounded-lg border border-slate-200"
-              placeholder="Link"
-              value={editBanner.link || ""}
-              onChange={(e) => setEditBanner({ ...editBanner, link: e.target.value })}
-            />
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-500 uppercase">Banner Image</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setEditBannerFile(e.target.files?.[0] || null)}
-              />
-              <div className="flex items-center gap-2">
-                {editBannerFile ? (
-                  <span className="text-xs font-bold text-green-600">New file selected</span>
-                ) : editBanner.image ? (
-                  <img
-                    src={editBanner.image.startsWith("http") ? editBanner.image : `/uploads/${editBanner.image.split("/").pop() || ""}`}
-                    alt="Current"
-                    className="w-16 h-16 rounded object-cover border"
-                  />
-                ) : (
-                  <span className="text-xs text-slate-500">No image</span>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => { setEditBannerModal(false); setEditBannerFile(null); }} className="px-4 py-2 rounded-lg border">Cancel</button>
-              <button onClick={handleUpdateBanner} className="px-4 py-2 rounded-lg bg-orange-600 text-white font-black">Save</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {editOfferModal && editOffer && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h3 className="text-lg font-black">Edit Alert</h3>
-            <textarea
-              className="w-full p-3 rounded-lg border border-slate-200 h-28"
-              value={editOffer.content}
-              onChange={(e) => setEditOffer({ ...editOffer, content: e.target.value })}
-            />
-            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-              <input
-                type="checkbox"
-                checked={editOffer.isActive}
-                onChange={(e) => setEditOffer({ ...editOffer, isActive: e.target.checked })}
-              />
-              Active
-            </label>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setEditOfferModal(false)} className="px-4 py-2 rounded-lg border">Cancel</button>
-              <button onClick={handleUpdateOffer} className="px-4 py-2 rounded-lg bg-orange-600 text-white font-black">Save</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+        )}
+
+      </main>
+
+      {/* FIX 10: MOBILE BUTTON SAFE AREA FIX */}
+      <button 
+        onClick={() => setSidebarOpen(!sidebarOpen)} 
+        className="md:hidden fixed bottom-6 right-6 p-4 bg-orange-500 text-black rounded-full shadow-2xl z-50 transition-transform active:scale-95"
+        style={{ bottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+      >
+        <Menu className="w-6 h-6" />
+      </button>
+
+    </div>
   );
 }

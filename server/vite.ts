@@ -21,8 +21,8 @@ export async function setupVite(app: Express, server: Server) {
   // CRITICAL: Skip Vite middleware for API routes
   app.use((req, res, next) => {
     if (req.path.startsWith("/api/")) {
-      console.log("⏭️ [VITE] Skipping Vite middleware for API route:", req.path);
-      return next(); // Skip Vite, go to next middleware (API routes)
+      // Skip Vite, go to next middleware (API routes) - no logging to reduce clutter
+      return next(); 
     }
     // For non-API routes, use Vite middleware
     vite.middlewares(req, res, next);
@@ -35,8 +35,8 @@ export async function setupVite(app: Express, server: Server) {
     
     // Skip API routes - they should be handled by routes.ts
     if (url.startsWith("/api/")) {
-      console.log("⚠️ [VITE] API route intercepted by Vite middleware:", url);
-      return next(); // Let it fall through to API routes
+      // Let it fall through to API routes - no logging to reduce clutter
+      return next(); 
     }
     
     try {

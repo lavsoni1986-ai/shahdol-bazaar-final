@@ -7,7 +7,7 @@
     "config": "tailwind.config.ts",
     "css": "client/src/index.css",
     "baseColor": "neutral",
-    "cssVariables": true,
+    "cssVariables": false,
     "prefix": ""
   },
   "iconLibrary": "lucide",

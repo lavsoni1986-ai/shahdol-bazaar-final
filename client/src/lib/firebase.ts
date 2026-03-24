@@ -1,7 +1,9 @@
+// Firebase configuration - Kept for image upload functionality only
+// Auth is now handled via JWT on the backend
+
 import { initializeApp } from "firebase/app";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getFirestore } from "firebase/firestore"; // ✅ Database wapas aa gaya
-import { getAuth } from "firebase/auth"; // ✅ Auth bhi wapas
+import { getFirestore } from "firebase/firestore";
 
 // Aapki Config
 const firebaseConfig = {
@@ -13,15 +15,14 @@ const firebaseConfig = {
   appId: "1:1041061893156:web:aace73b331ad5fbb5234b1",
 };
 
-// 1. App Start
+// 1. App Start (for storage only)
 export const app = initializeApp(firebaseConfig);
 
-// 2. Exports (Jo baaki files maang rahi hain)
-export const db = getFirestore(app); // ✅ Ye missing tha
-export const auth = getAuth(app);
+// 2. Storage & Firestore exports
 export const storage = getStorage(app);
+export const db = getFirestore(app);
 
-// 3. Upload Function (Jo Dashboard maang raha hai)
+// 3. Upload Function (for images)
 export async function uploadImageToFirebase(file: File) {
   try {
     const fileName = `shops/${Date.now()}-${file.name}`;
@@ -35,3 +36,8 @@ export async function uploadImageToFirebase(file: File) {
     throw error;
   }
 }
+
+// Note: Firebase Auth has been removed. JWT-based auth is now used.
+// To use Firebase Auth in the future, uncomment these lines:
+// export const auth = getAuth(app);
+// export { getAuth } from "firebase/auth";
