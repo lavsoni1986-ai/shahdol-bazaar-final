@@ -1,0 +1,5 @@
+export const ONTOLOGY_VERSION = {
+  SEMANTIC_VERSION: 'v1',
+  TEMPORAL_VERSION: 'v1',
+  TRUST_SIGNAL_VERSION: 'v1'
+} as const;

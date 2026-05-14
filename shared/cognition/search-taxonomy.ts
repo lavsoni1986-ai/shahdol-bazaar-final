@@ -1,0 +1,322 @@
+/**
+ * COGNITION SEARCH TAXONOMY - ONTOLOGY-SAFE CATEGORY ALIASES
+ *
+ * Maps user intent queries to canonical ontology categories for semantic search.
+ * This enables BharatOS to understand that "doctor" means healthcare services,
+ * "electrician" means electrical services, etc.
+ *
+ * AUTHORITY: Consumes ontology enums only - no parallel taxonomy allowed
+ *
+ * Used by:
+ * - Query expansion engine
+ * - Entity search indexing
+ * - AI grounded retrieval
+ * - Demand signal analysis
+ */
+
+import { CanonicalCategory, CanonicalDomain } from '../contracts/ontology/index';
+
+export interface CategoryAlias {
+  canonical: CanonicalCategory | CanonicalDomain; // Ontology enum only
+  aliases: string[];
+  related: string[];
+  priority: number; // Higher = more important for search
+}
+
+/**
+ * DISTRICT CATEGORY TAXONOMY
+ * Maps common user queries to structured district categories
+ */
+export const DISTRICT_SEARCH_TAXONOMY: Record<string, CategoryAlias> = {
+  // HEALTHCARE DOMAIN
+  healthcare: {
+    canonical: CanonicalDomain.HEALTHCARE,
+    aliases: ['doctor', 'doctors', 'physician', 'clinic', 'hospitals', 'medical', 'medicine', 'health', 'treatment', 'patient'],
+    related: ['pharmacy', 'diagnostic', 'emergency', 'surgery', 'consultation'],
+    priority: 10
+  },
+
+  hospital: {
+    canonical: CanonicalCategory.HOSPITAL,
+    aliases: ['hospital', 'hospitals', 'medical center', 'clinic', 'health center', 'nursing home'],
+    related: ['emergency', 'icu', 'operation theatre', 'ward'],
+    priority: 9
+  },
+
+  pharmacy: {
+    canonical: CanonicalCategory.PHARMACY,
+    aliases: ['pharmacy', 'chemist', 'medical store', 'drug store', 'medicines'],
+    related: ['prescription', 'drugs', 'tablets', 'syrup'],
+    priority: 8
+  },
+
+  // ELECTRICAL & ELECTRONICS
+  electrician: {
+    canonical: CanonicalDomain.SERVICES,
+    aliases: ['electrician', 'electrical', 'wiring', 'fan', 'light', 'switch', 'socket'],
+    related: ['repair', 'installation', 'maintenance'],
+    priority: 7
+  },
+
+  // ELECTRONICS - PREPARATORY SPLIT (Phase 1C-A)
+  // WARNING: 'electronics' is ambiguous. Two sovereign keys are introduced below.
+  // Keep legacy 'electronics' alias for backward compatibility during migration.
+  'electronics.store': {
+    canonical: CanonicalCategory.ELECTRONICS_STORE,
+    aliases: ['electronics', 'mobile shop', 'tv shop', 'laptop store', 'appliance store', 'mobile store', 'electronics showroom', 'electronics'],
+    related: ['charger', 'screen', 'battery', 'software', 'headphones', 'appliances'],
+    priority: 8
+  },
+
+  'electronics.repair': {
+    canonical: CanonicalCategory.ELECTRONICS_REPAIR,
+    aliases: ['mobile repair', 'phone repair', 'laptop repair', 'tv repair', 'service center', 'repair shop', 'computer repair', 'electronics repair'],
+    related: ['repair', 'service', 'spare parts'],
+    priority: 7
+  },
+
+  restaurant: {
+    canonical: CanonicalDomain.COMMERCE,
+    aliases: ['restaurant', 'food', 'eat', 'hotel', 'dhaba', 'cafe', 'tiffin'],
+    related: ['menu', 'delivery', 'dining', 'cuisine'],
+    priority: 5
+  },
+
+  grocery: {
+    canonical: CanonicalCategory.GROCERY,
+    aliases: ['grocery', 'kirana', 'store', 'shop', 'supermarket', 'market', 'vegetables', 'fruits'],
+    related: ['daily needs', 'essentials', 'provisions'],
+    priority: 4
+  },
+
+  school: {
+    canonical: CanonicalCategory.SCHOOL,
+    aliases: ['school', 'schools', 'education', 'coaching', 'tuition', 'teacher', 'student'],
+    related: ['admission', 'fees', 'classes', 'exams'],
+    priority: 3
+  },
+
+  // Quarantined duplicate electronics block consolidated above (CanonicalDomain.COMMERCE)
+
+
+  // EDUCATION
+  school: {
+    canonical: 'school',
+    aliases: ['school', 'education', 'college', 'tuition', 'coaching', 'study', 'learning'],
+    related: ['primary', 'secondary', 'higher', 'vocational', 'competitive'],
+    priority: 9
+  },
+
+  // AUTOMOTIVE
+  mechanic: {
+    canonical: CanonicalDomain.SERVICES,
+    aliases: ['mechanic', 'car repair', 'vehicle', 'bike', 'scooter', 'automobile'],
+    related: ['engine', 'tyre', 'brake', 'battery'],
+    priority: 7
+  },
+
+  plumber: {
+    canonical: CanonicalDomain.SERVICES,
+    aliases: ['plumber', 'plumbing', 'water', 'pipe', 'leak', 'tap', 'bathroom', 'kitchen'],
+    related: ['repair', 'installation', 'drainage'],
+    priority: 6
+  },
+
+  carpenter: {
+    canonical: CanonicalDomain.SERVICES,
+    aliases: ['carpenter', 'woodwork', 'furniture', 'door', 'window', 'cabinet', 'wood'],
+    related: ['repair', 'making', 'installation'],
+    priority: 5
+  },
+
+  salon: {
+    canonical: CanonicalDomain.SERVICES,
+    aliases: ['salon', 'beauty', 'haircut', 'spa', 'parlor', 'cosmetic', 'makeup', 'nail'],
+    related: ['facial', 'massage', 'makeup', 'nails', 'grooming'],
+    priority: 4
+  },
+
+  bank: {
+    canonical: CanonicalDomain.GOVERNANCE,
+    aliases: ['bank', 'banking', 'atm', 'finance', 'loan', 'account'],
+    related: ['deposit', 'withdrawal', 'transfer'],
+    priority: 3
+  },
+
+  taxi: {
+    canonical: CanonicalDomain.TRANSPORT,
+    aliases: ['taxi', 'cab', 'auto', 'rickshaw', 'ride', 'transport'],
+    related: ['booking', 'pickup', 'drop'],
+    priority: 2
+  },
+
+  laundry: {
+    canonical: CanonicalDomain.SERVICES,
+    aliases: ['laundry', 'dry cleaning', 'washing', 'iron', 'clothes', 'dry clean', 'cleaning'],
+    related: ['wash', 'clean', 'press'],
+    priority: 6
+  },
+
+  // HOME SERVICES
+  // Quarantined duplicate plumber block consolidated above (CanonicalDomain.SERVICES)
+
+
+  // Quarantined duplicate carpenter block consolidated above (CanonicalDomain.SERVICES)
+
+
+  // BEAUTY & PERSONAL CARE
+  // Quarantined duplicate salon block consolidated above (CanonicalDomain.SERVICES)
+
+
+  // FINANCIAL SERVICES
+  bank: {
+    canonical: 'bank',
+    aliases: ['bank', 'banking', 'atm', 'finance', 'loan', 'insurance', 'investment'],
+    related: ['savings', 'account', 'credit', 'debit', 'transaction'],
+    priority: 8
+  },
+
+  // TRANSPORT
+  taxi: {
+    canonical: 'taxi',
+    aliases: ['taxi', 'cab', 'auto', 'rickshaw', 'transport', 'ride', 'travel'],
+    related: ['local', 'outstation', 'booking', 'pickup'],
+    priority: 8
+  },
+
+  // GENERAL SERVICES (quarantined duplicate)
+  // Quarantined duplicate laundry block consolidated above (CanonicalDomain.SERVICES)
+
+};
+
+/**
+ * INVERSE MAPPING: Alias → Canonical Category
+ * For fast lookup during query expansion
+ */
+export const ALIAS_TO_CANONICAL: Record<string, string> = {};
+
+// Build inverse mapping on module load
+Object.entries(DISTRICT_SEARCH_TAXONOMY).forEach(([canonical, data]) => {
+  // Add canonical itself
+  ALIAS_TO_CANONICAL[canonical.toLowerCase()] = canonical;
+
+  // Add all aliases
+  data.aliases.forEach(alias => {
+    ALIAS_TO_CANONICAL[alias.toLowerCase()] = canonical;
+  });
+
+  // Add related terms (lower priority)
+  data.related.forEach(related => {
+    ALIAS_TO_CANONICAL[related.toLowerCase()] = canonical;
+  });
+});
+
+/**
+ * QUERY EXPANSION ENGINE
+ * Converts user query into expanded search terms
+ */
+export function expandSearchTerms(query: string): {
+  original: string;
+  canonical: string[];
+  expanded: string[];
+  confidence: number;
+} {
+  const normalizedQuery = query.toLowerCase().trim();
+
+  // Find canonical matches
+  const canonicalMatches = new Set<string>();
+  const expandedTerms = new Set<string>([normalizedQuery]);
+
+  // Check for exact canonical matches
+  if (DISTRICT_SEARCH_TAXONOMY[normalizedQuery]) {
+    canonicalMatches.add(normalizedQuery);
+    expandedTerms.add(normalizedQuery);
+  }
+
+  // Check for alias matches
+  const canonicalFromAlias = ALIAS_TO_CANONICAL[normalizedQuery];
+  if (canonicalFromAlias) {
+    canonicalMatches.add(canonicalFromAlias);
+
+    // Add all related terms for this canonical category
+    const categoryData = DISTRICT_SEARCH_TAXONOMY[canonicalFromAlias];
+    if (categoryData) {
+      categoryData.aliases.forEach(alias => expandedTerms.add(alias));
+      categoryData.related.forEach(related => expandedTerms.add(related));
+      expandedTerms.add(canonicalFromAlias);
+    }
+  }
+
+  // Calculate confidence based on canonical matches
+  const confidence = canonicalMatches.size > 0 ? 0.8 : 0.3;
+
+  return {
+    original: query,
+    canonical: Array.from(canonicalMatches),
+    expanded: Array.from(expandedTerms),
+    confidence
+  };
+}
+
+/**
+ * ENTITY SEARCH TEXT GENERATOR
+ * Creates comprehensive search text for entities
+ */
+export function generateEntitySearchText(
+  entityName: string,
+  category: string,
+  location: string = '',
+  description: string = ''
+): string {
+  const terms = new Set<string>();
+
+  // Add entity name parts
+  entityName.toLowerCase().split(/\s+/).forEach(word => {
+    if (word.length > 2) terms.add(word);
+  });
+
+  // Add category taxonomy terms
+  const categoryData = DISTRICT_SEARCH_TAXONOMY[category.toLowerCase()];
+  if (categoryData) {
+    terms.add(categoryData.canonical);
+    categoryData.aliases.forEach(alias => terms.add(alias));
+    categoryData.related.forEach(related => terms.add(related));
+  }
+
+  // Add location parts
+  if (location) {
+    location.toLowerCase().split(/\s+/).forEach(word => {
+      if (word.length > 2) terms.add(word);
+    });
+  }
+
+  // Add description keywords (basic extraction)
+  if (description) {
+    description.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .forEach(word => {
+        if (word.length > 3 && !['that', 'with', 'from', 'they', 'have', 'this', 'will', 'your', 'their', 'what'].includes(word)) {
+          terms.add(word);
+        }
+      });
+  }
+
+  return Array.from(terms).join(' ');
+}
+
+/**
+ * TAXONOMY VALIDATION
+ * Checks if a category exists in our taxonomy
+ */
+export function isValidCategory(category: string): boolean {
+  return category.toLowerCase() in DISTRICT_SEARCH_TAXONOMY;
+}
+
+/**
+ * GET ALL CANONICAL CATEGORIES
+ * Returns list of all supported categories
+ */
+export function getAllCanonicalCategories(): string[] {
+  return Object.keys(DISTRICT_SEARCH_TAXONOMY);
+}
