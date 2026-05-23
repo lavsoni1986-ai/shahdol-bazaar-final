@@ -1,5 +1,5 @@
-import { Request } from 'express';
-import { prisma } from '../storage.js';
+import type { Request } from 'express';
+import { prisma } from '../storage';
 
 /**
  * ============================================

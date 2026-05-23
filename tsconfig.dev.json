@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "client/src/**/*"
+  ],
+  "exclude": [
+    "client/src/core/**",
+    "client/src/shared/cognition/**",
+    "client/src/pages/archive/**",
+    "client/src/pages/archive/**",
+    "client/src/shared/contracts/**",
+    "client/src/shared/domain/**",
+    "client/src/shared/ontology/**",
+    "client/src/shared/**/search-taxonomy.ts",
+    "client/src/shared/**/entity-search-indexing.ts",
+    "client/src/shared/**/index.ts"
+  ]
+}

@@ -1,5 +1,6 @@
-import { prisma } from "../storage.js";
-import { parseOrderId } from "../utils/webhookSignatureVerifier.js";
+import { updateOrder, findOrderById, withTransaction } from "../repositories";
+import { parseOrderId } from "../utils/webhookSignatureVerifier";
+import { recomputeTrustScore } from "./dssl.service";
 
 /**
  * Cashfree webhook event types
@@ -105,14 +106,25 @@ async function handlePaymentSuccess(payload: CashfreeWebhookPayload): Promise<bo
     const transactionId = payload.data.payment.cf_payment_id || payload.data.payment.transaction_id;
 
     // Update the order with payment details
-    await prisma.order.update({
-      where: { id: numericOrderId },
-      data: {
-        status: mapPaymentStatusToOrderStatus(payload.data.payment.payment_status),
-        paymentStatus: mapPaymentStatusToPaymentStatus(payload.data.payment.payment_status),
-        paymentId: transactionId as string,
-      },
+    const orderStatus = mapPaymentStatusToOrderStatus(payload.data.payment.payment_status);
+    await withTransaction(async (tx) => {
+      await tx.order.update({
+        where: { id: numericOrderId },
+        data: {
+          status: orderStatus,
+          paymentStatus: mapPaymentStatusToPaymentStatus(payload.data.payment.payment_status),
+          paymentId: transactionId as string,
+        },
+      });
     });
+
+    // Recompute trust score if order completed
+    if (orderStatus === "COMPLETED") {
+      const order = await findOrderById(numericOrderId);
+      if (order?.vendorId && order?.districtId) {
+        await recomputeTrustScore(order.vendorId, order.districtId);
+      }
+    }
 
     console.log(`Order ${numericOrderId} payment successful. Transaction: ${transactionId}`);
     return true;
@@ -141,12 +153,14 @@ async function handlePaymentFailed(payload: CashfreeWebhookPayload): Promise<boo
       return false;
     }
 
-    await prisma.order.update({
-      where: { id: numericOrderId },
-      data: {
-        status: "failed",
-        paymentStatus: "failed",
-      },
+    await withTransaction(async (tx) => {
+      await tx.order.update({
+        where: { id: numericOrderId },
+        data: {
+          status: "failed",
+          paymentStatus: "failed",
+        },
+      });
     });
 
     console.log(`Order ${numericOrderId} payment failed.`);
@@ -176,12 +190,14 @@ async function handlePaymentPending(payload: CashfreeWebhookPayload): Promise<bo
       return false;
     }
 
-    await prisma.order.update({
-      where: { id: numericOrderId },
-      data: {
-        status: "pending",
-        paymentStatus: "pending",
-      },
+    await withTransaction(async (tx) => {
+      await tx.order.update({
+        where: { id: numericOrderId },
+        data: {
+          status: "pending",
+          paymentStatus: "pending",
+        },
+      });
     });
 
     console.log(`Order ${numericOrderId} payment pending.`);
@@ -255,19 +271,14 @@ export async function handleWebhook(payload: CashfreeWebhookPayload): Promise<bo
  */
 export async function getOrderByCashfreeId(cashfreeOrderId: string): Promise<any | null> {
   const { id: orderId } = parseOrderId(cashfreeOrderId);
+  const numericOrderId = Number(orderId);
   
-  if (!orderId) {
+  if (!numericOrderId) {
     return null;
   }
 
   try {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        product: true,
-        user: true,
-      },
-    });
+    const order = await findOrderById(numericOrderId);
     return order;
   } catch (error) {
     console.error("Error finding order by Cashfree ID:", error);

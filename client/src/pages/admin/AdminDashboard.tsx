@@ -2,11 +2,12 @@
 
 import AdminLayout from "./AdminLayout";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Shield, Zap, Users, Store, AlertTriangle, Activity, TrendingUp, DollarSign, Award } from "lucide-react";
+import { Shield, Zap, Users, Store, AlertTriangle, Activity, TrendingUp, DollarSign, Award, Package } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api-client";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { safeData } from "@/lib/admin-response";
+import { useLocation } from "wouter";
 
 /**
  * 🛡️ SOVEREIGN UI: GlassCard Component
@@ -43,6 +44,7 @@ export default function AdminDashboard() {
   const { currentDistrict } = useDistrict();
   const districtId = currentDistrict?.id;
   const districtSlug = currentDistrict?.slug;
+  const [, setLocation] = useLocation();
 
   // 1. System health data (Polled every 5 minutes)
   const { data: systemHealthRes, isLoading: healthLoading } = useQuery({
@@ -80,12 +82,26 @@ export default function AdminDashboard() {
     queryFn: () => apiRequest("GET", "/admin/metrics"),
   });
 
-  const systemHealth = safeData<any>(systemHealthRes);
-  const fraudSummary = safeData<any>(fraudSummaryRes);
-  const userSummary = safeData<any>(userSummaryRes);
-  const activityData = safeData<any>(activityDataRes);
-  const revenueData = safeData<any>(revenueDataRes);
-  const trustData = safeData<any>(trustDataRes);
+  // 7. Pending products count (for quick access)
+  const { data: pendingProductsRes } = useQuery({
+    queryKey: ["pendingProducts", districtId, districtSlug],
+    queryFn: () => apiRequest("GET", "/admin/products/pending"),
+  });
+
+  const systemHealth = safeData<any>(systemHealthRes, {});
+  const fraudSummary = safeData<any>(fraudSummaryRes, {});
+  const userSummary = safeData<any>(userSummaryRes, {});
+  const activityData = safeData<any>(activityDataRes, { chartData: [] });
+  const revenueData = safeData<any>(revenueDataRes, {});
+  const trustData = safeData<any>(trustDataRes, {});
+  const pendingProducts = safeData<any[]>(pendingProductsRes, []);
+
+  // Composite loading guard - dashboard ready when core queries have data
+  const dashboardLoading = healthLoading &&
+    !systemHealthRes &&
+    !fraudSummaryRes &&
+    !userSummaryRes &&
+    !pendingProductsRes;
 
   // Debug: Log all data states
   console.log("Dashboard data states:", {
@@ -95,6 +111,7 @@ export default function AdminDashboard() {
     activityData,
     revenueData,
     trustData,
+    pendingProducts,
     healthLoading
   });
 
@@ -102,7 +119,7 @@ export default function AdminDashboard() {
   console.log("systemHealth REAL:", systemHealth);
 
   // Allow rendering even if some queries are still loading
-  if (healthLoading) {
+  if (dashboardLoading) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center min-h-[400px]">
@@ -127,7 +144,8 @@ export default function AdminDashboard() {
     fraudSummary: !!fraudSummary,
     userSummary: !!userSummary,
     revenueData: !!revenueData,
-    trustData: !!trustData
+    trustData: !!trustData,
+    pendingProducts: !!pendingProducts
   });
 
   return (
@@ -139,21 +157,22 @@ export default function AdminDashboard() {
             BHARAT-OS <span className="text-orange-500">COMMAND CENTER</span>
           </h1>
           <p className="text-gray-400 mt-1">AI-powered governance of the sovereign commerce ecosystem</p>
-          <div className="text-xs text-gray-500 mt-2">
-            System Health: {systemHealth?.status || 'Loading...'} |
-            Data Loaded: {[
-              systemHealth && 'Health',
-              fraudSummary && 'Fraud',
-              userSummary && 'Users',
-              revenueData && 'Revenue',
-              trustData && 'Trust'
-            ].filter(Boolean).join(', ')}
-          </div>
+            <div className="text-xs text-gray-500 mt-2">
+              System Health: {systemHealth?.status || 'Loading...'} |
+              Data Loaded: {[
+                systemHealth && 'Health',
+                fraudSummary && 'Fraud',
+                userSummary && 'Users',
+                revenueData && 'Revenue',
+                trustData && 'Trust',
+                pendingProducts && 'Products'
+              ].filter(Boolean).join(', ')}
+            </div>
         </div>
 
         {/* Key Metrics Grid - 6 Cards */}
         {/* Row 1: Business Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
           <GlassCard className="p-6 border-l-4 border-green-500">
             <DollarSign className="text-green-500 mb-2" size={24} />
             <p className="text-gray-400 text-sm">Total Revenue</p>
@@ -162,34 +181,15 @@ export default function AdminDashboard() {
               <TrendingUp size={12} className="inline mr-1" />
               15.5% this month
             </p>
-          </GlassCard>
-
-          <GlassCard className="p-6 border-l-4 border-blue-500">
-            <Store className="text-blue-500 mb-2" size={24} />
-            <p className="text-gray-400 text-sm">Total Vendors</p>
-            <h2 className="text-2xl font-bold text-white">{fraudSummary?.highRiskVendors ?? userSummary?.totalVendors ?? 0}</h2>
-            <p className="text-green-400 text-xs mt-1">
-              <TrendingUp size={12} className="inline mr-1" />
-              +12% this month
-            </p>
-          </GlassCard>
-
-          <GlassCard className="p-6 border-l-4 border-orange-500">
-            <Users className="text-orange-500 mb-2" size={24} />
-            <p className="text-gray-400 text-sm">Active Users</p>
-            <h2 className="text-2xl font-bold text-white">{userSummary?.totalUsers ?? 0}</h2>
-            <p className="text-orange-400 text-xs mt-1">
-              800 active
-            </p>
-          </GlassCard>
-        </div>
+            </GlassCard>
+          </div>
 
         {/* Row 2: Risk & Trust Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
           <GlassCard className="p-6 border-l-4 border-red-500">
             <AlertTriangle className="text-red-500 mb-2" size={24} />
             <p className="text-gray-400 text-sm">Fraud Alerts</p>
-            <h2 className="text-2xl font-bold text-white">{systemHealth?.alertCount ?? 0}</h2>
+            <h2 className="text-2xl font-bold text-white">{fraudSummary?.totalAlerts ?? systemHealth?.alertCount ?? 0}</h2>
             <p className="text-red-400 text-xs mt-1">
               {systemHealth?.lockdownMode ? "LOCKDOWN" : "System Normal"}
             </p>
@@ -198,7 +198,7 @@ export default function AdminDashboard() {
           <GlassCard className="p-6 border-l-4 border-emerald-500">
             <Award className="text-emerald-500 mb-2" size={24} />
             <p className="text-gray-400 text-sm">Trust Score (DSSL)</p>
-            <h2 className="text-2xl font-bold text-white">{trustData?.trustScore ?? 0}</h2>
+            <h2 className="text-2xl font-bold text-white">{trustData?.averageTrustScore ?? trustData?.trustScore ?? 0}</h2>
             <p className="text-emerald-400 text-xs mt-1">
               Active: {trustData?.activeUsers ?? 0} | Total: {trustData?.totalUsers ?? 0}
             </p>
@@ -207,9 +207,9 @@ export default function AdminDashboard() {
           <GlassCard className="p-6 border-l-4 border-purple-500">
             <Shield className="text-purple-500 mb-2" size={24} />
             <p className="text-gray-400 text-sm">System Accuracy</p>
-            <h2 className="text-2xl font-bold text-white">{systemHealth?.falsePositiveMetrics?.accuracy ?? 0}%</h2>
+            <h2 className="text-2xl font-bold text-white">{systemHealth?.accuracy ?? systemHealth?.falsePositiveMetrics?.accuracy ?? 0}%</h2>
             <p className="text-purple-400 text-xs mt-1">
-              {systemHealth?.falsePositiveMetrics?.fraudDetections ?? 0} detected
+              {fraudSummary?.totalAlerts ?? systemHealth?.fraudDetections ?? 0} detected
             </p>
           </GlassCard>
         </div>
@@ -269,7 +269,7 @@ export default function AdminDashboard() {
         )}
 
         {/* System Health Monitor */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
           <GlassCard className="p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className={`w-3 h-3 rounded-full ${systemHealth?.lockdownMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>

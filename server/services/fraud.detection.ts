@@ -2,6 +2,7 @@
 // Prevents fake ratings, self-boosting, competitor sabotage
 
 import { computeUserIntelligence } from './user.intelligence';
+import { prisma } from '../storage';
 
 export async function calculateFraudScore(vendorId: number): Promise<number> {
   let fraudScore = 0;

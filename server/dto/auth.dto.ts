@@ -18,12 +18,10 @@ export const loginDTO = z.object({
     .regex(/^[^\s]+$/, "Username cannot contain spaces"),
 
   password: z.string()
-    .min(12, "Password must be at least 12 characters") // 🛡️ Sovereign Security
-    .max(100, "Password must not exceed 100 characters")
-    .regex(/[A-Z]/, "Must have one uppercase letter")
-    .regex(/[a-z]/, "Must have one lowercase letter")
-    .regex(/[0-9]/, "Must have one number")
-    .regex(/[!@#$%^&*(),.?":{}|<>]/, "Must have one special character"),
+    // Login must accept existing accounts even if they predate the current password policy.
+    // Password policy enforcement belongs to registration/reset flows.
+    .min(1, "Password is required")
+    .max(100, "Password must not exceed 100 characters"),
 });
 
 // ============================================
@@ -36,17 +34,36 @@ export const registerDTO = z.object({
     .regex(/^[^\s]+$/, "Username cannot contain spaces"),
 
   password: z.string()
-    .min(12, "Password must be at least 12 characters") // 🛡️ Sovereign Security
+    .min(12, "Password must be at least 12 characters")
     .max(100, "Password must not exceed 100 characters")
     .regex(/[A-Z]/, "Must have one uppercase letter")
     .regex(/[a-z]/, "Must have one lowercase letter")
     .regex(/[0-9]/, "Must have one number")
-    .regex(/[!@#$%^&*(),.?":{}|<>]/, "Must have one special character"),
+    .regex(/[!@#$%^&*(),.?\":{}|<>]/, "Must have one special character"),
 
   role: z.enum(["customer", "merchant"])
     .default("customer"),
-    
-  // ❌ districtId REMOVED - server-enforced only via tenantResolver
+
+  // MERCHANT PROVISIONING — blank-safe normalization
+  phone: z.preprocess(
+    (v) => v === "" ? undefined : v,
+    z.string().optional()
+  ),
+
+  email: z.preprocess(
+    (v) => v === "" ? undefined : v,
+    z.string().email("Invalid email").optional()
+  ),
+
+  shopName: z.preprocess(
+    (v) => v === "" ? undefined : v,
+    z.string().optional()
+  ),
+
+  shopAddress: z.preprocess(
+    (v) => v === "" ? undefined : v,
+    z.string().optional()
+  ),
 });
 
 // ============================================

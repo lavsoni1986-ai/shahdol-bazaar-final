@@ -1,14 +1,16 @@
 // 📁 client/src/pages/admin/AdminStats.tsx
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/api-client";
 
 export default function AdminStats() {
   // 🚀 BHARAT-OS: Fetching real stats from the database
   const { data: stats, isLoading } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
-      const response = await fetch("/api/public/stats?districtId=1"); // Shahdol ID: 1
-      return response.json();
+      const result = await apiRequest("GET", "public/stats?districtId=1"); // Shahdol ID: 1
+      if (!result.success) throw new Error(result.error || "Failed to fetch stats");
+      return result.data;
     }
   });
 

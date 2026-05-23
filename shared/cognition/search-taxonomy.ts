@@ -76,10 +76,10 @@ export const DISTRICT_SEARCH_TAXONOMY: Record<string, CategoryAlias> = {
   },
 
   restaurant: {
-    canonical: CanonicalDomain.COMMERCE,
+    canonical: CanonicalCategory.GROCERY,
     aliases: ['restaurant', 'food', 'eat', 'hotel', 'dhaba', 'cafe', 'tiffin'],
     related: ['menu', 'delivery', 'dining', 'cuisine'],
-    priority: 5
+    priority: 9
   },
 
   grocery: {

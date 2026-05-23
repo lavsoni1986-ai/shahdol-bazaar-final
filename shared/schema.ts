@@ -4,9 +4,14 @@ import { z } from "zod";
 // Prisma types are imported from @prisma/client in storage.ts
 
 /* ===================== PASSWORD VALIDATION ===================== */
+// 🛡️ Sovereign Security: 12+ chars, uppercase, lowercase, number, special
 export const passwordSchema = z.string()
-  .min(4, "Password must be at least 4 characters")
-  .max(100, "Password must not exceed 100 characters");
+  .min(12, "Password must be at least 12 characters")
+  .max(100, "Password must not exceed 100 characters")
+  .regex(/[A-Z]/, "Must have one uppercase letter")
+  .regex(/[a-z]/, "Must have one lowercase letter")
+  .regex(/[0-9]/, "Must have one number")
+  .regex(/[!@#$%^&*(),.?":{}|<>]/, "Must have one special character");
 
 /* ===================== USERS ===================== */
 export const insertUserSchema = z.object({
@@ -33,7 +38,7 @@ export const insertShopSchema = z.object({
   imageUrl: z.string().url().optional(),
   approved: z.boolean().default(false),
   isVerified: z.boolean().default(false),
-  districtId: z.number().int().optional().nullable(),
+  districtId: z.never(),
 });
 export type InsertShop = z.infer<typeof insertShopSchema>;
 
@@ -53,6 +58,7 @@ export const insertProductSchema = z.object({
   stock: z.number().int().min(0).optional(),
   status: z.string().optional(),
   approved: z.boolean().optional(),
+  districtId: z.never(), // 🛡️ Client cannot send this - server-side only (Verified JWT)
   vectorEmbedding: z.array(z.number()).optional(),
 });
 export type InsertProduct = z.infer<typeof insertProductSchema>;
@@ -69,7 +75,7 @@ export const insertCategorySchema = z.object({
   name: z.string().min(1, "Category name is required"),
   imageUrl: z.string().url().optional(),
   slug: z.string().optional(),
-  districtId: z.number().int().optional().nullable(),
+  districtId: z.never(),
 });
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 
@@ -81,7 +87,7 @@ export const insertOfferSchema = z.object({
   code: z.string().optional(),
   userId: z.number().int().optional(),
   isActive: z.boolean().default(true),
-  districtId: z.number().int().optional().nullable(),
+  districtId: z.never(),
 });
 export type InsertOffer = z.infer<typeof insertOfferSchema>;
 
@@ -91,7 +97,7 @@ export const insertOrderSchema = z.object({
   shopId: z.number().int().optional(),
   vendorId: z.number().int().optional(),
   userId: z.number().int().optional(),
-  districtId: z.number().int().optional(), // District context for the order
+  districtId: z.never(), // 🛡️ Client cannot send this - server-side only (Verified JWT)
   customerName: z.string().min(1).max(100).optional(),
   customerPhone: z.string().regex(/^[0-9]{10}$/, "Must be 10-digit mobile number").optional(),
   customerAddress: z.string().max(500).optional(),

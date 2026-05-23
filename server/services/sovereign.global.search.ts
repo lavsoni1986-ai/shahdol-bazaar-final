@@ -2,7 +2,8 @@ import { prisma } from "../storage";
 import { parseNaturalLanguage, IntentMatch } from "./intent.service";
 import { LocalIntelligenceManager } from "./local.intelligence.profile";
 import { DistrictManager } from "./district.manager";
-import { calculateSovereignScore } from "./brain.service";
+import { calculateSovereignScore } from "./sovereign-brain";
+import { aiProviderManager } from "../ai/provider-manager";
 
 export interface GlobalSearchResult {
   localResults: IntentMatch[];
@@ -32,7 +33,7 @@ export class SovereignGlobalSearch {
     voiceTranscript?: string,
     maxDistance: number = 100
   ): Promise<GlobalSearchResult> {
-    // Parse the intent from natural language
+    // Parse the intent from natural language (uses AI provider routing)
     const intentQuery = await parseNaturalLanguage(query, voiceTranscript, userDistrictId);
 
     // Search locally first

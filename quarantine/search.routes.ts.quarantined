@@ -1,0 +1,69 @@
+/**
+ * SEARCH ROUTES - Main search API endpoints
+ */
+
+import express, { type Request, type Response } from "express";
+import { searchUnified } from "../services/searchUnified.service";
+import { prisma } from "../storage";
+
+const router = express.Router();
+
+router.get("/global", async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    const districtId = req.ctx?.districtId;
+
+    if (!q || !districtId) {
+      return res.status(400).json({ success: false, error: "Query and district required" });
+    }
+
+    const result = await searchUnified(q, districtId);
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: "Search failed"
+    });
+  }
+});
+
+// GET /api/search/suggestions?q=partial
+router.get("/suggestions", async (req: Request, res: Response) => {
+  try {
+    const districtId = req.ctx?.districtId;
+    const query = (req.query.q as string)?.trim();
+
+    if (!districtId || !query) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // Simple keyword suggestions based on vendors
+    const vendors = await prisma.vendor.findMany({
+      where: {
+        districtId,
+        name: { contains: query, mode: "insensitive" },
+        status: "APPROVED"
+      },
+      select: { name: true },
+      take: 5
+    });
+    const uniqueSuggestions = [...new Set(
+      vendors.map((v: any) => v.name)
+    )].filter(s => s.toLowerCase().includes(query.toLowerCase()));
+
+    return res.json({
+      success: true,
+      data: uniqueSuggestions.slice(0, 8)
+    });
+
+  } catch (error) {
+    console.error("Suggestions error:", error);
+    return res.json({ success: true, data: [] });
+  }
+});
+
+export default router;

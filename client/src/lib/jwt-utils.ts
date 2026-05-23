@@ -1,7 +1,6 @@
 /**
- * JWT Utility Functions
- * Helper functions to decode and verify JWT tokens on the client side
- * Note: This is client-side decoding only for reading data, not verification
+ * @deprecated Cookie-based auth is canonical now.
+ * This file is retained for legacy compatibility, but should not be used for auth decisions.
  */
 
 export interface DecodedJWT {

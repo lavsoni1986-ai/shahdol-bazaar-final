@@ -31,7 +31,7 @@ export const LoginSchema = z.object({
     .regex(/^[^\s]+$/, "No spaces allowed"),
   password: z.string()
     .min(1, "Password is required"),
-}).catchall(z.any());
+}).strict();
 
 /**
  * Login input type
@@ -52,12 +52,12 @@ export const RegisterSchema = z.object({
     .regex(/^[^\s]+$/, "No spaces allowed"),
   password: z.string()
     .min(4, "Password must be at least 4 characters"),
-  role: z.string().optional(),
+  role: z.enum(["customer", "merchant"]).default("customer"),
   districtId: z.union([z.number(), z.string()]).transform(val => {
     if (typeof val === 'string') return parseInt(val, 10);
     return val;
   }).pipe(z.number().min(1, "District is required")),
-}).catchall(z.any());
+}).strict();
 
 /**
  * Register input type
@@ -218,8 +218,10 @@ export const CreateInquirySchema = z.object({
     .min(2, "Name must be at least 2 characters")
     .max(100, "Name must not exceed 100 characters")
     .trim(),
+  // email removed from User registration schema due to Prisma contract changes
+  // Keep validation available for other inbox-based features if needed
   email: z.string()
-    .email("Invalid email format")
+    .email("Invalid email format").optional()
     .optional()
     .nullable(),
   phone: z.string()

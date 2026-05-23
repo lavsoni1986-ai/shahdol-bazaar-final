@@ -1,0 +1,54 @@
+# 🚀 BharatOS - Render Deployment Config
+# Shahdol Bazaar MVP - Multi-District Ready
+
+services:
+  # 🌐 Backend API Server
+  - type: web
+    name: shahdol-bazaar-api
+    runtime: node
+    repo: https://github.com/lavsoni1986-ai/shahdol-bazaar-final.git
+    branch: main
+    buildCommand: npm install && npx prisma generate && npm run build:client
+    startCommand: npm run start:render
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "5002"
+      - key: DATABASE_URL
+        fromDatabase:
+          type: postgresql
+          name: shahdol-bazaar-db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: REFRESH_TOKEN_SECRET
+        generateValue: true
+      - key: VITE_APP_URL
+        value: https://shahdol-bazaar-api.onrender.com
+      - key: VITE_API_URL
+        value: https://shahdol-bazaar-api.onrender.com/api
+      - key: CLIENT_URL
+        value: https://shahdol-bazaar-api.onrender.com
+      - key: FRONTEND_URL
+        value: https://shahdol-bazaar-api.onrender.com
+      - key: VITE_DEFAULT_DISTRICT_ID
+        value: "121"
+      - key: VITE_DEFAULT_DISTRICT_SLUG
+        value: shahdol
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX
+        value: "100"
+      - key: DSSL_ENABLED
+        value: "false"
+
+  # 🗄️ PostgreSQL Database (via Render Managed Postgres)
+  databases:
+    - name: shahdol-bazaar-db
+      databaseName: shahdol_bazaar
+      user: shahdol_admin
+      version: "16"
+      plan: free

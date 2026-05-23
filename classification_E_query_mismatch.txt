@@ -1,0 +1,95 @@
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:76:client/src/pages/archive/legacy/ai-monitoring.tsx(156,18): error TS2345: Argument of type '{}' is not assignable to parameter of type 'SetStateAction<AIMetrics | null>'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:77:client/src/pages/archive/legacy/ai-monitoring.tsx(157,20): error TS2345: Argument of type 'never[]' is not assignable to parameter of type 'SetStateAction<TrendData | null>'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:78:client/src/pages/archive/legacy/ai-monitoring.tsx(162,22): error TS2554: Expected 2 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:79:client/src/pages/archive/legacy/ai-monitoring.tsx(163,22): error TS2554: Expected 2 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:80:client/src/pages/archive/legacy/ai-monitoring.tsx(192,24): error TS2554: Expected 2 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:81:client/src/pages/archive/legacy/ai-monitoring.tsx(203,24): error TS2554: Expected 2 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:130:server/dto/entity.dto.ts(310,32): error TS2554: Expected 2 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:184:server/routes/admin.routes.ts(179,47): error TS2769: No overload matches this call.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:186:    Argument of type '(a: number, b: number) => number' is not assignable to parameter of type '(previousValue: unknown, currentValue: unknown, currentIndex: number, array: unknown[]) => unknown'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:190:    Argument of type '(a: number, b: number) => number' is not assignable to parameter of type '(previousValue: number, currentValue: unknown, currentIndex: number, array: unknown[]) => number'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:260:server/routes/admin/admin.routes.ts(216,41): error TS2554: Expected 1 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:262:server/routes/admin/admin.routes.ts(293,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:267:server/routes/admin/admin.routes.ts(415,50): error TS2554: Expected 1 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:269:server/routes/admin/admin.routes.ts(440,31): error TS2554: Expected 1 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:282:server/routes/admin/admin.routes.ts(728,31): error TS2554: Expected 1 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:293:server/routes/admin/ai-command.routes.ts(49,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:294:server/routes/admin/ai-command.routes.ts(60,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:295:server/routes/admin/ai-command.routes.ts(78,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:297:server/routes/admin/ai-command.routes.ts(95,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:298:server/routes/admin/ai-command.routes.ts(113,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:299:server/routes/admin/ai-command.routes.ts(152,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:300:server/routes/admin/ai-command.routes.ts(158,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:301:server/routes/admin/ai-command.routes.ts(174,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:302:server/routes/admin/ai-command.routes.ts(187,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:304:server/routes/admin/ai-command.routes.ts(226,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:305:server/routes/admin/ai-command.routes.ts(237,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:307:server/routes/admin/ai-command.routes.ts(259,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:308:server/routes/admin/ai-command.routes.ts(267,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:312:server/routes/admin/ai-command.routes.ts(282,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:313:server/routes/admin/ai-command.routes.ts(291,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:314:server/routes/admin/ai-command.routes.ts(302,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:315:server/routes/admin/ai-command.routes.ts(308,19): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:323:server/routes/admin/dynamic-ranking.routes.ts(87,49): error TS2769: No overload matches this call.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:325:    Argument of type '(sum: number, w: number) => number' is not assignable to parameter of type '(previousValue: unknown, currentValue: unknown, currentIndex: number, array: unknown[]) => unknown'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:329:    Argument of type '(sum: number, w: number) => number' is not assignable to parameter of type '(previousValue: number, currentValue: unknown, currentIndex: number, array: unknown[]) => number'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:341:server/routes/ai/success.orchestrator.ts(243,34): error TS2345: Argument of type '{ districtId: number; areaKey: any; domain: string; searchTerms: string[]; vendorIds: any[]; productIds: any[]; serviceIds: number[]; hospitalIds: any[]; successScore: number; responseMode: string | undefined; }' is not assignable to parameter of type '{ districtId: number; areaKey: string; domain: string; searchTerms: string[]; vendorIds: number[]; productIds: number[]; successScore: number; responseMode: string; }'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:352:server/routes/analytics.routes.ts(30,64): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:353:server/routes/api/local.routes.ts(26,44): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:372:server/routes/marketplace/products.routes.ts(113,65): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:374:server/routes/marketplace/products.routes.ts(137,48): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:375:server/routes/marketplace/products.routes.ts(144,52): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:377:server/routes/marketplace/products.routes.ts(182,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:378:server/routes/marketplace/products.routes.ts(189,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:379:server/routes/marketplace/products.routes.ts(211,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:380:server/routes/marketplace/products.routes.ts(214,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:381:server/routes/marketplace/products.routes.ts(218,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:382:server/routes/marketplace/products.routes.ts(276,87): error TS2345: Argument of type '{ details: string | null; }' is not assignable to parameter of type 'string'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:383:server/routes/marketplace/products.routes.ts(298,35): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:384:server/routes/marketplace/products.routes.ts(301,37): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:385:server/routes/marketplace/products.routes.ts(305,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:386:server/routes/marketplace/products.routes.ts(317,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:387:server/routes/marketplace/products.routes.ts(322,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:388:server/routes/marketplace/products.routes.ts(330,33): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:389:server/routes/marketplace/products.routes.ts(333,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:390:server/routes/marketplace/products.routes.ts(337,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:391:server/routes/marketplace/products.routes.ts(351,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:392:server/routes/marketplace/products.routes.ts(355,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:393:server/routes/marketplace/products.routes.ts(358,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:394:server/routes/marketplace/products.routes.ts(362,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:395:server/routes/marketplace/products.routes.ts(376,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:396:server/routes/marketplace/products.routes.ts(380,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:397:server/routes/marketplace/products.routes.ts(383,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:398:server/routes/marketplace/products.routes.ts(387,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:399:server/routes/marketplace/products.routes.ts(400,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:400:server/routes/marketplace/products.routes.ts(404,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:401:server/routes/marketplace/products.routes.ts(407,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:402:server/routes/marketplace/products.routes.ts(411,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:403:server/routes/marketplace/products.routes.ts(424,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:404:server/routes/marketplace/products.routes.ts(428,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:405:server/routes/marketplace/products.routes.ts(431,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:406:server/routes/marketplace/products.routes.ts(435,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:413:server/routes/orders.routes.ts(62,58): error TS2345: Argument of type 'null' is not assignable to parameter of type 'EventPublisher'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:419:server/routes/payments.cashfree.routes.ts(34,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:420:server/routes/payments.cashfree.routes.ts(41,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:422:server/routes/payments.cashfree.routes.ts(73,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:423:server/routes/payments.cashfree.routes.ts(81,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:425:server/routes/payments.cashfree.routes.ts(102,23): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:426:server/routes/payments.cashfree.routes.ts(119,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:427:server/routes/payments.cashfree.routes.ts(130,37): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:428:server/routes/payments.cashfree.routes.ts(135,37): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:429:server/routes/payments.cashfree.routes.ts(147,37): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:433:server/routes/payments.cashfree.routes.ts(152,37): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:435:server/routes/payments.cashfree.routes.ts(172,23): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:437:server/routes/payments.cashfree.routes.ts(198,23): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:438:server/routes/payments.cashfree.routes.ts(201,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:439:server/routes/payments.cashfree.routes.ts(205,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:440:server/routes/payments.cashfree.routes.ts(226,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:441:server/routes/payments.cashfree.routes.ts(233,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:445:server/routes/payments.cashfree.routes.ts(238,35): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:447:server/routes/payments.cashfree.routes.ts(285,21): error TS2554: Expected 2-3 arguments, but got 1.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:448:server/routes/payments.cashfree.routes.ts(293,33): error TS2554: Expected 3-5 arguments, but got 2.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:511:server/services/district-memory.service.ts(1735,60): error TS2345: Argument of type '{ source: string; id: number; value: number; vendorId: number; context: JsonValue; timestamp: Date; signalType: string; }[]' is not assignable to parameter of type 'TrustSignal[]'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:515:server/services/district-memory.service.ts(1738,58): error TS2345: Argument of type '{ source: string; id: number; value: number; vendorId: number; context: JsonValue; timestamp: Date; signalType: string; }[]' is not assignable to parameter of type 'TrustSignal[]'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:625:server/services/searchUnified.service.ts(208,56): error TS2345: Argument of type '{ trustSignal: any; id: number; name: string; slug: string; category: string; districtId: number; trustScore: number; dsslScore?: number; finalScore?: number; rating?: number | null; avgRating?: number | null; isVerified?: boolean; description?: string | null; logo?: string | null; }' is not assignable to parameter of type 'ReasonTarget'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:642:server/services/sovereign-brain/response-orchestrator.ts(11,64): error TS2554: Expected 1 arguments, but got 2.

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiRequest } from "@/lib/api-client";
 
 export const useDistricts = () => {
   const [districts, setDistricts] = useState<any[]>([]);
@@ -8,9 +9,8 @@ export const useDistricts = () => {
     const fetchDistricts = async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/districts');
-        const result = await res.json();
-        if (result.success) setDistricts(result.data || []);
+        const result = await apiRequest("GET", "/districts");
+        setDistricts(Array.isArray(result?.data) ? result.data : []);
       } catch (e) {
         console.error("❌ District Hook Error:", e);
       } finally {

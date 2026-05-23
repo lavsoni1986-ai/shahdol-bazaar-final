@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "name": "mobile_repair",
+    "endpoint": "/api/search/global",
+    "params": {
+      "q": "mobile repair",
+      "districtId": 2
+    },
+    "timestamp": "2026-04-24T09:37:46.015Z",
+    "districtId": 2,
+    "districtSlug": "shahdol"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "vary": "Origin, Accept-Encoding",
+      "access-control-allow-credentials": "true",
+      "ratelimit-policy": "100;w=3600",
+      "ratelimit-limit": "100",
+      "ratelimit-remaining": "86",
+      "ratelimit-reset": "3594",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "1; mode=block",
+      "content-type": "application/json; charset=utf-8",
+      "content-length": "185",
+      "etag": "W/\"b9-5uCBS1CYBq9fmll2wD1m+dkBnko\"",
+      "date": "Fri, 24 Apr 2026 09:37:46 GMT",
+      "connection": "keep-alive",
+      "keep-alive": "timeout=5"
+    },
+    "data": "{\"success\":true,\"data\":{\"results\":[],\"intent\":{\"keywords\":[\"mobile\",\"repair\"],\"openNow\":false,\"intent\":\"service\",\"urgency\":\"medium\",\"preferences\":[],\"timeContext\":\"general\"},\"total\":0}}"
+  }
+}

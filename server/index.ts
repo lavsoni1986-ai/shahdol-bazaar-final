@@ -1,19 +1,67 @@
 import 'dotenv/config';
+
+// ============================================
+// 🚨 CRITICAL ENV VALIDATION - SHAHDOL BZR CORE
+// ============================================
+
+function validateCriticalEnv() {
+  const required = [
+    'DATABASE_URL',
+    'JWT_SECRET'
+  ];
+
+  const missing = required.filter(key => !process.env[key]);
+
+  if (missing.length > 0) {
+    console.error('❌ FATAL: Missing critical environment variables:');
+    missing.forEach(key => console.error(`   - ${key}`));
+    console.error('\n💥 BharatOS refusing startup - insecure configuration');
+    process.exit(1);
+  }
+
+  console.log('✅ Critical environment validation passed');
+}
+
+validateCriticalEnv();
+
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
+import { fileURLToPath } from "url";
 import fs from "fs";
+import crypto from "crypto";
 import cors from "cors";
 import helmet from "helmet";
-import cookieParser from "cookie-parser";
+import rateLimit from 'express-rate-limit';
+
 import compression from "compression";
-import { registerRoutes } from "./routes.js";
-import { setupVite } from "./vite.js";
-import { serveStatic } from "./static.js";
+import cookieParser from "cookie-parser";
+// ✅ New Sovereign Aggregator import
+import { registerSovereignRoutes } from "./routes/index";
+import { setupVite } from "./vite";
+import { serveStatic } from "./static";
 import { createServer } from "http";
 import session from "express-session";
-import { prisma, checkDatabaseConnection, isDatabaseConnected } from "./storage.js";
-import { tenantResolver } from "./middleware/tenantResolver.js";
-import { apiCacheMiddleware } from "../api-cache-headers.js";
+import { initRealtime } from "./realtime";
+
+import { apiCacheMiddleware } from "../api-cache-headers";
+import { tenantContext, checkDatabaseConnection, isDatabaseConnected } from "./storage";
+import { tenantResolver } from "./middleware/tenantResolver";
+// import { findPaymentByOrderId, findUserById, upgradeUserSubscription } from "./repositories";
+import { isTrustedE2E } from "./middleware/trustedE2E";
+import { apiLimiter } from "./auth/rateLimiter";
+import { errorHandler } from "./middleware/errorHandler";
+import { findActiveOffersByDistrict, deleteOfferById } from "./repositories/offer.repo";
+import { findAllCategories, deleteCategoryById } from "./repositories/category.repo";
+// ✅ OpenAPI/Swagger imports
+import swaggerUi from "swagger-ui-express";
+import { generateSwaggerSpec } from "./lib/swagger";
+// ✅ Import API registry to register all endpoints
+import "./lib/apiRegistry";
+
+// import { startAdScheduler } from "./workers/ad.scheduler"; // QUARANTINED
+import { startMemoryCleanupScheduler } from "./workers/memory.cleanup.scheduler";
+// import { runSovereignConnectEngine } from "./workers/revenue.worker";
+import type { Server } from "http";
 
 // ============================================
 // SECURITY: Async Error Wrapper
@@ -26,18 +74,25 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
   };
 
 // ============================================
+// UTILITY: Timeout Guard for Heavy Operations
+// ============================================
+const timeout = (ms: number) =>
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Operation timeout after ${ms}ms`)), ms)
+  );
+
+// ============================================
 // SECURITY: Trust Proxy Configuration
 // ============================================
 // Required for correct IP detection behind reverse proxies/load balancers
 // Without this, x-forwarded-for headers can be spoofed by attackers
 
-// Default to production mode if running on port 5001 (production port)
-// This ensures CSP is enforced when server runs on production port
+// Use explicit NODE_ENV - don't override with port-based detection in development
 const port = process.env.PORT ? parseInt(process.env.PORT) : 5002;
 const isProductionPort = port === 5002 || port === 443;
 
-// Use explicit NODE_ENV or fallback to port-based detection
-const effectiveIsProduction = process.env.NODE_ENV === 'production' || isProductionPort;
+// Use explicit NODE_ENV - port-based detection only if NODE_ENV is not set
+const effectiveIsProduction = process.env.NODE_ENV === 'production' || (process.env.NODE_ENV !== 'development' && isProductionPort);
 
 if (effectiveIsProduction) {
   console.log('🔒 [SECURITY] Production mode detected (NODE_ENV:', process.env.NODE_ENV, ', port:', port, ')');
@@ -45,33 +100,36 @@ if (effectiveIsProduction) {
 }
 
 // Global exception handler - log why the process is dying
-process.on("uncaughtException", (err, origin) => {
+process.on("uncaughtException", (err) => {
   console.error("❌ [FATAL] Uncaught Exception:", err.message);
-  console.error("❌ [FATAL] Stack:", err.stack);
-  console.error("❌ [FATAL] Origin:", origin);
+  if (process.env.NODE_ENV !== "production") {
+    console.error("❌ [FATAL] Stack:", err.stack);
+  }
   process.exit(1);
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("❌ [FATAL] Unhandled Rejection at:", promise);
-  console.error("❌ [FATAL] Reason:", reason);
+  if (process.env.NODE_ENV !== "production") {
+    console.error("❌ [FATAL] Reason:", reason);
+  }
 });
 
 // Validate required environment variables at startup
 // In development: WARN only, don't crash the server
 // In production: THROW error to enforce strict validation
 function validateEnv() {
-  // Core required variables (server won't start without these)
-  const required = [
-    'DATABASE_URL', 
-    'JWT_SECRET', 
-    'REFRESH_TOKEN_SECRET'
+  // Core required variables (already validated at top)
+  // These are soft-required: warn but don't crash
+  const recommended = [
+    'REFRESH_TOKEN_SECRET',
+    'SESSION_SECRET'
   ];
-  
-  // Feature-specific variables (optional in dev, required in prod)
+
+  // Feature-specific variables (optional)
   const optional = [
-    'CLOUDINARY_CLOUD_NAME', 
-    'CLOUDINARY_API_KEY', 
+    'CLOUDINARY_CLOUD_NAME',
+    'CLOUDINARY_API_KEY',
     'CLOUDINARY_API_SECRET',
     'CASHFREE_APP_ID',
     'CASHFREE_SECRET_KEY',
@@ -83,35 +141,33 @@ function validateEnv() {
     'CLIENT_URL',
     'FRONTEND_URL',
   ];
-  
-  const isDev = process.env.NODE_ENV === "development" || !process.env.NODE_ENV;
-  const missing: string[] = [];
+
+  const missingRecommended: string[] = [];
   const missingOptional: string[] = [];
-  
-  // Check required variables
-  for (const key of required) {
+
+  // Check recommended variables
+  for (const key of recommended) {
     if (!process.env[key]) {
-      missing.push(key);
+      missingRecommended.push(key);
     }
   }
-  
+
   // Check optional variables
   for (const key of optional) {
     if (!process.env[key]) {
       missingOptional.push(key);
     }
   }
-  
-  if (missing.length > 0) {
-    // Missing required - crash regardless of environment
-    throw new Error(`Missing required env: ${missing.join(", ")}`);
+
+  if (missingRecommended.length > 0) {
+    console.warn("⚠️ [ENV] Missing recommended env variables (set them for full features):", missingRecommended.join(", "));
   }
-  
+
   // Log optional variable status
   if (missingOptional.length > 0) {
     console.warn("⚠️ [ENV] Missing optional env variables:", missingOptional.join(", "));
   } else {
-    console.log("✅ All Env Variables Synced - Cashfree, Groq, Twilio all configured!");
+    console.log("✅ All feature env variables configured!");
   }
 }
 
@@ -130,6 +186,11 @@ async function testDatabaseConnection() {
     const connected = await checkDatabaseConnection();
     if (connected) {
       console.log("✅ [DB] Database connection successful!");
+
+      // 🛡️ AUDIT INTEGRITY CHECK - Disabled for now to prevent startup issues
+      // const { verifyAuditIntegrity } = await import("./routes/index");
+      // await verifyAuditIntegrity();
+
     } else {
       console.error("❌ [DB] Database connection failed - server will run but API calls may fail");
     }
@@ -140,6 +201,8 @@ async function testDatabaseConnection() {
 }
 
 const app = express();
+
+let httpServer: Server;
 
 // ============================================
 // SECURITY: Trust Proxy Configuration
@@ -161,47 +224,75 @@ app.use(compression({
   },
 }));
 
-const allowedOrigins = [process.env.FRONTEND_URL, process.env.CLIENT_URL, "http://localhost:5174", "https://shahdolbazaar.com"].filter(Boolean) as string[];   // Removes empty values
+// ============================================
+// SOVEREIGN CORS STRICT WHITELIST
+// ============================================
+
+
 
 // ============================================
-// SECURITY: Strict CORS Origin Validation
+// SECURITY MIDDLEWARE
 // ============================================
-// Strict origin matching function - prevents subdomain attacks
-// Uses exact identity comparison instead of .includes() which is permissive
-const isOriginAllowed = (origin: string | undefined): boolean => {
-  if (!origin) return true; // Allow no-origin requests (mobile apps, curl)
-  
-  // Allow any localhost or local network IP for development
-  if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) {
-    return true;
-  }
-  
-  // Allow any 192.168.x.x local network IP for mobile testing
-  if (origin.match(/^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:\d+/)) {
-    return true;
-  }
-  
-  return allowedOrigins.some(allowed => allowed === origin);
-};
 
-// ✅ CORS FIX: Allow current production + preview + local
+const ALLOWED_ORIGINS = [
+  "http://localhost:5174",  // ✅ आपके फ्रंटएंड का लोकल एड्रेस (अनिवार्य)
+  "http://localhost:5002",
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+  // भविष्य के जिलों के लिए
+  /^https?:\/\/.*\.bharatos\.in$/,
+];
+
 app.use(cors({
   origin: (origin, callback) => {
-    // 1. Allow requests with no origin (like mobile apps or curl)
-    // 2. Allow if origin is in our allowed list (strict identity check)
-    if (isOriginAllowed(origin)) {
-      return callback(null, origin);
+    // अगर कोई ओरिजिन नहीं है (जैसे मोबाइल ऐप या सर्वर-टू-सर्वर) या व्हाइटलिस्ट में है
+    if (!origin || ALLOWED_ORIGINS.some(allowed =>
+      typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
+    )) {
+      callback(null, true);
+    } else {
+      console.error(`🚨 CORS BLOCKED: Origin ${origin} not in whitelist`);
+      callback(new Error('CORS policy violation: Origin not allowed'));
     }
-    
-    console.warn(`🚨 [CORS BLOCK]: Origin ${origin} not in Sovereign List`);
-    return callback(new Error("Not allowed by CORS - Sovereign Shield Active"));
   },
-  credentials: true,
+  credentials: true, // 🔐 Cookies के लिए यह ज़रूरी है
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-District-Id", "X-District-Slug"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-District-Id", "X-District-Slug"],
 }));
 
-const httpServer = createServer(app);
+// 🚨 CRITICAL FIX: Handle OPTIONS preflight AFTER CORS but BEFORE tenantResolver
+app.options("*", cors());
+
+// Cookie parser for JWT cookies
+app.use(cookieParser());
+
+// Global API rate limiting - protects against abuse
+app.use('/api', rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // 1000 requests per 15 minutes per IP
+  message: { success: false, error: "API rate limit exceeded. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // 🛡️ SAFE BYPASS: Trusted E2E test traffic in development only
+  skip: (req) => isTrustedE2E(req),
+}));
+
+// ============================================
+// 🛡️ RATE LIMITING (ANTI-ABUSE PROTECTION)
+// ============================================
+
+// Rate limiting configuration moved to middleware section above
+
+// ============================================
+// SOVEREIGN CORS STRICT WHITELIST
+// ============================================
+
+
+
+
+
+
+
+
 
 // ============================================
 // SECURITY MIDDLEWARE
@@ -230,13 +321,13 @@ if (isDevelopment) {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: [
-          "'self'", 
-          "'unsafe-inline'", 
-          "'unsafe-eval'", 
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
           "https://sdk.cashfree.com",
-          "https://www.googletagmanager.com", 
-          "https://www.google-analytics.com", 
-          "https://widget.cloudinary.com", 
+          "https://www.googletagmanager.com",
+          "https://www.google-analytics.com",
+          "https://widget.cloudinary.com",
           "https://upload-widget.cloudinary.com",
           "https://*.cloudinary.com",
           // OneSignal push notifications
@@ -245,33 +336,33 @@ if (isDevelopment) {
           "https://*.onesignal.com"
         ],
         styleSrc: [
-          "'self'", 
-          "'unsafe-inline'", 
+          "'self'",
+          "'unsafe-inline'",
           "https://fonts.googleapis.com",
           "https://*.cloudinary.com"
         ],
         fontSrc: [
-          "'self'", 
-          "https://fonts.gstatic.com", 
+          "'self'",
+          "https://fonts.gstatic.com",
           "data:",
           "https://*.cloudinary.com"
         ],
         imgSrc: [
-          "'self'", 
-          "data:", 
-          "https:", 
-          "http:", 
-          "https://res.cloudinary.com", 
+          "'self'",
+          "data:",
+          "https:",
+          "http:",
+          "https://res.cloudinary.com",
           "https://*.cloudinary.com",
           "blob:"
         ],
         connectSrc: [
-          "'self'", 
-          "https:", 
-          "http:", 
+          "'self'",
+          "https:",
+          "http:",
           "https://*.cashfree.com",
-          "https://www.google-analytics.com", 
-          "https://api.cloudinary.com", 
+          "https://www.google-analytics.com",
+          "https://api.cloudinary.com",
           "https://*.cloudinary.com",
           // OneSignal push notifications
           "https://onesignal.com",
@@ -281,9 +372,9 @@ if (isDevelopment) {
           "ws:"
         ],
         frameSrc: [
-          "'self'", 
+          "'self'",
           "https://*.cashfree.com",
-          "https://widget.cloudinary.com", 
+          "https://widget.cloudinary.com",
           "https://upload-widget.cloudinary.com",
           "https://*.cloudinary.com"
         ],
@@ -301,13 +392,13 @@ if (isDevelopment) {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: [
-          "'self'", 
-          "'unsafe-inline'", 
-          "'unsafe-eval'", 
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
           "https://sdk.cashfree.com",
-          "https://www.googletagmanager.com", 
-          "https://www.google-analytics.com", 
-          "https://widget.cloudinary.com", 
+          "https://www.googletagmanager.com",
+          "https://www.google-analytics.com",
+          "https://widget.cloudinary.com",
           "https://upload-widget.cloudinary.com",
           "https://*.cloudinary.com",
           // OneSignal push notifications
@@ -319,12 +410,12 @@ if (isDevelopment) {
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:", "https://*.cloudinary.com"],
         imgSrc: ["'self'", "data:", "https:", "http:", "https://res.cloudinary.com", "https://*.cloudinary.com", "blob:"],
         connectSrc: [
-          "'self'", 
-          "https:", 
-          "http:", 
+          "'self'",
+          "https:",
+          "http:",
           "https://*.cashfree.com",
-          "https://www.google-analytics.com", 
-          "https://api.cloudinary.com", 
+          "https://www.google-analytics.com",
+          "https://api.cloudinary.com",
           "https://*.cloudinary.com",
           "https://onesignal.com",
           "https://cdn.onesignal.com",
@@ -341,8 +432,33 @@ if (isDevelopment) {
   }));
 }
 
-// Cookie parser (must be before routes)
-app.use(cookieParser());
+// Enhanced request logging middleware - only for API routes
+app.use((req: any, res, next) => {
+  if (!req.path.startsWith('/api')) return next();
+
+  const requestId = req.headers['x-request-id'] || req.headers['X-Request-ID'] || 'unknown';
+  const userId = req.ctx?.userId || 'anonymous';
+  const districtId = req.ctx?.districtId || req.districtId || 'unknown';
+  const ip = req.ip || req.connection.remoteAddress;
+
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - IP:${ip} - User:${userId} - District:${districtId} - ReqID:${requestId}`);
+  next();
+});
+
+// 🛡️ REMOVED: Duplicate rate limiter - already applied above on /api route
+
+// ✅ Additional Security Headers (HSTS, X-Content-Type-Options, X-Frame-Options)
+app.use((req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
+
+
+// PATCH 10B: Remove naked global /api/admin guard (admin routers handle auth/roles)
 
 // API Caching Middleware - Add cache headers for CDN edge caching
 // This adds Cache-Control headers to GET responses for public API endpoints
@@ -353,12 +469,41 @@ app.use('/api', apiCacheMiddleware);
 // ============================================
 app.use("/api/payments/webhook/cashfree", express.raw({ type: "application/json" }));
 
-// ✅ SECURITY FIX: Re-enable rate limiting
-import { apiLimiter } from "./auth/rateLimiter.js";
+// ============================================
+// CASHFREE WEBHOOK HANDLER FOR SUBSCRIPTIONS
+// ============================================
+app.post("/api/payments/webhook/cashfree", async (req, res) => {
+  try {
+    const payload = JSON.parse(req.body.toString());
 
-// Apply rate limiting to API routes (skip auth routes which have their own limiters)
+    // Validate webhook structure
+    if (!payload?.data?.order?.order_id || !payload?.data?.order?.order_status) {
+      console.error("Invalid webhook payload structure");
+      return res.status(400).json({ success: false });
+    }
+
+    const { order_id, order_status } = payload.data.order;
+
+    // Only process paid orders - log and acknowledge
+    if (order_status === "PAID") {
+      console.log(`💳 [WEBHOOK] Payment received for order ${order_id}`);
+      // Payment processing logic moved to payments.cashfree.routes.ts
+    }
+
+    return res.json({ success: true });
+
+  } catch (err) {
+    console.error("Webhook processing failed:", err);
+    return res.status(500).json({ success: false });
+  }
+});
+
+// Body parsers
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// ✅ Security: Additional rate limiting via apiLimiter (applied to /api)
 app.use('/api/', (req, res, next) => {
-  // Skip rate limiting for auth routes (they have their own limiters)
   const authRoutes = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh', '/api/auth/logout'];
   if (authRoutes.some(route => req.path === route || req.originalUrl === route)) {
     return next();
@@ -366,33 +511,12 @@ app.use('/api/', (req, res, next) => {
   return apiLimiter(req, res, next);
 });
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: false, limit: '10mb' }));
-
-// ✅ MANIFEST FIX: Serve static files from both public and client/public directories
-
-// ✅ Serve uploaded files from local uploads directory
-
-  // ✅ SECURITY FIX: Require separate SESSION_SECRET
-  // Session secret is critical for security - fail fast if not configured in production
-  const SESSION_SECRET = process.env.SESSION_SECRET;
-  const isDev = process.env.NODE_ENV === "development" || !process.env.NODE_ENV;
-  
-  if (!SESSION_SECRET) {
-    if (isDev) {
-      // Safe fallback for development only
-      const fallbackSecret = "dev-only-insecure-secret-change-in-production";
-      console.warn("⚠️ [DEV] Using insecure fallback SESSION_SECRET. Set SESSION_SECRET in .env for production!");
-      console.warn("⚠️ [DEV] This is fine for local development but NEVER use in production.");
-      // Use fallback - but log warning
-      (global as any).__DEV_SESSION_SECRET = fallbackSecret;
-    } else {
-      // Fail fast in production - no secret means insecure sessions
-      const errorMsg = "SESSION_SECRET environment variable is required in production!";
-      console.error(`❌ [SECURITY] ${errorMsg} Server cannot start without it.`);
-      throw new Error(errorMsg);
-    }
-  }
+// ✅ SECURITY FIX: Require separate SESSION_SECRET
+// Session secret is critical for security - fail fast if not configured
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) {
+  throw new Error("SESSION_SECRET environment variable is required!");
+}
 
 // Session middleware (optional, kept for backward compatibility)
 // JWT tokens are now primary auth method
@@ -414,181 +538,201 @@ app.use(session({
 const uploadsDir = path.resolve(process.cwd(), "public", "uploads");
 fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o777 });
 
-// Request logging for APIs
+// ============================================
+// 📊 OBSERVABILITY: Request Tracking & Monitoring
+// ============================================
+
+// Generate unique request ID for tracing and store in AsyncLocalStorage
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const requestId = crypto.randomUUID();
+  (req as any).requestId = requestId;
+  (req as any).startTime = Date.now();
+
+  // Store requestId in AsyncLocalStorage for audit logging
+  // districtId will be set by tenantResolver middleware later
+  tenantContext.run({ districtId: -1, requestId }, () => {
+    next();
+  });
+});
+
+// ✅ SOVEREIGN ORDER: tenantResolver AFTER tenantContext birth
+app.use("/api", tenantResolver);
+
+// Structured request logging
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/")) {
-    console.log("🔵 [REQUEST] Incoming API request:", req.method, req.path, req.originalUrl);
+    const requestId = (req as any).requestId;
+    console.log(`🔵 [REQUEST] ${requestId} ${req.method} ${req.path}`, {
+      userAgent: req.get('User-Agent')?.substring(0, 100),
+      ip: req.ip,
+      userId: (req as any).user?.id || 'anonymous'
+    });
   }
   next();
 });
 
-// ✅ SECURITY FIX: Smart tenant resolver with public route bypass
-const PUBLIC_ROUTES = [
-  '/health',
-  '/auth/login',
-  '/auth/register', 
-  '/auth/refresh',
-  '/auth/logout',
-  '/ui/context',
-  '/products',
-  '/categories',
-  '/banners',
-  '/bus-timetable',
-  '/shops',
-];
-
-app.use("/api", (req, res, next) => {
-  // ✅ FIX: Strip /api prefix from path for matching against public routes
-  // Because middleware is mounted at /api, req.path still contains /api prefix
-  const pathToCheck = req.path.startsWith('/api') ? req.path.slice(4) : req.path;
-  
-  // ✅ FIX: Bypass tenant resolver for auth, admin, analytics, payments, webhooks, AI
-  // These routes require proper auth anyway, so we don't set a default district
-  const bypassPaths = ['/auth', '/admin', '/analytics', '/payments', '/webhooks', '/districts', '/marketplace', '/ai', '/vendors'];
-  if (bypassPaths.some(path => pathToCheck.startsWith(path))) {
-    // Let auth middleware handle district validation
-    return next();
-  }
-
-  // Allow public routes without tenant context (public marketplace data)
-  // These are read-only endpoints that don't contain sensitive data
-  const PUBLIC_READ_ONLY = [
-    '/health',
-    '/ui/context',
-    '/products',
-    '/categories',
-    '/banners',
-    '/bus-timetable',
-    '/shops',
-    '/offers',
-    '/orders',
-    '/marketplace',
-    '/reviews',
-    '/vendors',
-  ];
-  
-  const isPublicReadOnly = PUBLIC_READ_ONLY.some(route => 
-    pathToCheck === route || 
-    pathToCheck.startsWith(route + '/')
-  );
-  
-  // Allow public read-only routes without district context
-  if (req.method === 'GET' && isPublicReadOnly) {
-    return next();
-  }
-  
-  // Also allow district lookup routes
-  if (pathToCheck.startsWith('/districts/') || pathToCheck === '/districts') {
-    return next();
-  }
-  
-  // Also allow vendor/shop public lookups - extract district from path/query
-  if (pathToCheck.startsWith('/vendors/') || pathToCheck.startsWith('/shops/') || pathToCheck.startsWith('/marketplace/')) {
-    // For public lookups, use district from query param or header, not default
-    // If no district specified, these will show all (aggregate) data
-    return tenantResolver(req, res, next);
-  }
-  
-  // For protected routes (mutations, authenticated reads), use full tenant resolver
-  return tenantResolver(req, res, next);
+// Response logging with latency
+app.use((req, res, next) => {
+  const originalSend = res.send;
+  res.send = function (data) {
+    if (req.path.startsWith("/api/")) {
+      const requestId = (req as any).requestId;
+      const latency = Date.now() - (req as any).startTime;
+      console.log(`✅ [RESPONSE] ${requestId} ${req.method} ${req.path} ${res.statusCode} ${latency}ms`);
+    }
+    return originalSend.call(this, data);
+  };
+  next();
 });
 
-(async () => {
+// Removed: unused PUBLIC_ROUTES after middleware simplification
+
+app.use("/api", (req, _res, next) => {
+  const url = req.originalUrl;
+  req.isAdminRoute = url.startsWith("/api/admin");
+  req.isPublicRoute =
+    url.startsWith("/api/health") ||
+    url.startsWith("/api/docs") ||
+    url.startsWith("/api/public");
+  req.requiresAuth =
+    !url.startsWith("/api/auth") &&
+    !req.isPublicRoute;
+  return next();
+});
+
+async function startServer() {
   // Validate required environment variables first
   validateEnv();
-  
+
   // Test database connectivity first
   await testDatabaseConnection();
-  
+
+  // 🚨 CRITICAL: Enhanced health endpoint for production monitoring
+  app.get("/health", (req, res) => {
+    const health = {
+      status: "ok",
+      db: isDatabaseConnected(),
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      // 🚨 ADD THESE FOR PRODUCTION MONITORING:
+      memory: process.memoryUsage(),
+      version: process.env.npm_package_version || "1.0.0",
+      environment: process.env.NODE_ENV,
+      // districts: await prisma.district.count() - commented out for perf
+    };
+
+    // 🚨 CRITICAL: Return 503 if DB is down
+    if (!isDatabaseConnected()) {
+      return res.status(503).json({ ...health, status: "error", message: "Database unreachable" });
+    }
+
+    res.json(health);
+  });
+
+  httpServer = createServer(app);
+
+  // 🔥 REAL-TIME GATEWAY: Initialize Socket.IO with auth & security
+  // Redis adapter will be applied if available (graceful fallback if not)
+  const io = await initRealtime(httpServer);
+
+  // Make io available globally for real-time updates
+  (global as any).io = io;
+
   // ✅ CRITICAL: Register API routes immediately after middleware setup (before Vite/static)
   console.log("🔵 [INDEX] ========================================");
-  console.log("🔵 [INDEX] Step 1: Registering API routes FIRST...");
-  await registerRoutes(httpServer, app);
-  console.log("✅ [INDEX] API routes registered successfully");
+  console.log("🔵 [INDEX] Step 1: Registering API routes...");
 
-  // Serve static files after API routes so /api/* is never intercepted by static middleware.
-  app.use(express.static(path.resolve(process.cwd(), "public")));
-  app.use(express.static(path.resolve(process.cwd(), "client", "public")));
-  app.use('/uploads', express.static(path.resolve(process.cwd(), "uploads")));
+  // 🎯 SIMPLE ROUTING: All routes under /api (no /api/v1)
+  const apiRouter = express.Router();
+  await registerSovereignRoutes(apiRouter);
+  app.use("/api", apiRouter);
+  console.log("✅ [INDEX] /api routes mounted");
+
+
+
+  // 🎯 Step 1.5: Mount Swagger UI for API documentation
+  const swaggerSpec = generateSwaggerSpec();
+  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'BharatOS API Documentation',
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+    },
+  }));
+
+  console.log("✅ [INDEX] Swagger UI mounted at /api/docs");
+
+  // ============================================
+  // 🚨 CRITICAL: PRODUCTION STATIC FILE SERVING
+  // ============================================
+  // Serve built client files - this is what makes the frontend work in production!
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  // ✅ Serve static files from built client
+  app.use(express.static(path.join(__dirname, "../dist/client")));
+
+  // ✅ SPA fallback - serve index.html for all non-API routes
+  app.get("*", (req, res) => {
+    if (req.path.startsWith("/api")) {
+      return res.status(404).json({ error: "API endpoint not found" });
+    }
+
+    res.sendFile(path.join(__dirname, "../dist/client/index.html"));
+  });
+
+  // Handle unhandled rejections for orchestration stability
+  process.on('unhandledRejection', (reason, promise) => {
+    console.warn('🚨 [UNHANDLED_REJECTION] Unhandled promise rejection detected', {
+      reason: reason?.toString(),
+      promise: promise?.toString()
+    });
+    // Note: Do not exit process - log and continue for production stability
+  });
+
   console.log("🔵 [INDEX] ========================================");
 
-  // ============================================
-  // FINAL ERROR HANDLER - Must be last app.use()
-  // ============================================
-  // Catches all errors including async errors and returns JSON
-  // This middleware MUST be registered after all routes and static files
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    // ============================================
-    // MULTER ERROR HANDLING
-    // ============================================
-    // Handle file size limit errors
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ success: false, message: "File too large. Maximum size is 5MB." });
-    }
-    if (err.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json({ success: false, message: "Too many files uploaded." });
-    }
-    // Handle invalid file type errors
-    if (err.message && err.message.startsWith('INVALID_FILE_TYPE')) {
-      return res.status(400).json({ success: false, message: "Invalid file type. Only JPEG, PNG and WebP images are allowed." });
-    }
-    if (err.message === 'Only image files are allowed') {
-      return res.status(400).json({ success: false, message: "Invalid file type. Only image files are allowed." });
-    }
-    
-    // ============================================
-    // ZOD VALIDATION ERRORS
-    // ============================================
-    if (err.name === 'ZodError') {
-      const errors = err.flatten?.()?.fieldErrors || {};
-      return res.status(400).json({ 
-        success: false, 
-        message: "Validation failed",
-        errors 
-      });
-    }
-    
-    // ============================================
-    // DEFAULT ERROR HANDLER - Always returns JSON
-    // ============================================
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    
-    // Ensure we always return JSON, not HTML
-    res.setHeader("Content-Type", "application/json");
-    res.status(status).json({ 
-      success: false,
-      message: process.env.NODE_ENV === 'production' && status === 500 
-        ? "Internal Server Error" // Don't leak error details in production
-        : message 
-    });
-    
-    // Log full error in development for debugging
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('🚨 [ERROR HANDLER]', err);
-    }
+  // 🚀 साम्राज्य का शंखनाद: सर्वर को पोर्ट पर चालू करें
+  console.log(`🔍 [DEBUG] Attempting to listen on port ${port}...`);
+
+  httpServer.listen(port, "0.0.0.0", () => {
+    console.log(`🚀 [BharatOS] Sovereign Server Live on port ${port}`);
+    console.log(`🌍 URL: http://localhost:${port}`);
+    console.log(`📚 Docs: http://localhost:${port}/api/docs`);
+    console.log(`🔍 [DEBUG] Server listen callback executed successfully`);
+
+    // ✅ Initialize background workers after server starts
+    console.log(`🔍 [DEBUG] Skipping background workers for now...`);
+    // if (process.env.ENABLE_BACKGROUND_WORKERS === "true") {
+    //   console.log(`🔍 [DEBUG] Initializing background workers...`);
+    //   startAdScheduler();
+    //   startMemoryCleanupScheduler();
+
+    //   // 🔄 हर २४ घंटे में रेवेन्यू के अवसर खोजें
+    //   setInterval(() => {
+    //     runSovereignConnectEngine().catch(console.error);
+    //   }, 24 * 60 * 60 * 1000);
+    // }
   });
 
-  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 5002;
-  
-  // Start server immediately after API routes are registered
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server live on http://localhost:${PORT}`);
-    console.log(`✅ API routes: http://localhost:${PORT}/api`);
-    console.log(`🛡️  Sovereign Shield Origin: ${allowedOrigins.join(', ')}`);
+  httpServer.on('error', (err) => {
+    console.error(`❌ [FATAL] Server failed to bind to port ${port}:`, err);
+    process.exit(1);
   });
 
-  // Now set up Vite/Static middleware (non-blocking)
-  console.log("🔵 [INDEX] Step 2: Setting up Vite/Static middleware...");
-  if (app.get("env") === "development") {
-    try {
-      await setupVite(app, httpServer);
-      console.log("✅ [INDEX] Vite middleware setup complete");
-    } catch (err) {
-      console.error("⚠️ Vite setup failed:", err);
-    }
-  } else {
-    serveStatic(app);
-    console.log("✅ [INDEX] Static file serving setup complete");
-  }
-})();
+  httpServer.on('listening', () => {
+    console.log(`✅ [SUCCESS] Server successfully listening on port ${port}`);
+  });
+}
+
+// 🛡️ BHARAT-OS SOVEREIGN ERROR CATCHER
+// ध्यान रहे: इसे हमेशा सारे रूट्स (Routes) के सबसे नीचे लगाना है!
+// Error handler from middleware/errorHandler
+app.use(errorHandler);
+
+// ✅ CORRECT: startServer() को फंक्शन के बाहर कॉल करें
+startServer().catch((err) => {
+  console.error("❌ [FATAL] Server failed to start:", err);
+  process.exit(1);
+});

@@ -1,0 +1,3 @@
+// Quarantine backup manifest for financial normalization
+- server/routes/auth.routes.ts -> quarantine/phase1c-financial-normalization/server_routes_auth.routes.ts
+- server/repositories/user.repo.ts -> quarantine/phase1c-financial-normalization/server_repositories_user.repo.ts

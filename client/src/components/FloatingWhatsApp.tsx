@@ -1,21 +1,18 @@
 import { MessageCircle } from "lucide-react";
+import { apiRequest } from "@/lib/api-client";
 
 const SUPPORT_NUMBER = "919753239303";
 const PREFILL = "Hello Shahdol Bazaar, mujhe shopping mein madad chahiye.";
 
 const trackLead = async (source: string, action: string) => {
   try {
-    await fetch('/api/leads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source,
-        action,
-        metadata: { 
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent
-        }
-      })
+    await apiRequest('POST', 'leads', {
+      source,
+      action,
+      metadata: { 
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent
+      }
     });
   } catch (e) {
     console.error('Lead tracking failed:', e);

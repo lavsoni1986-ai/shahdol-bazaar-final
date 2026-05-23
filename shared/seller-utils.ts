@@ -63,5 +63,6 @@ export function isValidSellerId(id: unknown): id is number {
  */
 export function getSellerIdSafe(item: { shopId?: number | null; vendorId?: number | null }): number {
   const normalized = normalizeSellerId(item);
-  return normalized ?? 0; // Default to 0 if invalid (will fail validation on server)
+  if (!normalized) throw new Error("Invalid seller ID");
+  return normalized;
 }

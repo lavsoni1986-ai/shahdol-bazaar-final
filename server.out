@@ -1,0 +1,60 @@
+✅ Critical environment validation passed
+🔵 [HELMET] Development mode: CSP disabled
+✅ All feature env variables configured!
+🔵 [DB] Testing database connection...
+(node:14612) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✅ [DB] Database connection verified
+✅ [DB] Database connection successful!
+⚠️ [SCALE] Redis adapter unavailable - running single-instance mode
+⚠️ [SCALE] Running in single-instance mode
+🔵 [INDEX] ========================================
+🔵 [INDEX] Step 1: Registering API routes...
+✅ Routes registered: /api/auth, /api/ai, /api/admin, /districts, /stats, /local, /merchant, /upload, /marketplace, /analytics, /orders, /banners
+✅ [INDEX] /api routes mounted
+✅ [INDEX] Swagger UI mounted at /api/docs
+🔵 [INDEX] ========================================
+🔍 [DEBUG] Attempting to listen on port 5002...
+🚀 [BharatOS] Sovereign Server Live on port 5002
+🌍 URL: http://localhost:5002
+📚 Docs: http://localhost:5002/api/docs
+🔍 [DEBUG] Server listen callback executed successfully
+🔍 [DEBUG] Skipping background workers for now...
+✅ [SUCCESS] Server successfully listening on port 5002
+[2026-05-22T06:34:29.290Z] GET /api/marketplace/products - IP:127.0.0.1 - User:anonymous - District:unknown - ReqID:unknown
+🏢 [TENANT] GET /api/marketplace/products | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+🔵 [REQUEST] 10251313-562f-4434-b539-f8dcd0039652 GET /api/marketplace/products { userAgent: 'curl/8.13.0', ip: '127.0.0.1', userId: 'anonymous' }
+🏢 [TENANT] GET /api/marketplace/products | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+🏢 [TENANT] GET /api/marketplace/products | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+[2026-05-22T06:34:36.154Z] GET /api/marketplace/products/3 - IP:127.0.0.1 - User:anonymous - District:unknown - ReqID:unknown
+🏢 [TENANT] GET /api/marketplace/products/3 | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+🔵 [REQUEST] 3fcf14aa-685d-4668-9413-011af125a5a1 GET /api/marketplace/products/3 { userAgent: 'curl/8.13.0', ip: '127.0.0.1', userId: 'anonymous' }
+🏢 [TENANT] GET /api/marketplace/products/3 | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+🏢 [TENANT] GET /api/marketplace/products/3 | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+[2026-05-22T06:34:36.174Z] [INFO] [SYSTEM:[ENTITY_RESOLUTION] PRODUCT_RESOLVED] Product resolved: id=3 title="Home visit service" vendor="sanjivenidoctor" district=1
+[2026-05-22T06:34:43.731Z] GET /api/marketplace/products/2 - IP:127.0.0.1 - User:anonymous - District:unknown - ReqID:unknown
+🏢 [TENANT] GET /api/marketplace/products/2 | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+🔵 [REQUEST] a23b6dc8-dd6c-4ef3-8fef-c5c09b540a4b GET /api/marketplace/products/2 { userAgent: 'curl/8.13.0', ip: '127.0.0.1', userId: 'anonymous' }
+🏢 [TENANT] GET /api/marketplace/products/2 | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+🏢 [TENANT] GET /api/marketplace/products/2 | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+[2026-05-22T06:34:43.758Z] [INFO] [SYSTEM:[ENTITY_RESOLUTION] PRODUCT_RESOLVED] Product resolved: id=2 title="motorola mobile" vendor="rohitmobile" district=1
+[2026-05-22T06:34:50.084Z] GET /api/marketplace/products/2 - IP:127.0.0.1 - User:anonymous - District:unknown - ReqID:unknown
+🏢 [TENANT] GET /api/marketplace/products/2 | Slug: nonexistent
+[2026-05-22T06:35:02.313Z] GET /api/marketplace/stores/rohitmobile - IP:127.0.0.1 - User:anonymous - District:unknown - ReqID:unknown
+🏢 [TENANT] GET /api/marketplace/stores/rohitmobile | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+🔵 [REQUEST] 3410ed41-e3c4-4e43-977c-d228895abc54 GET /api/marketplace/stores/rohitmobile { userAgent: 'curl/8.13.0', ip: '127.0.0.1', userId: 'anonymous' }
+🏢 [TENANT] GET /api/marketplace/stores/rohitmobile | Slug: shahdol
+🏢 [TENANT] ✅ header district resolved: 1 (Shahdol)
+[2026-05-22T06:35:02.325Z] [INFO] [EXECUTION:vendor_fetch_start] Resolving vendor by slug
+[2026-05-22T06:35:02.338Z] [INFO] [SYSTEM:[ENTITY_RESOLUTION] VENDOR_RESOLVED] Vendor resolved: id=3 slug="rohitmobile" district=1
+[2026-05-22T06:35:02.339Z] [INFO] [EXECUTION:vendor_fetch_complete] Vendor resolved successfully

@@ -10,7 +10,7 @@
   --color-nebula-orange: #f97316;
   --color-sovereign-bg: #030003;
   --color-sovereign-surface: #0a0a0a;
-  
+
   /* 🔥 FLUID TYPOGRAPHY (Smoother Ramps as per your math) */
   --text-xs: clamp(0.7rem, 0.5vw + 0.5rem, 0.75rem);
   --text-sm: clamp(0.8rem, 0.8vw + 0.5rem, 0.875rem);
@@ -20,7 +20,7 @@
   --text-2xl: clamp(1.25rem, 1.8vw + 0.75rem, 1.5rem);
   --text-3xl: clamp(1.5rem, 2vw + 1rem, 1.875rem);
   /* Smoother transition for ultra-wide screens */
-  --text-4xl: clamp(1.875rem, 2vw + 1rem, 2.25rem); 
+  --text-4xl: clamp(1.875rem, 2vw + 1rem, 2.25rem);
 }
 
 /* ===============================
@@ -29,7 +29,7 @@
 @layer base {
   html {
     /* Locks the baseline for consistent REM math across all browsers */
-    font-size: 100%; 
+    font-size: 100%;
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
   }
@@ -41,18 +41,28 @@
     @apply text-base text-slate-200 bg-sovereign-bg;
   }
 
+  /* 🛡️ SOVEREIGN IMAGE BASELINE — prevents inline whitespace bleeding */
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
   /* Universal Custom Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
-    height: 6px; 
+    height: 6px;
   }
+
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+
   ::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
   }
@@ -62,6 +72,7 @@
    FLUID UTILITIES (The Masterstroke)
 ================================= */
 @layer utilities {
+
   /* Safe area for mobile notches (iPhone etc) */
   .safe-bottom {
     padding-bottom: max(env(safe-area-inset-bottom), 16px);
@@ -78,7 +89,7 @@
   .p-fluid {
     padding: clamp(16px, 3vw, 24px);
   }
-  
+
   .py-fluid {
     padding-top: clamp(16px, 3vw, 24px);
     padding-bottom: clamp(16px, 3vw, 24px);
@@ -91,5 +102,15 @@
 
   .gap-fluid {
     gap: clamp(16px, 3vw, 24px);
+  }
+
+  /* Scrollbar hide utility */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }

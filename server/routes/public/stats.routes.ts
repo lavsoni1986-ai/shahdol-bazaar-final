@@ -1,6 +1,7 @@
 import express, { type Request, type Response } from "express";
 import { prisma } from "../../storage";
 import { findVendorsByCategory, countVendorsByDistrict, countVendorsByCategory, findVendorBySlug } from "../../repositories/vendor.repo";
+import { mapVendorByType } from "../../dto/entity.dto";
 import { countActiveProductsByDistrict } from "../../repositories/product.repo";
 import { ErrorCode, sendError, sendSuccess } from "../../middleware/errorHandler";
 import logger from "../../middleware/logger";
@@ -95,16 +96,16 @@ router.get("/hospitals", async (req: Request, res: Response) => {
   const page = Math.max(1, Number(req.query?.page) || 1);
   const limit = Math.min(50, Math.max(1, Number(req.query?.limit) || 20));
   const skip = (page - 1) * limit;
-  
+
   console.log("🏥 HOSPITALS (as VENDORS): districtId =", districtId, "page =", page);
 
-   // 🔴 FIX: Hospitals are now Vendors with category = 'HOSPITAL'
-   const [hospitals, total] = await Promise.all([
-     findVendorsByCategory('HOSPITAL', districtId),
-     countVendorsByCategory('HOSPITAL', districtId)
-   ]);
-  
-  return sendSuccess(res, hospitals);
+  // 🔴 FIX: Hospitals are now Vendors with category = 'HOSPITAL'
+  const [hospitals, total] = await Promise.all([
+    findVendorsByCategory('HOSPITAL', districtId),
+    countVendorsByCategory('HOSPITAL', districtId)
+  ]);
+
+  return sendSuccess(res, hospitals.map(mapVendorByType));
 });
 
 // --- FETCH HOSPITAL BY SLUG ---
@@ -135,7 +136,7 @@ router.get("/hospitals/:slug", async (req: Request, res: Response) => {
 
     return res.json({
       success: true,
-      data: hospital
+      data: await mapVendorByType(hospital)
     });
   } catch (e: any) {
     logger.error('Hospital lookup failed', {
@@ -156,7 +157,7 @@ router.get("/schools", async (req: Request, res: Response) => {
   const page = Math.max(1, Number(req.query?.page) || 1);
   const limit = Math.min(50, Math.max(1, Number(req.query?.limit) || 20));
   const skip = (page - 1) * limit;
-  
+
   console.log("🎓 SCHOOLS: districtId =", districtId, "page =", page, "limit =", limit);
 
   const [schools, total] = await Promise.all([
@@ -239,7 +240,7 @@ router.get("/bus-timetable", async (req: Request, res: Response) => {
     const page = Math.max(1, Number(req.query?.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(req.query?.limit) || 20));
     const skip = (page - 1) * limit;
-    
+
     console.log("🚌 BUS TIMETABLE: districtId =", districtId, "page =", page);
 
     const [buses, total] = await Promise.all([

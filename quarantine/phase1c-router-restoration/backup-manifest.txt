@@ -1,0 +1,4 @@
+Router restoration backup list:
+- client/src/App.tsx -> quarantine/phase1c-router-restoration/client_src_App.tsx
+- client/src/pages/partner-dashboard.tsx -> quarantine/phase1c-router-restoration/client_src_pages_partner-dashboard.tsx
+- client/src/contexts/AuthContext.tsx -> quarantine/phase1c-router-restoration/client_src_contexts_AuthContext.tsx

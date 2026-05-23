@@ -61,7 +61,7 @@ export default function AuditPanel() {
                     </span>
                   </div>
 
-                  <p className="text-gray-300 text-sm mb-2">{log.details}</p>
+                  <pre className="text-gray-300 text-sm mb-2 whitespace-pre-wrap">{JSON.stringify(log.details, null, 2)}</pre>
 
                   <div className="flex items-center gap-4 text-xs text-gray-500">
                     <div className="flex items-center gap-1">

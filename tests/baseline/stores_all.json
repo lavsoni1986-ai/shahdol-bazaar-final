@@ -1,0 +1,50 @@
+{
+  "url": "http://localhost:5002/api/marketplace/stores",
+  "method": "GET",
+  "params": {
+    "districtId": 2
+  },
+  "headers": {
+    "x-district-slug": "shahdol"
+  },
+  "response": {
+    "status": 400,
+    "headers": {
+      "vary": "Origin, Accept-Encoding",
+      "access-control-allow-credentials": "true",
+      "ratelimit-policy": "100;w=3600",
+      "ratelimit-limit": "100",
+      "ratelimit-remaining": "93",
+      "ratelimit-reset": "3598",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "1; mode=block",
+      "content-type": "application/json; charset=utf-8",
+      "content-length": "193",
+      "etag": "W/\"c1-fqobTV+0kxujdjNFKPbo72Uifrk\"",
+      "date": "Fri, 24 Apr 2026 09:09:55 GMT",
+      "connection": "keep-alive",
+      "keep-alive": "timeout=5"
+    },
+    "body": {
+      "success": false,
+      "error": "Invalid query parameters",
+      "details": [
+        {
+          "field": "districtId",
+          "message": "Expected string, received number",
+          "code": "invalid_type"
+        }
+      ],
+      "timestamp": "2026-04-24T09:09:55.146Z"
+    }
+  }
+}

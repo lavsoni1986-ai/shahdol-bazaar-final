@@ -1,6 +1,9 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useCart } from "@/contexts/CartContext";
+import { useDistrict } from "@/contexts/DistrictContext";
+import { apiRequest } from "@/lib/api-client";
+import { sovereignApiRoutes } from "@/shared/routing/sovereign-routes";
 import {
   Sheet,
   SheetContent,
@@ -12,7 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Minus, Plus, Trash2, ShoppingBag, MessageCircle, User, Phone, MapPin } from "lucide-react";
+import {
+  Minus, Plus, Trash2, ShoppingBag, MessageCircle, User, Phone, MapPin, AlertTriangle, Loader2
+} from "lucide-react";
 import { useQueries } from "@tanstack/react-query";
 
 interface CartProps {
@@ -20,21 +25,35 @@ interface CartProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Fetch shop/vendor details - use relative path for Vite proxy
-const API_BASE = "";
-
-async function fetchShop(shopId: number) {
-  // Try vendor API first
-  const vendorUrl = `${API_BASE || ""}/api/vendors/id/${shopId}`;
-  const vendorRes = await fetch(vendorUrl);
-  if (vendorRes.ok) {
-    return vendorRes.json();
+/**
+ * SOVEREIGN: Typed vendor fetch with centralized route builder.
+ * Returns an object with success/data/error fields — NEVER throws on 404.
+ */
+async function fetchVendor(vendorId: number): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+  statusCode?: number;
+}> {
+  try {
+    // ✅ SOVEREIGN: Use centralized route builder — NO hardcoded route drift
+    const vendorUrl = sovereignApiRoutes.marketplace.vendorById(vendorId);
+    const vendorRes = await apiRequest('GET', vendorUrl);
+    // apiRequest returns { success, data } — NOT a raw fetch Response
+    if (vendorRes?.success && vendorRes?.data) {
+      return { success: true, data: vendorRes.data };
+    }
+    // SOVEREIGN: Handle valid API response that doesn't have data
+    return { success: false, error: vendorRes?.error || "Vendor data unavailable", statusCode: 404 };
+  } catch (err: any) {
+    // SOVEREIGN: Handle 404 or any fetch failure gracefully — NO crashes
+    const statusCode = err?.statusCode || (err?.message?.includes("404") ? 404 : 0);
+    return {
+      success: false,
+      error: err?.message || "Vendor fetch failed",
+      statusCode,
+    };
   }
-  // Fallback to shops API
-  const url = `${API_BASE || ""}/api/shops/${shopId}`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  return res.json();
 }
 
 export function Cart({ open, onOpenChange }: CartProps) {
@@ -45,42 +64,60 @@ export function Cart({ open, onOpenChange }: CartProps) {
     removeFromCart,
     clearCart,
     getTotalPrice,
+    sanitizedItems,
   } = useCart();
+  const { currentDistrict } = useDistrict();
+  const districtId = currentDistrict?.id;
 
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
 
-  // Group items by shop - using useMemo to ensure stable reference
-  const itemsByShop = useMemo(() => {
+  // Group items by vendor - using useMemo to ensure stable reference
+  const itemsByVendor = useMemo(() => {
     return items.reduce((acc, item) => {
-      if (!acc[item.shopId]) {
-        acc[item.shopId] = [];
+      const vendorId = item.vendorId;
+      if (!acc[vendorId]) {
+        acc[vendorId] = [];
       }
-      acc[item.shopId].push(item);
+      acc[vendorId].push(item);
       return acc;
     }, {} as Record<number, typeof items>);
   }, [items]);
 
-  // Get unique shop IDs - using useMemo
-  const shopIds = useMemo(() => {
-    return Object.keys(itemsByShop).map(Number);
-  }, [itemsByShop]);
+  // Get unique vendor IDs - using useMemo
+  const vendorIds = useMemo(() => {
+    return Object.keys(itemsByVendor).map(Number);
+  }, [itemsByVendor]);
 
   // Use useQueries for dynamic queries - this is the correct way to handle multiple dynamic queries
-  const shopQueries = useQueries({
-    queries: shopIds.map((shopId) => ({
-      queryKey: ["shop", shopId],
-      queryFn: () => fetchShop(shopId),
-      enabled: open && !!shopId,
+  const vendorQueries = useQueries({
+    queries: vendorIds.map((vendorId) => ({
+      queryKey: ["vendor", vendorId, districtId],
+      queryFn: () => fetchVendor(vendorId),
+      enabled: open && !!vendorId,
+      retry: false, // SOVEREIGN: Don't retry on 404 — fail fast with recovery UX
+      staleTime: 30000, // 30s cache
     })),
   });
 
   const totalPrice = getTotalPrice();
 
   const [, setLocation] = useLocation();
-  
+
+  // SOVEREIGN: Track which vendors failed to fetch
+  const failedVendors = useMemo(() => {
+    const failed: Record<number, string> = {};
+    vendorQueries.forEach((query, index) => {
+      const vendorId = vendorIds[index];
+      if (!query.isLoading && (!query.data?.success || !query.data?.data)) {
+        failed[vendorId] = query.data?.error || "Vendor unavailable";
+      }
+    });
+    return failed;
+  }, [vendorQueries, vendorIds]);
+
   const handleProceedToCheckout = () => {
     if (items.length === 0) return;
     onOpenChange(false); // Close cart
@@ -96,50 +133,50 @@ export function Cart({ open, onOpenChange }: CartProps) {
       return;
     }
 
-    // Group items by shop for separate orders
-    const ordersByShop = Object.entries(itemsByShop).map(([shopId, shopItems]) => {
-      const shopIndex = shopIds.indexOf(Number(shopId));
-      const shopQuery = shopIndex >= 0 ? shopQueries[shopIndex] : null;
-      const shop = shopQuery?.data;
-      const phone = shop?.mobile || shop?.phone || "919753239303"; // Fallback to support number
-      const shopName = shop?.name || "Shop";
+    // Group items by vendor for separate orders
+    const ordersByVendor = Object.entries(itemsByVendor).map(([vendorId, vendorItems]) => {
+      const vendorIndex = vendorIds.indexOf(Number(vendorId));
+      const vendorQuery = vendorQueries[vendorIndex];
+      const vendor = vendorQuery?.data?.data;
+      const phone = vendor?.mobile || vendor?.phone || "919753239303"; // Fallback to support number
+      const vendorName = vendor?.name || "Vendor";
 
-      const orderItems = shopItems.map(
-        (item) => `• ${item.name} - ₹${parseFloat(item.price).toLocaleString()} x ${item.quantity}`
+      const orderItems = vendorItems.map(
+        (item) => `• ${item.name} - ₹${item.price.toLocaleString()} x ${item.quantity}`
       );
-      const shopTotal = shopItems.reduce(
-        (sum, item) => sum + parseFloat(item.price) * item.quantity,
+      const vendorTotal = vendorItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
         0
       );
 
       const message = `🛒 *Order from Shahdol Bazaar*
-
-*Customer Details:*
-👤 Name: ${customerName}
-📱 Phone: ${customerPhone}
-📍 Delivery Address: ${deliveryAddress}
-
-*Shop:* ${shopName}
-
-*Items:*
-${orderItems.join("\n")}
-
-*Total: ₹${shopTotal.toLocaleString()}*
-
-Please confirm this order. Thank you!`;
+ 
+ *Customer Details:*
+ 👤 Name: ${customerName}
+ 📱 Phone: ${customerPhone}
+ 📍 Delivery Address: ${deliveryAddress}
+ 
+ *Vendor:* ${vendorName}
+ 
+ *Items:*
+ ${orderItems.join("\n")}
+ 
+ *Total: ₹${vendorTotal.toLocaleString()}*
+ 
+ Please confirm this order. Thank you!`;
 
       return { phone, message };
     });
 
-    // If all items are from one shop, send single message
-    if (ordersByShop.length === 1) {
-      const { phone, message } = ordersByShop[0];
+    // If all items are from one vendor, send single message
+    if (ordersByVendor.length === 1) {
+      const { phone, message } = ordersByVendor[0];
       const cleanPhone = phone.replace(/\D/g, "");
       const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, "_blank");
     } else {
-      // Multiple shops - send to each shop separately
-      ordersByShop.forEach(({ phone, message }) => {
+      // Multiple vendors - send to each vendor separately
+      ordersByVendor.forEach(({ phone, message }) => {
         const cleanPhone = phone.replace(/\D/g, "");
         const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
         setTimeout(() => window.open(whatsappUrl, "_blank"), 100);
@@ -171,6 +208,28 @@ Please confirm this order. Thank you!`;
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
+          {/* SOVEREIGN: Sanitized items recovery notification */}
+          {sanitizedItems.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="text-sm text-amber-800">
+                <p className="font-medium">Some items were removed</p>
+                <p className="text-amber-600">{sanitizedItems.length} item(s) were no longer available or had invalid data.</p>
+              </div>
+            </div>
+          )}
+
+          {/* SOVEREIGN: Failed vendor notification */}
+          {Object.keys(failedVendors).length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+              <div className="text-sm text-red-800">
+                <p className="font-medium">Vendor information unavailable</p>
+                <p className="text-red-600">Some vendors could not be loaded. You can still proceed, but vendor details may be incomplete.</p>
+              </div>
+            </div>
+          )}
+
           {items.length === 0 ? (
             <div className="text-center py-12">
               <ShoppingBag size={48} className="mx-auto text-slate-300 mb-4" />
@@ -181,22 +240,39 @@ Please confirm this order. Thank you!`;
             </div>
           ) : (
             <>
-              {/* Items grouped by shop */}
-              {Object.entries(itemsByShop).map(([shopId, shopItems]) => {
-                const shopIndex = shopIds.indexOf(Number(shopId));
-                const shopQuery = shopIndex >= 0 ? shopQueries[shopIndex] : null;
-                const shop = shopQuery?.data;
-                const shopName = shop?.name || "Shop";
+              {/* Items grouped by vendor */}
+              {Object.entries(itemsByVendor).map(([vendorId, vendorItems]) => {
+                const vendorIndex = vendorIds.indexOf(Number(vendorId));
+                const vendorQuery = vendorQueries[vendorIndex];
+                const vendor = vendorQuery?.data?.data;
+                const vendorName = vendor?.name || "Vendor";
+
+                // SOVEREIGN: Show loading state for vendor data
+                const isVendorLoading = vendorQuery?.isLoading;
+                const hasVendorFailed = !vendorQuery?.data?.success;
+                const vendorError = vendorQuery?.data?.error;
 
                 return (
-                  <div key={shopId} className="space-y-4">
+                  <div key={vendorId} className="space-y-4">
                     <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        {shopName}
-                      </span>
+                      {isVendorLoading ? (
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading vendor...
+                        </span>
+                      ) : hasVendorFailed ? (
+                        <span className="text-xs font-bold text-red-500 uppercase tracking-wider flex items-center gap-2">
+                          <AlertTriangle className="h-3 w-3" />
+                          {vendorError || "Vendor unavailable"}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          {vendorName}
+                        </span>
+                      )}
                     </div>
 
-                    {shopItems.map((item) => (
+                    {vendorItems.map((item) => (
                       <div
                         key={item.id}
                         className="flex gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100"
@@ -213,7 +289,7 @@ Please confirm this order. Thank you!`;
                             {item.name}
                           </h3>
                           <p className="text-lg font-black text-orange-600 mb-3">
-                            ₹{parseFloat(item.price).toLocaleString()}
+                            ₹{item.price.toLocaleString()}
                           </p>
                           <div className="flex items-center gap-3">
                             <div className="flex items-center gap-2 border border-slate-200 rounded-lg">
@@ -249,7 +325,7 @@ Please confirm this order. Thank you!`;
                           <p className="font-bold text-slate-900">
                             ₹
                             {(
-                              parseFloat(item.price) * item.quantity
+                              item.price * item.quantity
                             ).toLocaleString()}
                           </p>
                         </div>
@@ -358,4 +434,3 @@ Please confirm this order. Thank you!`;
     </Sheet>
   );
 }
-

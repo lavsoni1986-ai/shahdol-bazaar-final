@@ -30,9 +30,12 @@ model District {
   hospitals       Hospital[]       @relation("DistrictToHospitals")
   inquiries       Inquiry[]        @relation("DistrictToInquiries")
   offers          Offer[]
+  productOwnerDistricts Product[]   @relation("DistrictToProducts")
   serviceWorkers  ServiceWorker[]  @relation("DistrictToServiceWorkers")
   users           User[]
   vendors         Vendor[]         @relation("DistrictToVendors")
+  schools         Schools[]
+  sovereignOrders SovereignOrder[]
 
   @@map("District")
 }
@@ -52,9 +55,12 @@ model Vendor {
   businessType          BusinessType @default(PRODUCT)
   category              String?
   categorySlug          String?
+  searchText            String?
+  aiRankScore           Float        @default(0)
+  rating                Float        @default(0)
   districtId            Int?         @map("district_id")
   dsslLastUpdated       DateTime?
-  dsslScore             Int          @default(100)
+  dsslScore             Int          @default(0)
   experience            Int?         @default(0)
   hospitalData          Json?
   images                String[]
@@ -64,6 +70,7 @@ model Vendor {
   legacyHospitalId      String?      @unique
   legacyShopId          Int?         @unique
   legacySchoolId        Int?         @map("legacy_school_id")
+  legacyServiceWorkerId Int?         @unique
   mobile                String?
   phone                 String?
   safetyBadges          String[]
@@ -71,6 +78,7 @@ model Vendor {
   serviceHours          String?
   specialties           String[]
   status                VendorStatus @default(PENDING)
+  isShadowBanned        Boolean      @default(false)
   trendingScore         Int          @default(0)
   updatedAt             DateTime     @updatedAt
   userId                Int?         @map("user_id")
@@ -81,6 +89,14 @@ model Vendor {
   offers                Offer[]
   products              Product[]
   district              District?    @relation("DistrictToVendors", fields: [districtId], references: [id])
+
+  fraudHistories FraudHistory[]
+
+  vendorMLProfile VendorMLProfile?
+
+  userPreferences userPreference[]
+
+  metadata VendorMetadata?
 
   @@unique([districtId, slug])
   @@index([slug])
@@ -216,18 +232,22 @@ model ShopAppointment {
 }
 
 model Schools {
-  id              Int      @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
+  districtId      Int?      @map("district_id")
   name            String
   address         String
   contact         String?
   email           String?
   about           String?
-  board           String?  @default("CBSE")
+  board           String?   @default("CBSE")
   vectorEmbedding Json?
-  dsslScore       Int      @default(70)
-  isVerified      Boolean  @default(false)
+  dsslScore       Int       @default(70)
+  isVerified      Boolean   @default(false)
+  isActive        Boolean   @default(true)
   safetyBadges    String[]
+  district        District? @relation(fields: [districtId], references: [id])
 
+  @@index([districtId])
   @@map("Schools")
 }
 
@@ -255,31 +275,38 @@ model Category {
 }
 
 model Product {
-  id              Int            @id @default(autoincrement())
-  title           String         @map("name")
-  description     String?
-  imageUrl        String?        @map("image")
-  virtualTryOn    Boolean        @default(false)
-  vendorId        Int
-  approved        Boolean        @default(false)
-  createdAt       DateTime       @default(now())
-  aiAdCopy        String?
-  aiDescription   String?
-  categoryId      Int?
-  categoryName    String?
-  isTrending      Boolean        @default(false)
-  mrp             Float?         @map("original_price")
-  price           Float?         @map("selling_price")
-  status          String         @default("pending")
-  stock           Int            @default(100)
-  vectorEmbedding Json?
-  category        Category?      @relation(fields: [categoryId], references: [id])
-  vendor          Vendor         @relation(fields: [vendorId], references: [id])
-  images          ProductImage[]
-  reviews         Review[]
-  orders          Order[]
+  id                  Int                  @id @default(autoincrement())
+  title               String               @map("name")
+  description         String?
+  imageUrl            String?              @map("image")
+  virtualTryOn        Boolean              @default(false)
+  vendorId            Int
+  approved            Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  aiAdCopy            String?
+  aiDescription       String?
+  categoryId          Int?
+  categoryName        String?
+  isTrending          Boolean              @default(false)
+  mrp                 Float?               @map("original_price")
+  price               Float?               @map("selling_price")
+  status              String               @default("pending")
+  stock               Int                  @default(100)
+  availableStock      Int                  @default(0)
+  reservedStock       Int                  @default(0)
+  soldStock           Int                  @default(0)
+  vectorEmbedding     Json?
+  districtId         Int?                  @map("district_id")
+  category            Category?            @relation(fields: [categoryId], references: [id])
+  vendor              Vendor               @relation(fields: [vendorId], references: [id])
+  district            District?            @relation("DistrictToProducts", fields: [districtId], references: [id])
+  images              ProductImage[]
+  reviews             Review[]
+  orders              Order[]
+  sovereignOrderItems SovereignOrderItem[]
 
   @@index([vendorId])
+  @@index([districtId])
   @@index([status])
   @@index([approved])
   @@index([categoryName])
@@ -325,31 +352,38 @@ model Offer {
 }
 
 model User {
-  id                   Int             @id @default(autoincrement())
-  username             String          @unique
+  id                   Int              @id @default(autoincrement())
+  username             String           @unique
   password             String
-  role                 String          @default("customer")
-  isAdmin              Boolean         @default(false)
-  shopName             String?         @map("shop_name")
-  shopAddress          String?         @map("shop_address")
-  mapsLink             String?         @map("maps_link")
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  stripeCustomerId     String?         @map("stripe_customer_id")
-  stripeSubscriptionId String?         @map("stripe_subscription_id")
-  subscriptionPlan     String          @default("FREE") @map("subscription_plan")
-  subscriptionStatus   String          @default("inactive") @map("subscription_status")
-  subscriptionEndsAt   DateTime?       @map("subscription_ends_at")
-  districtId           Int?            @map("district_id")
-  consentAt            DateTime?       @map("consent_at")
-  consentGiven         Boolean         @default(false) @map("consent_given")
+  role                 String           @default("customer")
+  isAdmin              Boolean          @default(false)
+  shopName             String?          @map("shop_name")
+  shopAddress          String?          @map("shop_address")
+  mapsLink             String?          @map("maps_link")
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  stripeCustomerId     String?          @map("stripe_customer_id")
+  stripeSubscriptionId String?          @map("stripe_subscription_id")
+  subscriptionPlan     String           @default("FREE") @map("subscription_plan")
+  subscriptionStatus   String           @default("inactive") @map("subscription_status")
+  subscriptionEndsAt   DateTime?        @map("subscription_ends_at")
+  districtId           Int?             @map("district_id")
+  consentAt            DateTime?        @map("consent_at")
+  consentGiven         Boolean          @default(false) @map("consent_given")
   adminProfile         Admin?
   hospitals            Hospital[]
   offers               Offer[]
   reviews              Review[]
   serviceWorkers       ServiceWorker[]
-  district             District?       @relation(fields: [districtId], references: [id])
+  district             District?        @relation(fields: [districtId], references: [id])
   orders               Order[]
+  sovereignOrders      SovereignOrder[]
+
+  fraudHistories FraudHistory[]
+
+  userIntelligence UserIntelligence?
+
+  userPreferences userPreference[]
 
   @@index([role])
   @@index([createdAt])
@@ -416,6 +450,8 @@ model Admin {
   userId     Int       @unique @map("user_id")
   district   District? @relation(fields: [districtId], references: [id])
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  adminLogs AdminLog[]
 
   @@map("Admin")
 }
@@ -515,6 +551,47 @@ model Order {
   @@map("orders")
 }
 
+model SovereignOrder {
+  id               Int                  @id @default(autoincrement())
+  userId           Int?
+  districtId       Int
+  totalAmountPaisa Int
+  totalItems       Int
+  status           String               @default("pending")
+  idempotencyKey   String?              @unique
+  customerName     String?
+  customerPhone    String?
+  customerAddress  String?
+  paymentMethod    String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  user             User?                @relation(fields: [userId], references: [id])
+  district         District             @relation(fields: [districtId], references: [id])
+  items            SovereignOrderItem[]
+
+  @@index([userId])
+  @@index([districtId])
+  @@index([status])
+  @@index([idempotencyKey])
+  @@map("sovereign_orders")
+}
+
+model SovereignOrderItem {
+  id              Int            @id @default(autoincrement())
+  orderId         Int
+  productId       Int
+  quantity        Int
+  unitPricePaisa  Int
+  totalPricePaisa Int
+  createdAt       DateTime       @default(now())
+  order           SovereignOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product        @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("sovereign_order_items")
+}
+
 model ServiceWorker {
   id           Int      @id @default(autoincrement())
   userId       Int?     @map("user_id")
@@ -550,6 +627,156 @@ model ServiceWorker {
   @@map("ServiceWorker")
 }
 
+model DistrictDemandMemory {
+  id               Int      @id @default(autoincrement())
+  districtId       Int      @map("district_id")
+  domain           String?  @default("general")
+  entity           String?  @default("unknown")
+  query            String
+  originalQuery    String?
+  normalizedIntent String?
+  confidence       Float?
+  matchedEntities  Int      @default(0)
+  demandCount      Int      @default(1)
+  lastQueried      DateTime @default(now())
+  trend            String?  @default("stable")
+
+  @@unique([districtId, domain, entity])
+  @@index([districtId])
+  @@index([domain])
+  @@index([lastQueried])
+  @@map("district_demand_memory")
+}
+
+model DistrictSupplyGap {
+  id              Int      @id @default(autoincrement())
+  districtId      Int      @map("district_id")
+  domain          String
+  entity          String
+  demandCount     Int      @default(0)
+  urgencyScore    Float    @default(0)
+  trendScore      Float    @default(0)
+  onboardingReady Boolean  @default(false)
+  lastSeenAt      DateTime @updatedAt
+  lastUpdated     DateTime @default(now())
+
+  @@unique([districtId, domain, entity])
+  @@index([districtId])
+  @@index([domain])
+  @@map("district_supply_gap")
+}
+
+model QueryTrend {
+  id         Int      @id @default(autoincrement())
+  districtId Int      @map("district_id")
+  query      String
+  frequency  Int      @default(1)
+  lastSeen   DateTime @default(now())
+  trend      String?  @default("stable")
+  velocity   Float    @default(0)
+  category   String?
+  intent     String?
+
+  @@unique([districtId, query])
+  @@index([districtId])
+  @@index([frequency])
+  @@map("query_trend")
+}
+
+model ServiceGap {
+  id                 Int      @id @default(autoincrement())
+  districtId         Int      @map("district_id")
+  serviceType        String
+  locality           String?
+  demandLevel        String?  @default("medium")
+  frequency          Int      @default(1)
+  urgencyScore       Float    @default(0)
+  availableProviders Int      @default(0)
+  lastUpdated        DateTime @default(now())
+
+  @@unique([districtId, serviceType])
+  @@index([districtId])
+  @@index([serviceType])
+  @@map("service_gap")
+}
+
+model DistrictSignal {
+  id         Int       @id @default(autoincrement())
+  districtId Int       @map("district_id")
+  signalType String
+  domain     String
+  entity     String?
+  intensity  Float     @default(0)
+  confidence Float     @default(0)
+  context    Json?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([districtId])
+  @@index([signalType])
+  @@index([domain])
+  @@map("district_signal")
+}
+
+model PartnerInteraction {
+  id              Int      @id @default(autoincrement())
+  districtId      Int      @map("district_id")
+  partnerType     String   @default("vendor")
+  partnerId       Int
+  interactionType String
+  value           Float?
+  context         Json?
+  createdAt       DateTime @default(now())
+
+  @@index([districtId])
+  @@index([partnerType])
+  @@index([partnerId])
+  @@index([interactionType])
+  @@map("partner_interaction")
+}
+
+model DemandIntelligence {
+  id          Int      @id @default(autoincrement())
+  districtId  Int      @map("district_id")
+  domain      String
+  entity      String
+  query       String
+  intent      String
+  frequency   Int      @default(1)
+  lastQueried DateTime @default(now())
+  trend       String   @default("stable")
+
+  // Economic Intelligence (stored as JSON for flexibility)
+  economicContext    Json?
+  temporalPatterns   Json?
+  geographicPatterns Json?
+  userDemographics   Json?
+  businessInsights   Json?
+
+  @@unique([districtId, domain, entity])
+  @@index([districtId])
+  @@index([domain])
+  @@index([frequency])
+  @@index([lastQueried])
+  @@map("demand_intelligence")
+}
+
+model TrustSignal {
+  id         Int      @id @default(autoincrement())
+  vendorId   Int      @map("vendor_id")
+  signalType String // click, view, booking, review, search
+  value      Float    @default(1.0)
+  timestamp  DateTime @default(now())
+  source     String   @default("organic") // organic, suspicious, verified
+  context    Json? // Additional metadata
+
+  @@index([vendorId])
+  @@index([signalType])
+  @@index([timestamp])
+  @@index([source])
+  @@map("trust_signal")
+}
+
 enum VendorStatus {
   PENDING
   APPROVED
@@ -582,9 +809,283 @@ enum InquiryStatus {
   COMPLETED
 }
 
+// Core Governance Models - Phase 1A Restoration
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String
+  entityType String
+  entityId   Int
+  targetType String?
+  targetId   Int?
+  userId     Int?
+  districtId Int?
+  details    Json?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([districtId])
+  @@map("audit_log")
+}
+
+model UserEvent {
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  eventType          String
+  action             String?
+  converted          Boolean?
+  eventData          Json?
+  sessionId          String?
+  deviceHash         String?
+  sessionFingerprint String?
+  districtId         Int?
+  ipAddress          String?
+  userAgent          String?
+  createdAt          DateTime @default(now())
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([districtId])
+  @@map("user_event")
+}
+
+model TelemetryTruth {
+  id                     Int       @id @default(autoincrement())
+  truthId                String?   @unique
+  districtId             Int
+  query                  String
+  queryOriginal          String?
+  domain                 String?
+  entity                 String?
+  intent                 String?
+  normalizedIntent       String?
+  confidence             Float?
+  matchedEntities        Int       @default(0)
+  hallucinationPrevented Boolean   @default(false)
+  traceHash              String?
+  executionTime          Int?
+  timestamp              DateTime?
+  createdAt              DateTime  @default(now())
+
+  @@index([districtId])
+  @@index([query])
+  @@index([intent])
+  @@map("telemetry_truth")
+}
+
+model VendorMetricsDaily {
+  id           Int      @id @default(autoincrement())
+  vendorId     Int
+  districtId   Int
+  date         DateTime
+  views        Int      @default(0)
+  clicks       Int      @default(0)
+  bookings     Int      @default(0)
+  revenue      Int      @default(0)
+  aiMentions   Int      @default(0)
+  rating       Float?
+  responseTime Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([vendorId, date])
+  @@index([districtId])
+  @@index([date])
+  @@map("vendor_metrics_daily")
+}
+
+model FraudPattern {
+  id            Int       @id @default(autoincrement())
+  patternType   String
+  pattern       String?
+  patternData   Json
+  severity      String    @default("LOW")
+  confidence    Float?
+  usageCount    Int       @default(0)
+  districtId    Int?
+  isActive      Boolean   @default(true)
+  lastTriggered DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([patternType])
+  @@index([districtId])
+  @@index([isActive])
+  @@map("fraud_pattern")
+}
+
+model EventLog {
+  id          Int      @id @default(autoincrement())
+  eventType   String
+  eventSource String
+  type        String?
+  eventData   Json?
+  metadata    Json?
+  districtId  Int?
+  severity    String   @default("INFO")
+  traceId     String?
+  createdAt   DateTime @default(now())
+
+  @@index([eventType])
+  @@index([eventSource])
+  @@index([districtId])
+  @@index([createdAt])
+  @@map("event_log")
+}
+
+model SystemLock {
+  id        Int      @id @default(autoincrement())
+  lockType  String
+  key       String?
+  lockKey   String   @unique
+  owner     String
+  isActive  Boolean  @default(true)
+  expiresAt DateTime
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([lockType])
+  @@index([expiresAt])
+  @@map("system_lock")
+}
+
 enum AppointmentStatus {
   PENDING
   CONFIRMED
   CANCELLED
   COMPLETED
+}
+
+model AdminLog {
+  id        Int      @id @default(autoincrement())
+  adminId   Int
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  admin Admin @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@map("admin_log")
+}
+
+model FraudHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  vendorId  Int?
+  eventType String
+  riskScore Float    @default(0)
+  details   Json?
+  createdAt DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  @@index([userId])
+  @@index([vendorId])
+  @@map("fraud_history")
+}
+
+model UserIntelligence {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @unique
+  intelligenceData Json?
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_intelligence")
+}
+
+model VendorMLProfile {
+  id         Int      @id @default(autoincrement())
+  vendorId   Int      @unique
+  mlScore    Float    @default(0)
+  trustScore Float    @default(0)
+  updatedAt  DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@map("vendor_ml_profile")
+}
+
+model userPreference {
+  id              Int   @id @default(autoincrement())
+  userId          Int
+  vendorId        Int
+  preferenceScore Float @default(0)
+
+  user   User   @relation(fields: [userId], references: [id])
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@unique([userId, vendorId])
+  @@map("user_preference")
+}
+
+model systemConfig {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+model adminActionLog {
+  id        Int      @id @default(autoincrement())
+  adminId   Int?
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@map("admin_action_log")
+}
+
+model SharedLearning {
+  id         Int      @id @default(autoincrement())
+  districtId Int
+  query      String
+  domain     String?
+  createdAt  DateTime @default(now())
+
+  @@map("shared_learning")
+}
+
+model VendorMetadata {
+  id       Int @id @default(autoincrement())
+  vendorId Int @unique
+
+  // Core capabilities
+  specializations  Json? // ["Cardiology", "Emergency"]
+  businessHours    Json? // { monday: { open: "09:00", close: "18:00" }, ... }
+  consultationMode String? // "IN_PERSON", "ONLINE", "BOTH"
+  localityHint     String? // Neighborhood/area identifier
+  tags             Json? // ["emergency", "24x7", "cashless"]
+
+  // Live signals (NULLABLE = unknown, not false)
+  emergencyAvailable Boolean? // null = unknown, true/false = verified
+  deliveryActive     Boolean?
+  acceptsInsurance   Boolean?
+  homeVisit          Boolean?
+
+  // Contact channels
+  whatsappNumber String?
+
+  // Quality signals
+  lastVerified DateTime?
+  dataPurity   Float? // 0-1, how complete the data is. null = unrated
+  freshness    Float? // 0-1, age-weighted recency. null = uncomputed
+  lastActivity DateTime?
+
+  // Operational
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@map("vendor_metadata")
 }

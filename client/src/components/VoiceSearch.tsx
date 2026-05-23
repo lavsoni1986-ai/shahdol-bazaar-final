@@ -4,6 +4,8 @@ import { Mic, MicOff, Search, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { apiRequest } from "@/lib/api-client";
+import { SOVEREIGN_CONFIG } from "@/lib/SovereignConstants";
 
 interface VoiceSearchResult {
   type: "product" | "store" | "category" | "navigation";
@@ -35,17 +37,23 @@ export default function VoiceSearch() {
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = "hi-IN"; // Hindi
+    recognition.lang = navigator.language || "en-US"; // Auto-detect language
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onresult = (event: any) => {
-      const current = event.resultIndex;
-      const transcript_text = event.results[current][0].transcript;
-      setTranscript(transcript_text);
-      
-      // If final result
-      if (event.results[current].isFinal) {
-        handleVoiceCommand(transcript_text);
+      try {
+        const current = event.resultIndex;
+        const transcript_text = event.results[current][0].transcript;
+        setTranscript(transcript_text);
+
+        // If final result
+        if (event.results[current].isFinal) {
+          handleVoiceCommand(transcript_text);
+        }
+      } catch (err) {
+        console.error("Voice result processing error:", err);
+        setError("Failed to process voice input. Please try again.");
+        setIsListening(false);
       }
     };
 
@@ -101,24 +109,34 @@ export default function VoiceSearch() {
     setError(null);
 
     try {
-      // Send to backend for processing
-      const response = await fetch("/api/ai/voice-command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript: command })
+      const data = await apiRequest("POST", "/ai/voice-search", {
+        text: command,
+        voiceTranscript: command,
+        districtId: SOVEREIGN_CONFIG.DEFAULT_DISTRICT_ID
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to process voice command");
-      }
-
-      const data = await response.json();
-      setResult(data);
-
-      // Navigate to result URL if provided
-      if (data.url) {
+      if (data.results && data.results.length > 0) {
+        // Navigate to marketplace with intent results
+        const topResult = data.results[0];
+        setResult({
+          type: "store",
+          query: command,
+          url: `/marketplace`,
+          message: `Found ${data.results.length} matches for "${data.intent.intent}"`
+        });
         setTimeout(() => {
-          setLocation(data.url);
+          setLocation(`/marketplace`);
+        }, 1500);
+      } else {
+        // Fallback to search
+        setResult({
+          type: "navigation",
+          query: command,
+          url: `/search?q=${encodeURIComponent(command)}`,
+          message: "Searching for your request..."
+        });
+        setTimeout(() => {
+          setLocation(`/search?q=${encodeURIComponent(command)}`);
         }, 1500);
       }
     } catch (err) {

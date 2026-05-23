@@ -1,5 +1,12 @@
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
+import type { Request } from 'express';
+
+type JwtModule = typeof import('jsonwebtoken');
+type JwtNamespaceWithDefault = JwtModule & { default?: JwtModule };
+
+// jsonwebtoken is CommonJS in this repo; under Node ESM, `import * as jwt` may expose the real API under `default`.
+const jwtApi: JwtModule = (jwt as JwtNamespaceWithDefault).default ?? jwt;
 
 // Throw error in production if JWT_SECRET is not set
 const isProduction = process.env.NODE_ENV === 'production';
@@ -31,13 +38,11 @@ const REFRESH_TOKEN_SECRET = envRefreshSecret || randomBytes(64).toString('hex')
 
 export interface JWTPayload {
   userId: number;
-  id?: number; // Alias for userId (for backward compatibility)
   username: string;
   role: 'SUPER_ADMIN' | 'CITY_ADMIN' | 'MERCHANT' | 'CUSTOMER';
-  shopId?: number | null;
-  districtId?: number | null; // Required for CITY_ADMIN role
-  districtSlug?: string | null; // District slug for tenant context
-  isAdmin?: boolean; // Admin flag for legacy compatibility
+  districtId?: number | null;
+  districtSlug?: string | null;
+  tokenVersion?: number;
 }
 
 export interface TokenPair {
@@ -46,11 +51,11 @@ export interface TokenPair {
 }
 
 /**
- * Generate access token (15 minutes expiry)
+ * Generate access token (7 days expiry)
  */
 export function generateAccessToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: '15m',
+  return jwtApi.sign(payload, JWT_SECRET, {
+    expiresIn: '30m', // 30 minutes session timeout
     issuer: 'shahdol-bazaar',
     audience: 'shahdol-bazaar-client',
   });
@@ -60,7 +65,13 @@ export function generateAccessToken(payload: JWTPayload): string {
  * Generate refresh token (7 days expiry)
  */
 export function generateRefreshToken(payload: JWTPayload): string {
-  return jwt.sign({ userId: payload.userId, username: payload.username }, REFRESH_TOKEN_SECRET, {
+  return jwtApi.sign({
+    userId: payload.userId,
+    username: payload.username,
+    districtId: payload.districtId,
+    role: payload.role,
+    tokenVersion: payload.tokenVersion || 1
+  }, REFRESH_TOKEN_SECRET, {
     expiresIn: '7d',
     issuer: 'shahdol-bazaar',
     audience: 'shahdol-bazaar-client',
@@ -82,10 +93,11 @@ export function generateTokenPair(payload: JWTPayload): TokenPair {
  */
 export function verifyAccessToken(token: string): JWTPayload {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const decoded = jwtApi.verify(token, JWT_SECRET, {
       issuer: 'shahdol-bazaar',
       audience: 'shahdol-bazaar-client',
     }) as JWTPayload;
+
     return decoded;
   } catch (error) {
     throw new Error('Invalid or expired access token');
@@ -95,12 +107,12 @@ export function verifyAccessToken(token: string): JWTPayload {
 /**
  * Verify refresh token
  */
-export function verifyRefreshToken(token: string): { userId: number; username: string } {
+export function verifyRefreshToken(token: string): { userId: number; username: string; districtId?: number; role?: string; tokenVersion?: number } {
   try {
-    const decoded = jwt.verify(token, REFRESH_TOKEN_SECRET, {
+    const decoded = jwtApi.verify(token, REFRESH_TOKEN_SECRET, {
       issuer: 'shahdol-bazaar',
       audience: 'shahdol-bazaar-client',
-    }) as { userId: number; username: string };
+    }) as { userId: number; username: string; districtId?: number; role?: string; tokenVersion?: number };
     return decoded;
   } catch (error) {
     throw new Error('Invalid or expired refresh token');
@@ -110,8 +122,20 @@ export function verifyRefreshToken(token: string): { userId: number; username: s
 /**
  * Extract token from Authorization header
  */
-export function extractTokenFromHeader(authHeader?: string): string | null {
+export function extractTokenFromHeader(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+
   if (!authHeader) return null;
-  if (!authHeader.startsWith('Bearer ')) return null;
-  return authHeader.substring(7);
+
+  // ✅ HANDLE ARRAY CASE
+  const header = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+
+  if (typeof header !== "string") return null;
+
+  if (!header.startsWith("Bearer ")) return null;
+
+  const token = header.split(" ")[1];
+  if (!token || token.trim() === "") return null;
+
+  return token;
 }

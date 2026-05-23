@@ -1,0 +1,64 @@
+{
+  "queries": [
+    {
+      "name": "search_doctor",
+      "endpoint": "/api/search/global",
+      "method": "GET",
+      "params": { "q": "doctor", "districtId": 2 }
+    },
+    {
+      "name": "search_kirana",
+      "endpoint": "/api/search/global",
+      "method": "GET",
+      "params": { "q": "kirana", "districtId": 2 }
+    },
+    {
+      "name": "search_bus",
+      "endpoint": "/api/search/global",
+      "method": "GET",
+      "params": { "q": "bus", "districtId": 2 }
+    },
+    {
+      "name": "search_grocery",
+      "endpoint": "/api/search/global",
+      "method": "GET",
+      "params": { "q": "grocery", "districtId": 2 }
+    },
+    {
+      "name": "search_hospital",
+      "endpoint": "/api/search/global",
+      "method": "GET",
+      "params": { "q": "hospital", "districtId": 2 }
+    },
+    {
+      "name": "stores_all",
+      "endpoint": "/api/marketplace/stores",
+      "method": "GET",
+      "params": { "districtId": 2 }
+    },
+    {
+      "name": "products_all",
+      "endpoint": "/api/marketplace/products",
+      "method": "GET",
+      "params": { "districtId": 2 }
+    },
+    {
+      "name": "stats_hospitals",
+      "endpoint": "/api/stats/hospitals",
+      "method": "GET",
+      "params": { "districtId": 2 }
+    },
+    {
+      "name": "stats_bus",
+      "endpoint": "/api/stats/bus-timetable",
+      "method": "GET",
+      "params": { "districtId": 2 }
+    },
+    {
+      "name": "search_electronics",
+      "endpoint": "/api/search/global",
+      "method": "GET",
+      "params": { "q": "electronics", "districtId": 2 }
+    }
+  ]
+}

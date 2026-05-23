@@ -1,198 +1,141 @@
 /**
- * API Client Utility
- * Handles API requests with proper URL resolution for development and production
- * 
- * SECURITY: 
- * - Access tokens stored EXCLUSIVELY in httpOnly cookies (XSS safe)
- * - Cookies automatically included via credentials: 'include'
- * - NO localStorage tokens - relies entirely on server-side session verification
- * - District isolation via x-district-slug header (configurable via env vars)
+ * SOVEREIGN API CLIENT
+ * One canonical API contract for full BharatOS frontend.
+ *
+ * SOVEREIGN FIX: Relaxed contract validation.
+ * Previously required "success" in result which caused crashes when
+ * backend returned non-standard response shapes. Now accepts:
+ * - { success: true, data: ... }
+ * - { data: ... }
+ * - { user: ... } (for auth endpoints)
+ * - { token: ... } (for login responses)
  */
 
-const SANITIZE_URL = (url: string) => url.replace(/(:\d+|:undefined|:null|:nan)(\/?\?|$)/g, '$2');
-const reservedSlugs = [
-  "marketplace-stores",
-  "schools",
-  "school",
-  "school-inquiry",
-  "bus",
-  "hospitals",
-  "services",
-];
-const RESERVED_DISTRICT_SLUGS = new Set(reservedSlugs);
+import { extractDistrictSlug } from "@/shared/routing/reserved-routes";
+
+function serializeBody(body?: any) {
+  if (body === undefined || body === null) return undefined;
+  if (typeof FormData !== "undefined" && body instanceof FormData) return body;
+  if (typeof body === "string") return body;
+  return JSON.stringify(body);
+}
+
+function resolveCanonicalDistrictSlug(): string {
+  if (typeof window === "undefined") return "shahdol";
+
+  const urlSlug = extractDistrictSlug(window.location.pathname);
+  if (urlSlug) {
+    try {
+      localStorage.setItem("districtSlug", urlSlug);
+    } catch { }
+    return urlSlug;
+  }
+
+  const savedSlug = localStorage.getItem("districtSlug");
+  if (savedSlug) return savedSlug;
+
+  return "shahdol";
+}
 
 /**
- * Get the API base URL
- * - In production: Uses same origin (API routes are on same domain)
- * - In development: Uses VITE_API_URL or defaults to localhost:5001 (backend server)
+ * SOVEREIGN: Check if a response is valid
+ * Accepts multiple response shapes to handle backend inconsistencies gracefully.
  */
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
-
-export const Default = API_BASE;
-
-export function getApiBaseUrl(): string {
-  return API_BASE;
+function isValidApiResponse(result: any): boolean {
+  if (!result) return false;
+  // Standard: { success: true/false, data: ... }
+  if ("success" in result) return true;
+  // Auth endpoints: { user: ... } or { token: ... }
+  if (result.user || result.token) return true;
+  // Data-only: { data: ... }
+  if ("data" in result) return true;
+  // Array response (some endpoints return arrays directly)
+  if (Array.isArray(result)) return true;
+  return false;
 }
 
-function sanitizeDistrictSlug(raw: string | null | undefined): string {
-  if (!raw) return "shahdol";
-  const normalized = raw.trim().toLowerCase().split(":")[0].replace(/[^a-z0-9-]/g, "");
-  return normalized || "shahdol";
-}
+export async function apiRequest(method: string, endpoint: string, body?: any) {
+  const cleanEndpoint = endpoint.replace(/^\/*(api\/+)*/, "");
+  const url = `/api/${cleanEndpoint}`;
 
-function sanitizeApiPathSuffixes(pathname: string): string {
-  return pathname
-    .split("/")
-    .map((segment) => segment.replace(/:(?:\d+|undefined|null|nan)$/i, ""))
-    .join("/");
-}
-
-function normalizeApiUrl(inputUrl: string): string {
-  if (typeof window === "undefined") return inputUrl;
-
-  try {
-    const parsed = new URL(SANITIZE_URL(inputUrl), window.location.origin);
-    if (!parsed.pathname.startsWith("/api/")) {
-      return SANITIZE_URL(parsed.toString());
-    }
-
-    parsed.pathname = sanitizeApiPathSuffixes(parsed.pathname);
-    if (parsed.pathname.startsWith("/api/districts/")) {
-      const parts = parsed.pathname.split("/");
-      if (parts[3]) {
-        const normalizedSlug = sanitizeDistrictSlug(parts[3]);
-        parts[3] = RESERVED_DISTRICT_SLUGS.has(normalizedSlug) ? "shahdol" : normalizedSlug;
-        parsed.pathname = parts.join("/");
-      }
-    }
-    return SANITIZE_URL(parsed.toString());
-  } catch {
-    return SANITIZE_URL(inputUrl);
-  }
-}
-
-function getTenantHeaders(): Record<string, string> {
-  // SSR mode: use environment variable defaults
-  if (typeof window === "undefined") {
-    return { 
-      "x-district-id": String(import.meta.env.VITE_DEFAULT_DISTRICT_ID || 3), 
-      "x-district-slug": import.meta.env.VITE_DEFAULT_DISTRICT_SLUG || "shahdol",
-      "x-requested-with": "shahdol-bazaar"
-    };
-  }
-
-  // Browser mode - try sessionStorage first, fallback to localStorage
-  // District sync: sessionStorage (tab-specific) -> localStorage (persistent)
-  let districtSlug = sessionStorage.getItem("districtSlug") || localStorage.getItem("districtSlug");
-  let storedId = sessionStorage.getItem("districtId") || localStorage.getItem("districtId");
-  
-  // If no district context, use environment variable defaults
-  if (!districtSlug && !storedId) {
-    return { 
-      "x-district-id": String(import.meta.env.VITE_DEFAULT_DISTRICT_ID || 3), 
-      "x-district-slug": import.meta.env.VITE_DEFAULT_DISTRICT_SLUG || "shahdol",
-      "x-requested-with": "shahdol-bazaar"
-    };
-  }
-  
-  // Validate stored ID
-  const numericId = storedId ? Number(storedId) : null;
-  if (storedId && (!Number.isInteger(numericId) || (numericId as number) <= 0)) {
-    return { 
-      "x-district-id": String(import.meta.env.VITE_DEFAULT_DISTRICT_ID || 3), 
-      "x-district-slug": import.meta.env.VITE_DEFAULT_DISTRICT_SLUG || "shahdol",
-      "x-requested-with": "shahdol-bazaar"
-    };
-  }
-  
-  // Validate slug
-  const sanitizedSlug = districtSlug ? sanitizeDistrictSlug(districtSlug) : null;
-  if (districtSlug && !sanitizedSlug) {
-    return { 
-      "x-district-id": String(import.meta.env.VITE_DEFAULT_DISTRICT_ID || 3), 
-      "x-district-slug": import.meta.env.VITE_DEFAULT_DISTRICT_SLUG || "shahdol",
-      "x-requested-with": "shahdol-bazaar"
-    };
-  }
-  
-  return {
-    "x-district-id": storedId || String(numericId) || String(import.meta.env.VITE_DEFAULT_DISTRICT_ID || 3),
-    "x-district-slug": sanitizedSlug || import.meta.env.VITE_DEFAULT_DISTRICT_SLUG || "shahdol",
-    "x-requested-with": "shahdol-bazaar", // CSRF protection - custom header
+  const headers: Record<string, string> = {
+    "x-district-slug": resolveCanonicalDistrictSlug(),
   };
-}
 
-/**
- * Get stored access token from localStorage
- * DEPRECATED: This function is kept for backward compatibility but should NOT be used.
- * The frontend now relies EXCLUSIVELY on httpOnly cookies for authentication.
- * Use /api/auth/verify endpoint for session state verification.
- * @deprecated Remove all localStorage token usage
- */
-function getStoredAccessToken(): string | null {
-  // SECURITY: We no longer use localStorage for tokens
-  // This function returns null to enforce cookie-only authentication
-  return null;
-}
+  if (!(typeof FormData !== "undefined" && body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
 
-/**
- * Make an API request with proper error handling
- * 
- * SECURITY: Uses httpOnly cookies exclusively for authentication (credentials: 'include')
- * No localStorage tokens - relies entirely on server-side session
- */
-export async function apiRequest<T = any>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<T> {
-  const baseUrl = getApiBaseUrl();
-  const rawUrl = SANITIZE_URL(endpoint.startsWith('http') 
-    ? endpoint 
-    : `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`);
-  const url = SANITIZE_URL(normalizeApiUrl(rawUrl));
-  
+  let res: Response;
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      // NO localStorage tokens - rely exclusively on httpOnly cookies
-      ...getTenantHeaders(),
-      ...(options?.headers as Record<string, string>),
-    };
-    
-    const response = await fetch(SANITIZE_URL(url), {
-      ...options,
-      credentials: 'include', // CRITICAL: Send httpOnly cookies only
+    res = await fetch(url, {
+      method,
+      credentials: "include",
       headers,
+      body: serializeBody(body),
     });
-    
-    if (!response.ok) {
-      // Handle 401 - token expired or invalid
-      if (response.status === 401) {
-        // Clear district context from sessionStorage (auth state handled by AuthContext via /api/auth/verify)
-        sessionStorage.removeItem("districtSlug");
-        sessionStorage.removeItem("districtId");
-        window.dispatchEvent(new StorageEvent("auth-update", { key: "user", newValue: null }));
-      }
-      const error = await response.json().catch(() => ({ 
-        message: `HTTP ${response.status}: ${response.statusText}` 
-      }));
-      throw new Error(error.message || 'API request failed');
-    }
-    
-    return await response.json();
-  } catch (error: any) {
-    console.error(`[API] Request failed: ${url}`, error);
+  } catch (fetchError: any) {
+    console.error("❌ Network error in apiRequest:", fetchError);
+    throw new Error(fetchError?.message || "Network error");
+  }
+
+  const text = await res.text();
+
+  let result: any;
+  try {
+    result = text ? JSON.parse(text) : {};
+  } catch {
+    console.error("❌ Non JSON API response:", text);
+    throw new Error("Invalid server response");
+  }
+
+  // SOVEREIGN: Relaxed contract check — don't throw if "success" is missing
+  // Previously threw Error("Invalid API contract") which crashed callers
+  if (!isValidApiResponse(result)) {
+    console.warn("⚠️ Non-standard API response shape (no success/data/user/token field):", result);
+    // SOVEREIGN: Instead of throwing, wrap in success:true structure
+    // This prevents crashes while still logging the anomaly
+    result = { success: true, data: result };
+  }
+
+  if (!res.ok) {
+    const errorMessage =
+      typeof result?.error === "string"
+        ? result.error
+        : result?.error?.message || "API Error";
+    // SOVEREIGN: Attach status code for caller inspection
+    const error = new Error(errorMessage) as any;
+    error.statusCode = res.status;
     throw error;
   }
+
+  return result;
 }
 
-/**
- * Get full API URL for a given endpoint
- */
-export function getApiUrl(endpoint: string): string {
-  const baseUrl = getApiBaseUrl();
-  const rawUrl = SANITIZE_URL(endpoint.startsWith('http')
-    ? endpoint
-    : `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`);
-  return SANITIZE_URL(normalizeApiUrl(rawUrl));
+export function getData<T = any>(res: any): T | null {
+  // SOVEREIGN: More robust data extraction
+  if (res?.data) return res.data as T;
+  if (res?.user) return res.user as T;
+  if (Array.isArray(res)) return res as unknown as T;
+  return (res ?? null) as T | null;
+}
+
+export function getArrayData<T = any>(res: any): T[] {
+  if (Array.isArray(res?.data)) return res.data as T[];
+  if (Array.isArray(res)) return res as T[];
+  return [];
+}
+
+export function persistPortalContext(role: "partner" | "customer") {
+  try {
+    localStorage.setItem("portalContext", role);
+  } catch { }
+}
+
+export function getPortalContext(): "partner" | "customer" {
+  try {
+    return (localStorage.getItem("portalContext") as any) || "customer";
+  } catch {
+    return "customer";
+  }
 }

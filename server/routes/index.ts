@@ -2,7 +2,8 @@ import type { Request, Response } from "express";
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../storage";
-import { requireAuth, requireSuperAdmin } from "../auth/middleware";
+import { requireAuth, requireSuperAdmin, requireCSRF } from "../auth/middleware";
+import { tenantResolver } from "../middleware/tenantResolver";
 import { findActiveOffersByDistrict, deleteOfferById } from "../repositories/offer.repo";
 import { findAllCategories, deleteCategoryById } from "../repositories/category.repo";
 import { adminRateLimiter } from "../auth/rateLimiter";
@@ -10,13 +11,25 @@ import { DSSL, DSSLService } from "../services/dssl.service";
 import aiRoutes from "./ai/concierge.routes";
 import dsslRoutes from "./ai/dssl.engine";
 import authRoutes from "./auth.routes";
-import adminRoutes from "./admin/admin.routes";
-import revenueRoutes from "./admin/revenue.routes";
+import adminRoutes from "./admin/index";
+
 import adminDsslRoutes from "./admin/dssl";
 import paymentsCashfreeRoutes from "./payments.cashfree.routes";
 import vendorDashboardRoutes from "./marketplace/vendor-dashboard.routes";
 import billingRoutes from "./billing.routes";
 import homeRoutes from "./public/home.routes";
+import statsRoutes from "./public/stats.routes";
+import localRoutes from "./public/local.routes";
+import productsRoutes from "./marketplace/products.routes";
+import storesRoutes from "./marketplace/stores.routes";
+import reviewsRoutes from "./marketplace/reviews.routes";
+import ordersRoutes from "./orders.routes";
+import merchantRoutes from "./marketplace/products.routes";
+import uploadRoutes from "./upload.routes";
+import searchUnifiedRoutes from "./search.unified.routes";
+import analyticsRoutes from "./analytics.routes";
+import transitRoutes from "./transit.routes";
+import appointmentsRoutes from "./appointments.routes";
 
 
 // 🧾 AUDIT LOGGING HELPER (TAMPER-PROOF)
@@ -67,6 +80,9 @@ const auditLog = async (
       data: {
         action,
         ...(req.ctx?.userId !== undefined ? { userId: req.ctx.userId } : {}),
+        // Ensure canonical entity mapping for audit schema
+        entityType: (targetType || action || 'SYSTEM').toString(),
+        entityId: (typeof targetId === 'number' && targetId > 0) ? targetId : (req.districtId as number),
         targetId,
         targetType,
         details,
@@ -230,6 +246,70 @@ router.delete("/categories/:id", requireAuth, requireSuperAdmin, async (req, res
   }
 });
 
+// 🛡️ SOVEREIGN API: Marketplace vendors by slug (canonical resolver)
+router.get("/marketplace/vendors/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const districtId = req.ctx?.districtId;
+    const requestId = `mv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    if (!districtId) {
+      return failure(res, "DISTRICT_REQUIRED", "District context required", 400);
+    }
+
+    const { resolveVendorBySlug } = await import("../services/entity-resolution");
+    const result = await resolveVendorBySlug(slug, districtId, requestId);
+
+    if (!result.success) {
+      const fail = result.failure!;
+      console.warn(`[MARKETPLACE_VENDORS] Resolution failed: ${fail.reason}`, {
+        slug, districtId, requestId,
+        diagnostics: fail.diagnostics
+      });
+      return failure(res, "NOT_FOUND", "Vendor not found", 404);
+    }
+
+    return success(res, result.data);
+  } catch (err) {
+    console.error("Marketplace vendor error:", err);
+    return failure(res, "SERVER_ERROR", "Failed to fetch vendor", 500);
+  }
+});
+
+// 🛡️ SOVEREIGN API: Marketplace orders by vendor slug
+router.get("/marketplace/orders/:slug", requireAuth, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const districtId = req.ctx?.districtId || req.districtId;
+    if (!districtId) {
+      return failure(res, "DISTRICT_REQUIRED", "District context required", 400);
+    }
+    const vendor = await prisma.vendor.findFirst({
+      where: {
+        slug,
+        districtId,
+        status: "APPROVED",
+        isShadowBanned: false
+      }
+    });
+    if (!vendor) {
+      return failure(res, "NOT_FOUND", "Vendor not found", 404);
+    }
+    const orders = await prisma.order.findMany({
+      where: { vendorId: vendor.id },
+      include: {
+        user: { select: { id: true, username: true } },
+        product: { select: { id: true, title: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    return success(res, orders);
+  } catch (err) {
+    console.error("Marketplace orders error:", err);
+    return failure(res, "SERVER_ERROR", "Failed to fetch orders", 500);
+  }
+});
+
 // ============================================
 // 🏪 MARKETPLACE ROUTES (District Isolated)
 // NOTE: /marketplace/stores and /marketplace/products are now handled
@@ -263,9 +343,37 @@ export const registerSovereignRoutes = async (app: RouteHost) => {
   app.use("/ai", dsslRoutes); // DSSL: /score, /analysis, etc.
   app.use("/admin", adminRoutes); // Admin: /users, /vendors, etc.
   // PATCH 9A: Retire noisy/duplicate admin demo surfaces (keep files, disable mounts)
-  app.use("/admin/revenue", revenueRoutes); // Revenue: /revenue/metrics, etc.
+
   app.use("/admin/dssl", adminDsslRoutes); // DSSL: /dssl/weights, /dssl/recalculate
   app.use("/payments", paymentsCashfreeRoutes); // Payments: /create, /verify
+  app.use("", statsRoutes); // Stats: categories, hospitals, etc.
+  app.use("/local", localRoutes); // Local: schools, bus, etc.
+  app.use("", merchantRoutes); // Merchant: products
+  app.use("/upload", uploadRoutes); // Upload: Cloudinary images
+  app.use("/marketplace", tenantResolver, storesRoutes); // Marketplace: stores (with tenant resolution)
+  app.use("/marketplace", tenantResolver, productsRoutes); // Marketplace: products (with tenant resolution)
+  app.use("/marketplace/reviews", tenantResolver, reviewsRoutes); // Marketplace: reviews (with tenant resolution)
+  app.use("/analytics", tenantResolver, analyticsRoutes); // Analytics: tracking with tenant resolution
+  app.use("/search", tenantResolver, searchUnifiedRoutes); // Unified search (with tenant resolution)
+  app.use("/orders", requireCSRF, ordersRoutes); // Orders: with CSRF
 
-   console.log("✅ Routes registered: /api/auth, /api/ai, /api/admin, /districts");
+  app.use("/appointments", appointmentsRoutes); // Appointments: POST /create
+
+  app.use("", transitRoutes); // Transit: /bus-timetable, etc.
+
+  // 🛡️ SOVEREIGN API: Banners
+  router.get("/banners", async (req, res) => {
+    try {
+      const banners = await prisma.banner.findMany({
+        where: { isActive: true },
+        orderBy: { id: "desc" }
+      });
+      return success(res, banners);
+    } catch (err) {
+      console.error("Banners fetch error:", err);
+      return failure(res, "SERVER_ERROR", "Failed to fetch banners", 500);
+    }
+  });
+
+  console.log("✅ Routes registered: /api/auth, /api/ai, /api/admin, /districts, /stats, /local, /merchant, /upload, /marketplace, /analytics, /orders, /banners");
 };

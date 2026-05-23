@@ -1,4 +1,4 @@
-import { findDistrictById, findDistricts, findEventLogs, withTransaction } from "../repositories";
+import { findDistrictById, findDistricts, findEventLogs } from "../repositories";
 
 export interface DistrictConfig {
   id: number;

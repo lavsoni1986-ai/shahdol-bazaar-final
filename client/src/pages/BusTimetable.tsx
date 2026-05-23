@@ -2,23 +2,33 @@ import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bus, Clock, MapPin, IndianRupee, Search, ArrowRight, ShieldCheck, Activity } from "lucide-react";
 import { useDistrict } from "@/contexts/DistrictContext";
+import { apiRequest, getArrayData } from "@/lib/api-client";
 
 export default function BusTimetable() {
-  const { currentDistrict } = useDistrict();
+  const { currentDistrict, isReady } = useDistrict();
   const [searchQuery, setSearchQuery] = useState("");
 
+  if (!isReady || !currentDistrict?.id) {
+    return (
+      <div className="sovereign-bg min-h-screen flex items-center justify-center">
+        <div className="text-orange-500 animate-pulse">Initializing...</div>
+      </div>
+    );
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/bus-timetable", { districtId: currentDistrict?.id || 3 }],
+    queryKey: ["bus-timetable", currentDistrict.id],
     queryFn: async () => {
-      const res = await fetch(`/api/bus-timetable?districtId=${currentDistrict?.id || 3}`);
-      return res.json();
-    }
+      const res = await apiRequest("GET", "/bus-timetable");
+      return getArrayData(res);
+    },
+    enabled: !!currentDistrict?.id
   });
 
-  const buses = data?.data || [];
-  const filteredBuses = buses.filter((b: any) => 
-    b.toCity.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    b.fromCity.toLowerCase().includes(searchQuery.toLowerCase())
+  const buses = data || [];
+  const filteredBuses = buses.filter((b: any) =>
+    (b.toCity || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (b.fromCity || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -34,14 +44,14 @@ export default function BusTimetable() {
                 Bus Control Panel
               </h1>
               <p className="text-[10px] font-black text-orange-500 uppercase tracking-[0.3em] mt-1">
-                Live Timetable • Shahdol Junction
+                Live Timetable • {currentDistrict?.name || 'District'} Junction
               </p>
             </div>
           </div>
 
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-orange-500 transition-colors" />
-            <input 
+            <input
               type="text"
               placeholder="अपनी मंज़िल लिखें (जैसे: Rewa, Umaria...)"
               className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-orange-500/50 transition-all text-white placeholder:text-gray-600 backdrop-blur-md"
@@ -91,39 +101,39 @@ export default function BusTimetable() {
                       <Clock className="w-4 h-4 text-gray-500" />
                       <div>
                         <p className="text-[8px] font-black text-gray-600 uppercase">Departure</p>
-                        <p className="text-xs font-bold text-white tracking-tighter">{bus.time || "06:00 AM"}</p>
+                        <p className="text-xs font-bold text-white tracking-tighter">{bus.firstBusTime || "06:00 AM"}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <IndianRupee className="w-4 h-4 text-emerald-500" />
                       <div>
                         <p className="text-[8px] font-black text-gray-600 uppercase">Fare</p>
-                        <p className="text-xs font-black text-emerald-500 tracking-tighter">₹{bus.price || "100"}</p>
+                        <p className="text-xs font-black text-emerald-500 tracking-tighter">{bus.fare || "₹100"}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Activity className="w-4 h-4 text-blue-500" />
                       <div>
                         <p className="text-[8px] font-black text-gray-600 uppercase">Type</p>
-                        <p className="text-xs font-bold text-blue-400 tracking-tighter">{bus.type || "Express"}</p>
+                        <p className="text-xs font-bold text-blue-400 tracking-tighter">{bus.busType || "Express"}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
-                   <div className="flex items-center gap-1.5 px-3 py-1 bg-white/5 rounded-full border border-white/10">
-                     <MapPin className="w-3 h-3 text-orange-500" />
-                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
-                       Via: {bus.routeDescription || "Main Highway"}
-                     </span>
-                   </div>
-                   <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-                     <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                     <span className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">
-                       Verified Route
-                     </span>
-                   </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                    <MapPin className="w-3 h-3 text-orange-500" />
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                      Via: {bus.boardingPoint || bus.routeDescription || "Shahdol Bus Stand"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">
+                      Verified Route
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}

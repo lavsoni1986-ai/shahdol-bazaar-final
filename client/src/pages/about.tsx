@@ -1,18 +1,9 @@
 import React from "react";
-import confetti from 'canvas-confetti'; // अगर यह इंस्टॉल नहीं है तो 'npm install canvas-confetti' करें
 import { ShieldCheck, MapPin, Users, Zap } from "lucide-react";
 
 export default function About() {
   
   const handleJoinClick = () => {
-    // 🎉 पटाखों वाला इफेक्ट
-    confetti({
-      particleCount: 150,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#f97316', '#ffffff', '#22c55e']
-    });
-
     // 2 सेकंड बाद व्हाट्सएप पर भेजें
     setTimeout(() => {
       window.open("https://wa.me/919753239303?text=नमस्ते लव भाई, मैं शहडोल बाज़ार पर अपना स्टोर रजिस्टर करना चाहता हूँ।", "_blank");

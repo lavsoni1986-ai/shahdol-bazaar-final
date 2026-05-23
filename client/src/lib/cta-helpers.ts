@@ -29,12 +29,12 @@ const CATEGORY_PATTERNS = {
 };
 
 /**
- * Determine the CTA configuration based on shop category
- * @param shopCategory - The category name (e.g., "Hospitals", "Fast Food", "Salon")
+ * Determine the CTA configuration based on vendor category
+ * @param vendorCategory - The category name (e.g., "Hospitals", "Fast Food", "Salon")
  * @returns CTA configuration with button text, icon, and action type
  */
-export function getCTAConfig(shopCategory: string): CTAConfig {
-  if (CATEGORY_PATTERNS.health.test(shopCategory)) {
+export function getCTAConfig(vendorCategory: string): CTAConfig {
+  if (CATEGORY_PATTERNS.health.test(vendorCategory)) {
     return {
       primary: {
         text: "📅 Book Appointment",
@@ -51,7 +51,7 @@ export function getCTAConfig(shopCategory: string): CTAConfig {
     };
   }
 
-  if (CATEGORY_PATTERNS.food.test(shopCategory)) {
+  if (CATEGORY_PATTERNS.food.test(vendorCategory)) {
     return {
       primary: {
         text: "🛒 Order Now",
@@ -62,7 +62,7 @@ export function getCTAConfig(shopCategory: string): CTAConfig {
     };
   }
 
-  if (CATEGORY_PATTERNS.services.test(shopCategory)) {
+  if (CATEGORY_PATTERNS.services.test(vendorCategory)) {
     return {
       primary: {
         text: "🗓️ Book Service",
@@ -85,64 +85,64 @@ export function getCTAConfig(shopCategory: string): CTAConfig {
 }
 
 /**
- * Get WhatsApp message context based on shop category
- * @param shopName - The shop name
- * @param shopCategory - The shop category
+ * Get WhatsApp message context based on vendor category
+ * @param vendorName - The vendor name
+ * @param vendorCategory - The vendor category
  * @param customContext - Optional custom context
  * @returns WhatsApp message prefix
  */
 export function getWhatsAppContext(
-  shopName: string,
-  shopCategory: string,
+  vendorName: string,
+  vendorCategory: string,
   customContext?: string
 ): string {
-  if (CATEGORY_PATTERNS.health.test(shopCategory)) {
-    return `Hello ${shopName}, I want to book an appointment via ShahdolBazaar. ${customContext || ""}`;
+  if (CATEGORY_PATTERNS.health.test(vendorCategory)) {
+    return `Hello ${vendorName}, I want to book an appointment via ShahdolBazaar. ${customContext || ""}`;
   }
 
-  if (CATEGORY_PATTERNS.food.test(shopCategory)) {
-    return `Hi ${shopName}, I'd like to order via ShahdolBazaar. ${customContext || ""}`;
+  if (CATEGORY_PATTERNS.food.test(vendorCategory)) {
+    return `Hi ${vendorName}, I'd like to order via ShahdolBazaar. ${customContext || ""}`;
   }
 
-  if (CATEGORY_PATTERNS.services.test(shopCategory)) {
-    return `Hello ${shopName}, I want to book a service via ShahdolBazaar. ${customContext || ""}`;
+  if (CATEGORY_PATTERNS.services.test(vendorCategory)) {
+    return `Hello ${vendorName}, I want to book a service via ShahdolBazaar. ${customContext || ""}`;
   }
 
-  return `Hello ${shopName}, I'm interested in your products on ShahdolBazaar. ${customContext || ""}`;
+  return `Hello ${vendorName}, I'm interested in your products on ShahdolBazaar. ${customContext || ""}`;
 }
 
 /**
  * Determine if a category requires booking functionality
- * @param shopCategory - The shop category
+ * @param vendorCategory - The vendor category
  * @returns true if the category supports bookings
  */
-export function supportsBookings(shopCategory: string): boolean {
-  return CATEGORY_PATTERNS.health.test(shopCategory) || CATEGORY_PATTERNS.services.test(shopCategory);
+export function supportsBookings(vendorCategory: string): boolean {
+  return CATEGORY_PATTERNS.health.test(vendorCategory) || CATEGORY_PATTERNS.services.test(vendorCategory);
 }
 
 /**
  * Get color class for category badge
- * @param shopCategory - The shop category
+ * @param vendorCategory - The vendor category
  * @returns Tailwind color classes
  */
-export function getCategoryColor(shopCategory: string): { bg: string; text: string } {
-  if (CATEGORY_PATTERNS.health.test(shopCategory)) {
+export function getCategoryColor(vendorCategory: string): { bg: string; text: string } {
+  if (CATEGORY_PATTERNS.health.test(vendorCategory)) {
     return { bg: "bg-blue-100", text: "text-blue-700" };
   }
 
-  if (CATEGORY_PATTERNS.food.test(shopCategory)) {
+  if (CATEGORY_PATTERNS.food.test(vendorCategory)) {
     return { bg: "bg-orange-100", text: "text-orange-700" };
   }
 
-  if (CATEGORY_PATTERNS.services.test(shopCategory)) {
+  if (CATEGORY_PATTERNS.services.test(vendorCategory)) {
     return { bg: "bg-green-100", text: "text-green-700" };
   }
 
-  if (CATEGORY_PATTERNS.fashion.test(shopCategory)) {
+  if (CATEGORY_PATTERNS.fashion.test(vendorCategory)) {
     return { bg: "bg-pink-100", text: "text-pink-700" };
   }
 
-  if (CATEGORY_PATTERNS.electronics.test(shopCategory)) {
+  if (CATEGORY_PATTERNS.electronics.test(vendorCategory)) {
     return { bg: "bg-purple-100", text: "text-purple-700" };
   }
 

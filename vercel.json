@@ -1,29 +1,13 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install",
+  "buildCommand": "npm run build:client",
+  "outputDirectory": "dist/client",
+  "installCommand": "npm install && npx prisma generate || true",
   "framework": null,
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/index"
-    },
-    {
-      "source": "/schools",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/admin(.*)",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/auth(.*)",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/partner(.*)",
-      "destination": "/index.html"
     },
     {
       "source": "/((?!api/).*)",
@@ -77,6 +61,8 @@
       "memory": 1024
     }
   },
-  "regions": ["iad1", "sfo1", "hnd1", "syd1", "fra1", "lhr1"],
+  "regions": [
+    "iad1"
+  ],
   "crons": []
 }

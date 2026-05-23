@@ -1,4 +1,5 @@
 import express, { type Request, type Response } from "express";
+import { safe } from "../../utils/safe";
 import { trackVendorView, trackUserEvent } from "../../services/user.tracking";
 import { eventQueue } from "../../services/event.queue";
 import { updateUserPreference } from "../../services/personalization.engine";
@@ -6,16 +7,21 @@ import { validateQuery } from "../../middleware/validate";
 import { storesQueryDTO } from "../../dto/marketplace.dto";
 import { success, failure } from "../../lib/apiResponse";
 import { explainVendorRecommendation } from "../../lib/aiExplainability";
-import { findStoresByDistrict, findVendorBySlug, findVendorById } from "../../repositories/vendor.repo";
+import { findStoresByDistrict, findVendorById } from "../../repositories/vendor.repo";
+import { mapVendorByType } from "../../dto/entity.dto";
 import { findProductsByVendor } from "../../repositories/product.repo";
 import { findDistrictBySlug } from "../../repositories/district.repo";
 import { findRecentUserEvent } from "../../repositories/userEvent.repo";
 import { prisma } from "../../storage";
+import { safeLogger } from "../../lib/logging/safe-logger";
+import { LogComponent } from "../../lib/logging/structured-logger";
 import {
   getUnifiedDiscoveryFeed,
   getTopDiscoveryPicks,
   getDiscoveryByType
 } from "../../services/discovery.service";
+import { resolveVendorBySlug, normalizeSlug } from "../../services/entity-resolution";
+import { EntityResolutionFailure } from "../../services/entity-resolution/types";
 
 const router = express.Router();
 
@@ -87,7 +93,7 @@ function adaptDiscoveryHomePayload(feed: any[]) {
       .filter((x) => x.entityType === "PRODUCT")
       .map((x) => ({
         id: x.sourceId,
-        title: x.title,
+        name: x.title,
         slug: x.slug,
         imageUrl: x.image,
         price: x.meta?.price,
@@ -110,6 +116,20 @@ function adaptDiscoveryHomePayload(feed: any[]) {
 // 🏪 MERCHANT LISTINGS
 // ============================================
 
+// --- HOME SNAPSHOT (PSR FRONT PAGE FEED) ---
+router.get("/home-snapshot", safe(async (req: Request, res: Response) => {
+  const districtId = req.ctx?.districtId || 1; // Default to Shahdol (id: 1) when tenant resolution bypassed
+
+  const feed = await getTopDiscoveryPicks(districtId, 42);
+  const adapted = adaptDiscoveryHomePayload(feed);
+
+  return success(res, adapted, {
+    source: "PSR_DISCOVERY_ENGINE",
+    districtId,
+    total: feed.length
+  });
+}));
+
 // --- FETCH STORES BY DISTRICT ---
 router.get("/stores", validateQuery(storesQueryDTO), async (req: Request, res: Response) => {
   try {
@@ -129,8 +149,53 @@ router.get("/stores", validateQuery(storesQueryDTO), async (req: Request, res: R
       });
     }
 
-    // 🔥 AI RANKING: Order by discovery engine rank score
-    const stores = await getDiscoveryByType(effectiveDistrictId, "SHOP");
+    const categoryQuery = (req.query.category as string) || (req.query.q as string) || "";
+
+    // 🔥 AI RANKING: Order by discovery engine rank score with sovereign fallback
+    let stores: any[] = [];
+
+    try {
+      stores = await getDiscoveryByType(effectiveDistrictId, "SHOP");
+    } catch (err) {
+      console.warn("⚠️ PSR discovery failed, falling back to direct vendor query");
+    }
+
+    if (!stores || !stores.length) {
+      const directVendors = await prisma.vendor.findMany({
+        where: {
+          districtId: effectiveDistrictId,
+          status: "APPROVED",
+          ...(categoryQuery
+            ? {
+              searchText: {
+                contains: categoryQuery.toLowerCase(),
+                mode: "insensitive"
+              }
+            }
+            : {})
+        },
+        orderBy: [
+          { aiRankScore: "desc" },
+          { dsslScore: "desc" },
+          { rating: "desc" }
+        ],
+        take: Number(limit) || 20
+      });
+
+      stores = directVendors.map((v) => ({
+        sourceId: v.id,
+        title: v.name,
+        slug: v.slug,
+        image: v.logo,
+        subtitle: v.category,
+        address: v.address,
+        phone: v.mobile || v.phone,
+        isSponsored: !!(v.boostedUntil && new Date(v.boostedUntil) > new Date()),
+        dsslScore: v.dsslScore,
+        rankScore: v.aiRankScore || v.dsslScore || 50
+      }));
+    }
+
     const limitedStores = stores.slice(0, Number(limit) || 20);
 
     // 🔥 USER BEHAVIOR TRACKING: Track marketplace view for authenticated users
@@ -172,63 +237,111 @@ router.get("/stores", validateQuery(storesQueryDTO), async (req: Request, res: R
       };
     });
 
-    return res.json(success(rankedStores, {
+    return success(res, rankedStores, {
       total: rankedStores.length,
       aiRanked: true,
       districtId: effectiveDistrictId,
       source: "PSR_DISCOVERY_ENGINE",
       requestId: `stores_${Date.now()}`
-    }));
+    });
   } catch (e) {
     console.error("Marketplace stores fetch error:", e);
     return res.status(500).json({ success: false, error: "Failed to fetch stores", details: e instanceof Error ? e.message : 'Unknown error' });
   }
 });
 
-// --- FETCH STORE BY SLUG ---
+// --- FETCH STORE BY SLUG (SOVEREIGN CANONICAL RESOLVER) ---
 router.get("/stores/:slug", async (req: Request, res: Response) => {
   try {
-    const slug = req.params.slug as string;
+    const rawSlug = req.params.slug as string;
     const districtId = req.ctx?.districtId;
+    const requestId = `store_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     if (!districtId) {
-      return res.status(400).json({ message: "District context required" });
+      return res.status(400).json({ success: false, error: "District context required" });
     }
 
-    console.log(`[MARKETPLACE] Fetching store details for slug: ${slug} in district: ${districtId}`);
+    const normalizedSlug = normalizeSlug(rawSlug);
+    safeLogger.info(LogComponent.EXECUTION, 'vendor_fetch_start', 'Resolving vendor by slug', { slug: rawSlug, normalizedSlug, districtId });
 
-    const store = await findVendorBySlug(slug, districtId);
+    const result = await resolveVendorBySlug(rawSlug, districtId, requestId);
 
-    if (!store) {
-      console.log(`[MARKETPLACE] Store NOT FOUND in Vendor table: ${slug}`);
-      return res.status(404).json({ message: "Store not found" });
+    if (!result.success) {
+      const fail = result.failure!;
+      safeLogger.warn(LogComponent.EXECUTION, 'vendor_fetch_failed',
+        `Store "${rawSlug}" resolution failed: ${fail.reason}`,
+        { diagnostics: fail.diagnostics });
+
+      // Map failure reason to HTTP status
+      const statusCode = fail.reason === EntityResolutionFailure.VENDOR_UNAPPROVED ||
+        fail.reason === EntityResolutionFailure.VENDOR_SHADOW_BANNED ||
+        fail.reason === EntityResolutionFailure.VENDOR_DISTRICT_MISMATCH
+        ? 404 : 404;
+
+      return res.status(statusCode).json({
+        success: false,
+        error: "Store not found",
+        _diagnostics: {
+          reason: fail.reason,
+          message: fail.message,
+          slug: rawSlug,
+          districtId,
+          requestId,
+        }
+      });
     }
 
-    return res.json(store);
+    safeLogger.info(LogComponent.EXECUTION, 'vendor_fetch_complete', 'Vendor resolved successfully', {
+      slug: rawSlug,
+      districtId,
+      vendorId: result.data.id,
+      requestId
+    });
+
+    const mapped = await mapVendorByType(result.data, { products: result.data.products });
+    return res.json({ success: true, data: mapped });
   } catch (e) {
     console.error(`[MARKETPLACE] Error fetching store ${req.params.slug}:`, e);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
 
-// --- GET VENDOR BY ID (Fixes 404 on Cart) ---
+// --- GET VENDOR BY ID (SOVEREIGN CANONICAL RESOLVER) ---
 router.get("/vendors/id/:id", async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+    const districtId = req.ctx?.districtId;
+    const requestId = `vendor_id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const vendor = await findVendorById(id);
-    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+    if (isNaN(id)) return res.status(400).json({ success: false, error: "Invalid ID" });
+    if (!districtId) return res.status(400).json({ success: false, error: "District context required" });
+
+    const { resolveVendorById } = await import("../../services/entity-resolution");
+    const result = await resolveVendorById(id, districtId, requestId);
+
+    if (!result.success) {
+      return res.status(404).json({
+        success: false,
+        error: "Vendor not found",
+        _diagnostics: {
+          reason: result.failure?.reason,
+          slug: id,
+          districtId,
+          requestId,
+        }
+      });
+    }
 
     // 🔥 USER BEHAVIOR TRACKING: Track vendor detail view
     if (req.ctx?.userId) {
       await trackVendorView(req.ctx.userId, id, req);
     }
 
-    return res.json(vendor);
+    const mapped = await mapVendorByType(result.data);
+    return res.json({ success: true, data: mapped });
   } catch (e) {
     console.error("Vendor fetch error:", e);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
 
@@ -240,9 +353,7 @@ router.get("/shops/:id", async (req: Request, res: Response) => {
 
     // 🔴 Guard: District context required
     if (!districtId) {
-      return res.status(400).json({
-        error: "❌ District context missing - Sovereign gate blocked"
-      });
+      return res.status(400).json({ success: false, error: "District context missing" });
     }
 
     const shop = await prisma.shop.findUnique({
@@ -250,13 +361,13 @@ router.get("/shops/:id", async (req: Request, res: Response) => {
     });
 
     if (!shop) {
-      return res.status(404).json({ message: "Shop not found" });
+      return res.status(404).json({ success: false, error: "Shop not found" });
     }
 
-    return res.json(shop);
+    return res.json({ success: true, data: shop });
   } catch (e) {
     console.error("Shop fetch error:", e);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
 

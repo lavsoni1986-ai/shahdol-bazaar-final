@@ -1,0 +1,1083 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model District {
+  id              Int              @id @default(autoincrement())
+  name            String
+  slug            String           @unique
+  state           String
+  primaryColor    String           @default("#f97316")
+  secondaryColor  String           @default("#22c55e")
+  logoUrl         String?
+  faviconUrl      String?
+  dsslContact     String?
+  dsslEmail       String?
+  isActive        Boolean          @default(true)
+  isDefault       Boolean          @default(false)
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  admins          Admin[]
+  analytics       AnalyticsEvent[] @relation("DistrictToAnalytics")
+  buses           BusTimetable[]   @relation("DistrictToBuses")
+  hospitals       Hospital[]       @relation("DistrictToHospitals")
+  inquiries       Inquiry[]        @relation("DistrictToInquiries")
+  offers          Offer[]
+  serviceWorkers  ServiceWorker[]  @relation("DistrictToServiceWorkers")
+  users           User[]
+  vendors         Vendor[]         @relation("DistrictToVendors")
+  schools         Schools[]
+  sovereignOrders SovereignOrder[]
+
+  @@map("District")
+}
+
+model Vendor {
+  id                    Int          @id @default(autoincrement())
+  name                  String
+  slug                  String
+  description           String?
+  logo                  String?
+  address               String?
+  isVerified            Boolean      @default(false)
+  createdAt             DateTime     @default(now())
+  aiAdCopy              String?
+  aiDescription         String?
+  boostedUntil          DateTime?
+  businessType          BusinessType @default(PRODUCT)
+  category              String?
+  categorySlug          String?
+  searchText            String?
+  aiRankScore           Float        @default(0)
+  rating                Float        @default(0)
+  districtId            Int?         @map("district_id")
+  dsslLastUpdated       DateTime?
+  dsslScore             Int          @default(0)
+  experience            Int?         @default(0)
+  hospitalData          Json?
+  images                String[]
+  isHospital            Boolean      @default(false)
+  isProfessional        Boolean      @default(false)
+  isTrending            Boolean      @default(false)
+  legacyHospitalId      String?      @unique
+  legacyShopId          Int?         @unique
+  legacySchoolId        Int?         @map("legacy_school_id")
+  legacyServiceWorkerId Int?         @unique
+  mobile                String?
+  phone                 String?
+  safetyBadges          String[]
+  serviceArea           String?
+  serviceHours          String?
+  specialties           String[]
+  status                VendorStatus @default(PENDING)
+  isShadowBanned        Boolean      @default(false)
+  trendingScore         Int          @default(0)
+  updatedAt             DateTime     @updatedAt
+  userId                Int?         @map("user_id")
+  vectorEmbedding       Json?
+  whatsappNotifications Boolean      @default(false)
+  doctors               Doctor[]     @relation("VendorToDoctors")
+  inquiries             Inquiry[]
+  offers                Offer[]
+  products              Product[]
+  district              District?    @relation("DistrictToVendors", fields: [districtId], references: [id])
+
+   fraudHistories FraudHistory[]
+
+   vendorMLProfile VendorMLProfile?
+
+   userPreferences userPreference[]
+
+   metadata VendorMetadata?
+
+   @@unique([districtId, slug])
+  @@index([slug])
+  @@index([businessType])
+  @@index([districtId])
+  @@index([status])
+  @@index([isTrending])
+  @@index([trendingScore])
+  @@map("Vendor")
+}
+
+model Inquiry {
+  id            String        @id @default(uuid())
+  vendorId      Int?
+  districtId    Int?          @map("district_id")
+  customerName  String?
+  customerPhone String
+  customerEmail String?
+  inquiryType   InquiryType   @default(LEAD)
+  message       String?
+  source        String        @default("website")
+  status        InquiryStatus @default(NEW)
+  preferredDate DateTime?
+  preferredTime String?
+  serviceType   String?
+  doctorId      String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  district      District?     @relation("DistrictToInquiries", fields: [districtId], references: [id])
+  vendor        Vendor?       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([districtId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerPhone])
+  @@index([inquiryType])
+  @@map("Inquiry")
+}
+
+model Shop {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String?  @unique
+  description String?
+  image       String?
+  address     String?
+  phone       String?
+  mobile      String?
+  category    String?
+  isVerified  Boolean  @default(false)
+  avgRating   Float?
+  approved    Boolean  @default(false)
+  ownerId     Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("Shop")
+}
+
+model Doctor {
+  id              String   @id @default(uuid())
+  name            String
+  qualification   String?
+  specialization  String?
+  experience      Int      @default(0)
+  consultationFee Float    @default(0)
+  timing          String?
+  image           String?
+  hospitalId      String?
+  vendorId        Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  vendor          Vendor?  @relation("VendorToDoctors", fields: [vendorId], references: [id])
+
+  @@map("Doctor")
+}
+
+model Hospital {
+  id                String    @id @default(uuid())
+  name              String
+  slug              String?   @unique
+  address           String?
+  contactNumber     String?
+  email             String?
+  description       String?
+  images            String[]
+  specialties       String[]
+  isVerified        Boolean?  @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  ambulanceService  Boolean   @default(false) @map("ambulance_service")
+  availableBeds     Int       @default(0) @map("available_beds")
+  city              String?
+  districtId        Int?      @map("district_id")
+  emergencyBedCount Int       @default(0) @map("emergency_bed_count")
+  emergencyPhone    String?   @map("emergency_phone")
+  hospitalType      String    @default("multi_specialty")
+  icuAvailable      Boolean   @default(false) @map("icu_available")
+  is24x7            Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  mapsLink          String?
+  nabhAccredited    Boolean   @default(false) @map("nabh_accredited")
+  openHours         String?
+  oxygenAvailable   Boolean   @default(false) @map("oxygen_available")
+  phone             String?
+  pincode           String?
+  totalBeds         Int       @default(0) @map("total_beds")
+  userId            Int?      @map("user_id")
+  website           String?
+  district          District? @relation("DistrictToHospitals", fields: [districtId], references: [id])
+  user              User?     @relation(fields: [userId], references: [id])
+
+  @@map("Hospital")
+}
+
+model ShopAppointment {
+  id            Int       @id @default(autoincrement())
+  shopId        Int?
+  shopName      String?
+  customerName  String?
+  customerPhone String?
+  customerEmail String?
+  preferredDate DateTime? @db.Date
+  preferredTime DateTime? @db.Time(6)
+  serviceType   String?
+  notes         String?
+  status        String?   @default("pending")
+  createdAt     DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime? @default(now()) @db.Timestamp(6)
+
+  @@map("ShopAppointment")
+}
+
+model Schools {
+  id              Int       @id @default(autoincrement())
+  districtId      Int?      @map("district_id")
+  name            String
+  address         String
+  contact         String?
+  email           String?
+  about           String?
+  board           String?   @default("CBSE")
+  vectorEmbedding Json?
+  dsslScore       Int       @default(70)
+  isVerified      Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  safetyBadges    String[]
+  district        District? @relation(fields: [districtId], references: [id])
+
+  @@index([districtId])
+  @@map("Schools")
+}
+
+model SchoolCourses {
+  id          Int     @id @default(autoincrement())
+  schoolId    Int?
+  className   String
+  stream      String?
+  description String?
+
+  @@map("SchoolCourses")
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String
+  slug        String    @unique
+  description String?
+  imageUrl    String?   @map("image")
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  products    Product[]
+
+  @@map("Category")
+}
+
+model Product {
+  id                  Int                  @id @default(autoincrement())
+  title               String               @map("name")
+  description         String?
+  imageUrl            String?              @map("image")
+  virtualTryOn        Boolean              @default(false)
+  vendorId            Int
+  approved            Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  aiAdCopy            String?
+  aiDescription       String?
+  categoryId          Int?
+  categoryName        String?
+  isTrending          Boolean              @default(false)
+  mrp                 Float?               @map("original_price")
+  price               Float?               @map("selling_price")
+  status              String               @default("pending")
+  stock               Int                  @default(100)
+  availableStock      Int                  @default(0)
+  reservedStock       Int                  @default(0)
+  soldStock           Int                  @default(0)
+  vectorEmbedding     Json?
+  category            Category?            @relation(fields: [categoryId], references: [id])
+  vendor              Vendor               @relation(fields: [vendorId], references: [id])
+  images              ProductImage[]
+  reviews             Review[]
+  orders              Order[]
+  sovereignOrderItems SovereignOrderItem[]
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([approved])
+  @@index([categoryName])
+  @@index([categoryId])
+  @@index([createdAt])
+  @@index([price])
+  @@index([stock])
+  @@index([isTrending])
+  @@index([vendorId, status])
+  @@index([approved, status])
+  @@index([categoryName, status])
+  @@map("Product")
+}
+
+model Review {
+  id         Int      @id @default(autoincrement())
+  productId  Int      @map("product_id")
+  userId     Int?     @map("user_id")
+  rating     Int
+  comment    String?
+  isApproved Boolean  @default(false) @map("is_approved")
+  createdAt  DateTime @default(now())
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@map("Review")
+}
+
+model Offer {
+  id         Int       @id @default(autoincrement())
+  content    String
+  vendorId   Int?
+  createdAt  DateTime  @default(now())
+  isActive   Boolean   @default(true)
+  type       String    @default("VENDOR_OFFER")
+  userId     Int?
+  districtId Int?      @map("district_id")
+  district   District? @relation(fields: [districtId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vendor     Vendor?   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("Offer")
+}
+
+model User {
+  id                   Int              @id @default(autoincrement())
+  username             String           @unique
+  password             String
+  role                 String           @default("customer")
+  isAdmin              Boolean          @default(false)
+  shopName             String?          @map("shop_name")
+  shopAddress          String?          @map("shop_address")
+  mapsLink             String?          @map("maps_link")
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  stripeCustomerId     String?          @map("stripe_customer_id")
+  stripeSubscriptionId String?          @map("stripe_subscription_id")
+  subscriptionPlan     String           @default("FREE") @map("subscription_plan")
+  subscriptionStatus   String           @default("inactive") @map("subscription_status")
+  subscriptionEndsAt   DateTime?        @map("subscription_ends_at")
+  districtId           Int?             @map("district_id")
+  consentAt            DateTime?        @map("consent_at")
+  consentGiven         Boolean          @default(false) @map("consent_given")
+  adminProfile         Admin?
+  hospitals            Hospital[]
+  offers               Offer[]
+  reviews              Review[]
+  serviceWorkers       ServiceWorker[]
+  district             District?        @relation(fields: [districtId], references: [id])
+  orders               Order[]
+  sovereignOrders      SovereignOrder[]
+
+   fraudHistories FraudHistory[]
+
+   userIntelligence UserIntelligence?
+
+   userPreferences userPreference[]
+
+   @@index([role])
+  @@index([createdAt])
+  @@index([isAdmin])
+  @@index([districtId])
+  @@map("User")
+}
+
+model Banner {
+  id        Int      @id @default(autoincrement())
+  image     String
+  title     String?
+  link      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("Banner")
+}
+
+model BusTimetable {
+  id            Int       @id @default(autoincrement())
+  districtId    Int?      @map("district_id")
+  fromCity      String    @map("from_city")
+  toCity        String    @map("to_city")
+  firstBusTime  String    @map("first_bus_time")
+  lastBusTime   String    @map("last_bus_time")
+  fare          String
+  boardingPoint String    @map("boarding_point")
+  isActive      Boolean?  @default(true) @map("is_active")
+  busType       String?   @default("General") @map("bus_type")
+  travelTime    String?   @map("travel_time")
+  operatorName  String?   @default("Local Operator") @map("operator_name")
+  frequency     String?   @default("Daily")
+  publicNote    String?   @map("public_note")
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime? @default(now()) @map("updated_at") @db.Timestamp(6)
+  district      District? @relation("DistrictToBuses", fields: [districtId], references: [id])
+
+  @@map("BusTimetable")
+}
+
+model SchoolInquiry {
+  id           String    @id @default(uuid()) @db.Uuid
+  studentName  String    @db.VarChar(255)
+  parentName   String    @db.VarChar(255)
+  mobileNumber String    @db.VarChar(20)
+  class        String    @db.VarChar(50)
+  schoolId     Int?
+  schoolName   String?   @db.VarChar(255)
+  status       String?   @default("pending") @db.VarChar(50)
+  notes        String?
+  createdAt    DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime? @default(now()) @updatedAt @db.Timestamp(6)
+
+  @@map("SchoolInquiry")
+}
+
+model Admin {
+  id         Int       @id @default(autoincrement())
+  role       String    @default("CITY_ADMIN")
+  createdAt  DateTime  @default(now())
+  districtId Int?      @map("district_id")
+  updatedAt  DateTime  @updatedAt
+  userId     Int       @unique @map("user_id")
+  district   District? @relation(fields: [districtId], references: [id])
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  adminLogs AdminLog[]
+
+  @@map("Admin")
+}
+
+model Lead {
+  id            String   @id @default(uuid())
+  shopId        Int?
+  shopName      String?
+  customerName  String?
+  customerPhone String?
+  message       String?
+  source        String   @default("website")
+  action        String   @default("click")
+  metadata      Json?
+  status        String   @default("new")
+  timestamp     DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([source])
+  @@map("Lead")
+}
+
+model AnalyticsEvent {
+  id         String    @id @default(uuid())
+  eventType  String
+  vendorId   Int?
+  districtId Int?      @map("district_id")
+  source     String?
+  action     String?
+  value      Json?
+  userId     Int?
+  sessionId  String?
+  createdAt  DateTime  @default(now())
+  district   District? @relation("DistrictToAnalytics", fields: [districtId], references: [id])
+
+  @@map("AnalyticsEvent")
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  eventId     String
+  eventType   String
+  status      String    @default("pending")
+  payload     Json?
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([provider, eventId])
+  @@index([provider, status, createdAt])
+  @@map("WebhookEvent")
+}
+
+model Metric {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value Int    @default(0)
+
+  @@map("Metric")
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  url       String
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("ProductImage")
+}
+
+model Order {
+  id              Int      @id @default(autoincrement())
+  userId          Int?     @map("user_id")
+  productId       Int      @map("product_id")
+  vendorId        Int?     @map("vendor_id")
+  districtId      Int?     @map("district_id")
+  quantity        Int      @default(1)
+  totalPrice      Float    @map("total_price")
+  status          String   @default("pending")
+  customerName    String?  @map("customer_name")
+  customerPhone   String?  @map("customer_phone")
+  customerAddress String?  @map("customer_address")
+  paymentStatus   String?  @default("pending") @map("payment_status")
+  paymentMethod   String?  @map("payment_method")
+  paymentId       String?  @map("payment_id")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  product         Product  @relation(fields: [productId], references: [id])
+  user            User?    @relation(fields: [userId], references: [id])
+
+  @@index([customerPhone])
+  @@index([status])
+  @@index([vendorId])
+  @@map("orders")
+}
+
+model SovereignOrder {
+  id               Int                  @id @default(autoincrement())
+  userId           Int?
+  districtId       Int
+  totalAmountPaisa Int
+  totalItems       Int
+  status           String               @default("pending")
+  idempotencyKey   String?              @unique
+  customerName     String?
+  customerPhone    String?
+  customerAddress  String?
+  paymentMethod    String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  user             User?                @relation(fields: [userId], references: [id])
+  district         District             @relation(fields: [districtId], references: [id])
+  items            SovereignOrderItem[]
+
+  @@index([userId])
+  @@index([districtId])
+  @@index([status])
+  @@index([idempotencyKey])
+  @@map("sovereign_orders")
+}
+
+model SovereignOrderItem {
+  id              Int            @id @default(autoincrement())
+  orderId         Int
+  productId       Int
+  quantity        Int
+  unitPricePaisa  Int
+  totalPricePaisa Int
+  createdAt       DateTime       @default(now())
+  order           SovereignOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product        @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("sovereign_order_items")
+}
+
+model ServiceWorker {
+  id           Int      @id @default(autoincrement())
+  userId       Int?     @map("user_id")
+  districtId   Int      @map("district_id")
+  name         String
+  slug         String   @unique
+  phone        String
+  email        String?
+  address      String?
+  description  String?
+  image        String?
+  serviceType  String   @default("general")
+  isAvailable  Boolean  @default(true)
+  serviceArea  String?
+  serviceHours String?
+  basePrice    Decimal? @db.Decimal(10, 2)
+  hourlyRate   Decimal? @db.Decimal(10, 2)
+  skillTags    String[]
+  experience   Int?
+  rating       Decimal? @default(0) @db.Decimal(3, 2)
+  reviewCount  Int      @default(0)
+  isVerified   Boolean  @default(false)
+  dsslScore    Int      @default(100)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  district     District @relation("DistrictToServiceWorkers", fields: [districtId], references: [id], onDelete: Cascade)
+  user         User?    @relation(fields: [userId], references: [id])
+
+  @@index([districtId])
+  @@index([serviceType])
+  @@index([isAvailable])
+  @@map("ServiceWorker")
+}
+
+model DistrictDemandMemory {
+  id               Int      @id @default(autoincrement())
+  districtId       Int      @map("district_id")
+  domain           String?  @default("general")
+  entity           String?  @default("unknown")
+  query            String
+  originalQuery    String?
+  normalizedIntent String?
+  confidence       Float?
+  matchedEntities  Int      @default(0)
+  demandCount      Int      @default(1)
+  lastQueried      DateTime @default(now())
+  trend            String?  @default("stable")
+
+  @@unique([districtId, domain, entity])
+  @@index([districtId])
+  @@index([domain])
+  @@index([lastQueried])
+  @@map("district_demand_memory")
+}
+
+model DistrictSupplyGap {
+  id              Int      @id @default(autoincrement())
+  districtId      Int      @map("district_id")
+  domain          String
+  entity          String
+  demandCount     Int      @default(0)
+  urgencyScore    Float    @default(0)
+  trendScore      Float    @default(0)
+  onboardingReady Boolean  @default(false)
+  lastSeenAt      DateTime @updatedAt
+  lastUpdated     DateTime @default(now())
+
+  @@unique([districtId, domain, entity])
+  @@index([districtId])
+  @@index([domain])
+  @@map("district_supply_gap")
+}
+
+model QueryTrend {
+  id         Int      @id @default(autoincrement())
+  districtId Int      @map("district_id")
+  query      String
+  frequency  Int      @default(1)
+  lastSeen   DateTime @default(now())
+  trend      String?  @default("stable")
+  velocity   Float    @default(0)
+  category   String?
+  intent     String?
+
+  @@unique([districtId, query])
+  @@index([districtId])
+  @@index([frequency])
+  @@map("query_trend")
+}
+
+model ServiceGap {
+  id                 Int      @id @default(autoincrement())
+  districtId         Int      @map("district_id")
+  serviceType        String
+  locality           String?
+  demandLevel        String?  @default("medium")
+  frequency          Int      @default(1)
+  urgencyScore       Float    @default(0)
+  availableProviders Int      @default(0)
+  lastUpdated        DateTime @default(now())
+
+  @@unique([districtId, serviceType])
+  @@index([districtId])
+  @@index([serviceType])
+  @@map("service_gap")
+}
+
+model DistrictSignal {
+  id         Int       @id @default(autoincrement())
+  districtId Int       @map("district_id")
+  signalType String
+  domain     String
+  entity     String?
+  intensity  Float     @default(0)
+  confidence Float     @default(0)
+  context    Json?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([districtId])
+  @@index([signalType])
+  @@index([domain])
+  @@map("district_signal")
+}
+
+model PartnerInteraction {
+  id              Int      @id @default(autoincrement())
+  districtId      Int      @map("district_id")
+  partnerType     String   @default("vendor")
+  partnerId       Int
+  interactionType String
+  value           Float?
+  context         Json?
+  createdAt       DateTime @default(now())
+
+  @@index([districtId])
+  @@index([partnerType])
+  @@index([partnerId])
+  @@index([interactionType])
+  @@map("partner_interaction")
+}
+
+model DemandIntelligence {
+  id          Int      @id @default(autoincrement())
+  districtId  Int      @map("district_id")
+  domain      String
+  entity      String
+  query       String
+  intent      String
+  frequency   Int      @default(1)
+  lastQueried DateTime @default(now())
+  trend       String   @default("stable")
+
+  // Economic Intelligence (stored as JSON for flexibility)
+  economicContext    Json?
+  temporalPatterns   Json?
+  geographicPatterns Json?
+  userDemographics   Json?
+  businessInsights   Json?
+
+  @@unique([districtId, domain, entity])
+  @@index([districtId])
+  @@index([domain])
+  @@index([frequency])
+  @@index([lastQueried])
+  @@map("demand_intelligence")
+}
+
+model TrustSignal {
+  id         Int      @id @default(autoincrement())
+  vendorId   Int      @map("vendor_id")
+  signalType String // click, view, booking, review, search
+  value      Float    @default(1.0)
+  timestamp  DateTime @default(now())
+  source     String   @default("organic") // organic, suspicious, verified
+  context    Json? // Additional metadata
+
+  @@index([vendorId])
+  @@index([signalType])
+  @@index([timestamp])
+  @@index([source])
+  @@map("trust_signal")
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BusinessType {
+  PRODUCT
+  SERVICE
+  HEALTHCARE
+  SCHOOL
+  RETAIL
+  EDUCATION
+}
+
+enum InquiryType {
+  LEAD
+  APPOINTMENT
+  GENERAL
+}
+
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  LOST
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+// Core Governance Models - Phase 1A Restoration
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  action      String
+  entityType  String
+  entityId    Int
+  targetType  String?
+  targetId    Int?
+  userId      Int?
+  districtId  Int?
+  details     Json?
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([districtId])
+  @@map("audit_log")
+}
+
+model UserEvent {
+  id                  Int       @id @default(autoincrement())
+  userId              Int
+  eventType           String
+  action              String?
+  converted           Boolean?
+  eventData           Json?
+  sessionId           String?
+  deviceHash          String?
+  sessionFingerprint  String?
+  districtId          Int?
+  ipAddress           String?
+  userAgent           String?
+  createdAt           DateTime  @default(now())
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([districtId])
+  @@map("user_event")
+}
+
+model TelemetryTruth {
+  id                Int       @id @default(autoincrement())
+  truthId           String?   @unique
+  districtId        Int
+  query             String
+  queryOriginal     String?
+  domain            String?
+  entity            String?
+  intent            String?
+  normalizedIntent  String?
+  confidence        Float?
+  matchedEntities   Int       @default(0)
+  hallucinationPrevented Boolean @default(false)
+  traceHash         String?
+  executionTime     Int?
+  timestamp         DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([districtId])
+  @@index([query])
+  @@index([intent])
+  @@map("telemetry_truth")
+}
+
+model VendorMetricsDaily {
+  id              Int       @id @default(autoincrement())
+  vendorId        Int
+  districtId      Int
+  date            DateTime
+  views           Int       @default(0)
+  clicks          Int       @default(0)
+  bookings        Int       @default(0)
+  revenue         Int       @default(0)
+  aiMentions      Int       @default(0)
+  rating          Float?
+  responseTime    Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([vendorId, date])
+  @@index([districtId])
+  @@index([date])
+  @@map("vendor_metrics_daily")
+}
+
+model FraudPattern {
+  id              Int       @id @default(autoincrement())
+  patternType     String
+  pattern         String?
+  patternData     Json
+  severity        String    @default("LOW")
+  confidence      Float?
+  usageCount      Int       @default(0)
+  districtId      Int?
+  isActive        Boolean   @default(true)
+  lastTriggered   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([patternType])
+  @@index([districtId])
+  @@index([isActive])
+  @@map("fraud_pattern")
+}
+
+model EventLog {
+  id            Int       @id @default(autoincrement())
+  eventType     String
+  eventSource   String
+  type          String?
+  eventData     Json?
+  metadata      Json?
+  districtId    Int?
+  severity      String    @default("INFO")
+  traceId       String?
+  createdAt     DateTime  @default(now())
+
+  @@index([eventType])
+  @@index([eventSource])
+  @@index([districtId])
+  @@index([createdAt])
+  @@map("event_log")
+}
+
+model SystemLock {
+  id              Int       @id @default(autoincrement())
+  lockType        String
+  key             String?
+  lockKey         String    @unique
+  owner           String
+  isActive        Boolean   @default(true)
+  expiresAt       DateTime
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+
+  @@index([lockType])
+  @@index([expiresAt])
+  @@map("system_lock")
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model AdminLog {
+  id        Int      @id @default(autoincrement())
+  adminId   Int
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+  
+  admin Admin @relation(fields: [adminId], references: [id])
+  @@index([adminId])
+  @@map("admin_log")
+}
+
+model FraudHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  vendorId  Int?
+  eventType String
+  riskScore Float    @default(0)
+  details   Json?
+  createdAt DateTime @default(now())
+  
+  user   User?   @relation(fields: [userId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+  @@index([userId])
+  @@index([vendorId])
+  @@map("fraud_history")
+}
+
+model UserIntelligence {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @unique
+  intelligenceData Json?
+  updatedAt        DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id])
+  @@map("user_intelligence")
+}
+
+model VendorMLProfile {
+  id         Int      @id @default(autoincrement())
+  vendorId   Int      @unique
+  mlScore    Float    @default(0)
+  trustScore Float    @default(0)
+  updatedAt  DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+  @@map("vendor_ml_profile")
+}
+
+model userPreference {
+  id              Int     @id @default(autoincrement())
+  userId          Int
+  vendorId        Int
+  preferenceScore Float   @default(0)
+
+  user   User   @relation(fields: [userId], references: [id])
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@unique([userId, vendorId])
+  @@map("user_preference")
+}
+
+model systemConfig {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+model adminActionLog {
+  id        Int      @id @default(autoincrement())
+  adminId   Int?
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@map("admin_action_log")
+}
+
+model SharedLearning {
+  id         Int      @id @default(autoincrement())
+  districtId Int
+  query      String
+  domain     String?
+  createdAt  DateTime @default(now())
+
+  @@map("shared_learning")
+}
+
+model VendorMetadata {
+  id                Int      @id @default(autoincrement())
+  vendorId          Int      @unique
+
+  // Core capabilities
+  specializations    Json?      // ["Cardiology", "Emergency"]
+  businessHours      Json?      // { monday: { open: "09:00", close: "18:00" }, ... }
+  consultationMode   String?    // "IN_PERSON", "ONLINE", "BOTH"
+  localityHint       String?    // Neighborhood/area identifier
+  tags               Json?      // ["emergency", "24x7", "cashless"]
+
+  // Live signals (NULLABLE = unknown, not false)
+  emergencyAvailable Boolean?   // null = unknown, true/false = verified
+  deliveryActive     Boolean?
+  acceptsInsurance   Boolean?
+  homeVisit          Boolean?
+
+  // Contact channels
+  whatsappNumber     String?
+
+  // Quality signals
+  lastVerified       DateTime?
+  dataPurity         Float?     // 0-1, how complete the data is. null = unrated
+  freshness          Float?     // 0-1, age-weighted recency. null = uncomputed
+  lastActivity       DateTime?
+
+  // Operational
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@map("vendor_metadata")
+}

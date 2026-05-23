@@ -1,327 +1,160 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Store, Package, Search, MapPin, HeartPulse, GraduationCap, Building2, ShieldCheck, MessageCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { openWhatsApp } from "@/lib/order-logic";
+import { AISearchTerminal } from "@/components/home/AISearchTerminal";
+import { SovereignStoreCard } from "@/components/home/SovereignStoreCard";
+import { StoreCardSkeleton } from "@/components/shared/SovereignStoreCard";
+import { SovereignProductCard, ProductCardSkeleton } from "@/components/home/SovereignProductCard";
+import { Filter, ShoppingBag, Store, Sparkles } from "lucide-react";
+import { SOVEREIGN_CONFIG } from "@/lib/SovereignConstants";
+import { useDistrict } from "@/contexts/DistrictContext";
+import { apiRequest, getArrayData } from "@/lib/api-client";
 
-interface District {
-  id: number;
-  name: string;
-  slug: string;
-  description: string | null;
-  imageUrl: string | null;
-}
+export default function MarketplacePage() {
+  const { currentDistrict, isReady } = useDistrict();
+  const [activeTab, setActiveTab] = useState<'stores' | 'products'>('stores');
+  const [selectedCategory, setSelectedCategory] = useState("All");
 
-interface Store {
-  id: number;
-  name: string;
-  slug: string | null;
-  category: string;
-  description: string | null;
-  image: string | null;
-  address: string | null;
-  rating: number | null;
-  avgRating: number | null;
-  isVerified?: boolean;
-  dsslScore?: number;
-}
-
-interface Product {
-  id: number;
-  name: string;
-  title: string | null;
-  price: string;
-  mrp: string | null;
-  imageUrl: string | null;
-  category: string;
-  shopName: string | null;
-  stock: number;
-  isTrending: boolean;
-}
-
-export default function Marketplace() {
-  const [location] = useLocation();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDistrict, setSelectedDistrict] = useState<District | null>(null);
-
-  // Get district from URL slug (e.g., /marketplace/shahdol) or use default
-  const urlDistrictSlug = location.split("/marketplace/")[1]?.split("/")[0];
-  const districtSlug = urlDistrictSlug || localStorage.getItem("districtSlug") || "shahdol";
-
-  // Current district ID - used as dependency and safety check
-  const currentDistrictId = selectedDistrict?.id;
-
-  // Fetch district by slug
-  const { data: districtData } = useQuery<District>({
-    queryKey: ["district", districtSlug],
+  const { data: storesData, isLoading: storesLoading, error: storesError } = useQuery({
+    queryKey: ["marketplace/stores", currentDistrict?.id],
     queryFn: async () => {
-      if (!districtSlug) return null;
-      const res = await fetch(`/api/districts/${districtSlug}`);
-      if (!res.ok) throw new Error("District not found");
-      return res.json();
+      if (!isReady || !currentDistrict?.id) return [];
+      const res = await apiRequest("GET", "/marketplace/stores");
+      return getArrayData(res);
     },
-    enabled: !!districtSlug,
+    enabled: !!currentDistrict?.id && isReady,
+    retry: 2,
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 
-  // Fetch stores - only when districtId is available
-  const { data: storesData } = useQuery<{ data: Store[] }>({
-    queryKey: ["marketplace-stores", currentDistrictId],
+  const stores = Array.isArray(storesData) ? storesData : [];
+
+  const { data: productsData, isLoading: productsLoading, error: productsError } = useQuery({
+    queryKey: ["marketplace/products", currentDistrict?.id],
     queryFn: async () => {
-      // SAFETY CHECK: Stop if no districtId
-      if (!currentDistrictId) return { data: [] };
-      const params = new URLSearchParams();
-      params.append("districtId", String(currentDistrictId));
-      const res = await fetch(`/api/marketplace/stores?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch stores");
-      return res.json();
+      if (!isReady || !currentDistrict?.id) return [];
+      const res = await apiRequest("GET", "/marketplace/products");
+      return getArrayData(res);
     },
-    // Only enable when districtId is available and valid
-    enabled: !!currentDistrictId,
+    enabled: !!currentDistrict?.id && isReady,
+    retry: 2,
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 
-  // Fetch featured products
-  const { data: productsData } = useQuery<{ data: Product[]; pagination: any }>({
-    queryKey: ["marketplace-products", currentDistrictId, searchQuery],
-    queryFn: async () => {
-      // SAFETY CHECK: Stop if no districtId
-      if (!currentDistrictId) return { data: [], pagination: {} };
-      const params = new URLSearchParams();
-      params.append("districtId", String(currentDistrictId));
-      if (searchQuery) params.append("search", searchQuery);
-      params.append("limit", "12");
-      const res = await fetch(`/api/marketplace/products?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch products");
-      return res.json();
-    },
-    enabled: !!currentDistrictId,
-  });
+  const products = Array.isArray(productsData) ? productsData : [];
 
-  // Set selected district when districtData changes - only if different to prevent loops
-  useEffect(() => {
-    if (districtData && (!selectedDistrict || selectedDistrict.id !== districtData.id)) {
-      setSelectedDistrict(districtData);
-    }
-  }, [districtData]);
+  // Guard AFTER hooks
+  if (!isReady || !currentDistrict?.id) {
+    return (
+      <div className="sovereign-bg min-h-screen flex items-center justify-center">
+        <div className="text-orange-500 animate-pulse">Initializing district...</div>
+      </div>
+    );
+  }
 
-  const stores = storesData?.data || [];
-  const products = productsData?.data || [];
-
-  // Helper function to get icon based on store category
-  const getStoreIcon = (category: string | null | object) => {
-    // Handle category as object or string
-    const catName = typeof category === 'object' 
-      ? (category as any)?.name?.toLowerCase() 
-      : String(category || '').toLowerCase();
-    
-    const safeCatName = catName || '';
-    
-    if (safeCatName.includes('health') || safeCatName.includes('hospital') || safeCatName.includes('clinic') || safeCatName.includes('medical')) {
-      return <HeartPulse className="h-8 w-8 text-red-500" />;
-    }
-    if (safeCatName.includes('school') || safeCatName.includes('education') || safeCatName.includes('coaching') || safeCatName.includes('college')) {
-      return <GraduationCap className="h-8 w-8 text-yellow-600" />;
-    }
-    if (safeCatName.includes('service') || safeCatName.includes('repair') || safeCatName.includes('hotel')) {
-      return <Building2 className="h-8 w-8 text-blue-500" />;
-    }
-    return <Store className="h-8 w-8 text-orange-500" />;
-  };
+  const categories = ["All", "Grocery", "Electronics", "Fashion", "Pharmacy", "Food"];
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-32 pb-12">
-      {/* Header */}
-      <div className="bg-white border-b shadow-sm">
-        <div className="container mx-auto px-4 py-8">
-          {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-2xl shadow-sm mb-10 flex flex-wrap gap-4 items-center relative z-10">
-            <div className="flex-1 min-w-[200px]">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {selectedDistrict ? `${selectedDistrict.name} Marketplace` : "Shahdol Bazaar"}
-              </h1>
-              {selectedDistrict?.description && (
-                <p className="text-gray-600 text-sm">{selectedDistrict.description}</p>
-              )}
-            </div>
-            {/* Search */}
-            <div className="relative min-w-[250px] flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <Input
-                placeholder="Search products, stores..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border-gray-200 rounded-xl"
-              />
-            </div>
-            <Link href="/">
-              <Button variant="outline" className="rounded-xl">Back to Home</Button>
-            </Link>
+    <div className="sovereign-bg">
+      <div className="max-w-7xl mx-auto px-6 pt-6">
+        {/* 📑 Navigation & Filters */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12 border-b border-white/5 pb-8">
+          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10">
+            <TabButton
+              active={activeTab === 'stores'}
+              onClick={() => setActiveTab('stores')}
+              icon={<Store className="w-4 h-4" />}
+              label="Stores"
+            />
+            <TabButton
+              active={activeTab === 'products'}
+              onClick={() => setActiveTab('products')}
+              icon={<ShoppingBag className="w-4 h-4" />}
+              label="Products"
+            />
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${selectedCategory === cat
+                  ? 'bg-orange-500 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)]'
+                  : 'bg-white/5 text-gray-500 border border-white/10 hover:border-orange-500/30'
+                  }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-12">
-        {/* Stores Section */}
-        {stores.length > 0 && (
-          <section className="mb-16">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Store className="h-6 w-6 text-orange-600" />
-                Featured Stores
-              </h2>
-              <Link href={`/marketplace-stores${selectedDistrict ? `?district=${selectedDistrict.slug}` : ""}`}>
-                <Button variant="outline" className="rounded-xl">View All</Button>
-              </Link>
+        {/* 🏹 Content Grid */}
+        {storesError || productsError ? (
+          <div className="text-center py-20 glass-card-sovereign border-red-500/20">
+            <div className="text-red-500 mb-4">
+              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {stores.slice(0, 4).map((store) => (
-                <Link key={store.id} href={`/marketplace/store/${store.slug || store.id}`}>
-                  <Card className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 cursor-pointer h-full">
-                    <div className="aspect-video bg-gray-100 rounded-t-2xl overflow-hidden">
-                      {store.image ? (
-                        <img src={store.image} alt={store.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-orange-50">
-                          <div className="w-16 h-16 bg-orange-50 rounded-xl flex items-center justify-center mx-auto mb-4">
-                            {getStoreIcon(store.category as any)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg font-bold text-gray-900">{store.name}</CardTitle>
-                        {store.isVerified && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
-                            <ShieldCheck className="w-3 h-3" />
-                            DSSL Verified
-                          </span>
-                        )}
-                      </div>
-                      <CardDescription className="text-orange-600 font-medium">
-                        {store.category}
-                        {store.dsslScore !== undefined && (
-                          <span className="ml-2 text-amber-600">
-                            • Trust Score: {store.dsslScore}/100
-                          </span>
-                        )}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      {store.address && (
-                        <div className="flex items-center gap-1 text-sm text-gray-500 mb-2">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate">{store.address}</span>
-                        </div>
-                      )}
-                      {store.avgRating && store.avgRating > 0 && (
-                        <div className="text-sm text-yellow-600 font-medium">
-                          ⭐ {store.avgRating.toFixed(1)} ({store.rating || 0})
-                        </div>
-                      )}
-                      <Button className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-xl transition-colors mt-4">
-                        View Store
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Products Section */}
-        <section>
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Package className="h-6 w-6 text-orange-600" />
-              {searchQuery ? `Search Results` : "Featured Products"}
-            </h2>
-            {!searchQuery && (
-              <Link href={`/marketplace/products${selectedDistrict ? `?district=${selectedDistrict.slug}` : ""}`}>
-                <Button variant="outline" className="rounded-xl">View All</Button>
-              </Link>
+            <h3 className="text-xl font-bold text-white mb-2">Data Service Unavailable</h3>
+            <p className="text-gray-400 mb-4">Unable to load marketplace data. Please try again.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-orange-500 text-white rounded-lg font-bold hover:bg-orange-600 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {activeTab === 'stores' ? (
+              storesLoading ? (
+                // Loading skeleton for stores — canonical
+                Array.from({ length: 8 }).map((_, i) => (
+                  <StoreCardSkeleton key={i} variant="marketplace" />
+                ))
+              ) : (
+                stores?.map((store: any) => (
+                  <SovereignStoreCard key={store.id} data={store} />
+                ))
+              )
+            ) : (
+              productsLoading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <ProductCardSkeleton key={i} variant="marketplace" />
+                ))
+              ) : (
+                products?.map((product: any) => (
+                  <SovereignProductCard key={product.id} data={product} />
+                ))
+              )
             )}
           </div>
-          {products.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-2xl">
-              <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No products found</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {products.map((product) => (
-                <Link key={product.id} href={`/marketplace/product/${product.id}`}>
-                  <Card className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 cursor-pointer h-full">
-                    <div className="relative aspect-[16/9] overflow-hidden rounded-t-2xl">
-                      {product.imageUrl ? (
-                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="h-12 w-12 text-gray-300" />
-                        </div>
-                      )}
-                      {/* Stock Badge */}
-                      <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-bold ${
-                        product.stock > 0 
-                          ? "bg-green-100 text-green-800" 
-                          : "bg-amber-100 text-amber-800"
-                      }`}>
-                        {product.stock > 0 ? "In Stock" : "Coming Soon"}
-                      </div>
-                    </div>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base font-bold text-gray-900 line-clamp-2">{product.title || product.name}</CardTitle>
-                      <CardDescription className="text-xs">{product.category}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg font-bold text-orange-600">₹{product.price}</span>
-                        {product.mrp && parseFloat(product.mrp) > parseFloat(product.price) && (
-                          <span className="text-xs text-gray-400 line-through">₹{product.mrp}</span>
-                        )}
-                      </div>
-                      {product.shopName && (
-                        <p className="text-xs text-gray-500 mb-3">by {product.shopName}</p>
-                      )}
-                      <Button 
-                        className={`w-full font-bold py-2 rounded-xl transition-colors ${
-                          product.stock > 0 
-                            ? "bg-orange-600 hover:bg-orange-700 text-white" 
-                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        }`}
-                        disabled={product.stock <= 0}
-                      >
-                        {product.stock > 0 ? "View Details" : "Contact Store"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full mt-2 border-green-500 text-green-600 hover:bg-green-50"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          openWhatsApp(
-                            product.title || product.name,
-                            String(product.price),
-                            product.shopName || undefined,
-                            String(product.id),
-                            (product as any).vendorId ? String((product as any).vendorId) : undefined,
-                            (product as any).districtId ? String((product as any).districtId) : undefined
-                          );
-                        }}
-                      >
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        Order on WhatsApp
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+        )}
+
+        {/* 🛸 Empty State with AI Vibe */}
+        {((activeTab === 'stores' && !stores?.length && !storesLoading && !storesError) ||
+          (activeTab === 'products' && !products?.length && !productsLoading && !productsError)) && (
+            <div className="text-center py-40 glass-card-sovereign border-dashed">
+              <Sparkles className="w-12 h-12 text-orange-500/50 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white">Awaiting Sovereign Merchants</h3>
+              <p className="text-gray-500">First items in this category are arriving soon.</p>
             </div>
           )}
-        </section>
       </div>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all ${active ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'
+        }`}
+    >
+      {icon} {label}
+    </button>
   );
 }

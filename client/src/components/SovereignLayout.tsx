@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldCheck, Phone, MapPin, Clock, Star, ArrowLeft, ArrowRight, MessageCircle, Package, MapPinned } from "lucide-react";
+import { ShieldCheck, Phone, MapPin, Clock, Star, ArrowLeft, ArrowRight, MessageCircle, Package, MapPinned, Tag } from "lucide-react";
 
 export type PageType = "school" | "hospital" | "product";
 
@@ -52,7 +52,7 @@ interface SovereignBackButtonProps {
 
 export function SovereignBackButton({ onClick }: SovereignBackButtonProps) {
   return (
-    <button 
+    <button
       onClick={onClick || (() => window.history.back())}
       className="absolute top-6 left-6 z-50 p-3 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full hover:bg-orange-600 transition-all"
     >
@@ -80,7 +80,7 @@ export function SovereignContactButton({ type, value, onClick, href }: ContactBu
   const Icon = config.icon;
 
   const content = (
-    <div className="glass-card-3d p-4 rounded-3xl flex flex-col items-center justify-center gap-2 border border-white/10 hover:bg-white/[0.1] transition-all cursor-pointer">
+    <div className="glass-card-sovereign p-4 rounded-3xl flex flex-col items-center justify-center gap-2 border border-white/10 hover:bg-white/[0.1] transition-all cursor-pointer">
       <Icon className={`w-5 h-5 ${config.color}`} />
       <span className="text-[8px] font-black uppercase text-slate-500 tracking-tighter">{config.label}</span>
       {value && type !== "call" && type !== "whatsapp" && <span className="text-[10px] text-white font-bold truncate max-w-full">{value}</span>}
@@ -90,7 +90,7 @@ export function SovereignContactButton({ type, value, onClick, href }: ContactBu
   if (href) {
     return <a href={href} target="_blank" rel="noopener noreferrer">{content}</a>;
   }
-  
+
   return <button onClick={onClick}>{content}</button>;
 }
 
@@ -152,7 +152,7 @@ interface FeatureSectionProps {
 
 export function SovereignFeatureSection({ title, features }: FeatureSectionProps) {
   return (
-    <div className="glass-card-3d p-6 rounded-[2rem] border border-white/10 mb-6">
+    <div className="glass-card-sovereign p-6 rounded-[2rem] border border-white/10 mb-6">
       <h3 className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-4">{title}</h3>
       <div className="space-y-3">
         {features.map((feature, index) => (
@@ -184,7 +184,7 @@ interface GlassCardProps {
 
 export function SovereignGlassCard({ children, className = "" }: GlassCardProps) {
   return (
-    <div className={`glass-card-3d p-6 rounded-[2rem] border border-white/10 bg-white/[0.02] backdrop-blur-xl ${className}`}>
+    <div className={`glass-card-sovereign p-6 rounded-[2rem] border border-white/10 bg-white/[0.02] backdrop-blur-xl ${className}`}>
       {children}
     </div>
   );
@@ -209,32 +209,44 @@ export function SovereignSpecGrid({ items }: SpecGridProps) {
 }
 
 interface ProductSpecsProps {
-  stock?: string;
-  district?: string;
-  category?: string;
+  stock?: string | any;
+  district?: string | any;
+  category?: string | any;
   price?: string;
   originalPrice?: number;
 }
 
 export function SovereignProductSpecs({ stock = "In Stock", district = "Shahdol", category, price, originalPrice }: ProductSpecsProps) {
+  const safeRender = (data: any, fallback: string) => {
+    if (!data) return fallback;
+    if (typeof data === 'string') return data;
+    if (typeof data === 'object' && data.name) return data.name;
+    return fallback;
+  };
+
   return (
-    <div className="grid grid-cols-2 gap-4 mb-8">
-      <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-        <Package className="w-4 h-4 text-orange-500 mb-2" />
-        <p className="text-[10px] text-slate-500 uppercase font-black">Stock Status</p>
-        <p className="text-sm font-bold">{stock}</p>
+    <div className="grid grid-cols-3 gap-2 mb-8">
+      <div className="glass-card-sovereign p-3 border-white/5 flex flex-col items-center justify-center text-center group hover:border-orange-500/30 transition-all">
+        <Tag className="w-4 h-4 text-orange-500 mb-2 group-hover:scale-110 transition-transform" />
+        <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter mb-1">Category</span>
+        <span className="text-[10px] font-bold text-white uppercase truncate w-full">
+          {safeRender(category, "General")}
+        </span>
       </div>
-      <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-        <MapPin className="w-4 h-4 text-orange-500 mb-2" />
-        <p className="text-[10px] text-slate-500 uppercase font-black">Service Area</p>
-        <p className="text-sm font-bold">{district}</p>
+      <div className="glass-card-sovereign p-3 border-white/5 flex flex-col items-center justify-center text-center group hover:border-orange-500/30 transition-all">
+        <MapPin className="w-4 h-4 text-blue-500 mb-2 group-hover:scale-110 transition-transform" />
+        <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter mb-1">District</span>
+        <span className="text-[10px] font-bold text-white uppercase">
+          {safeRender(district, "Shahdol")}
+        </span>
       </div>
-      {category && (
-        <div className="p-4 bg-white/5 rounded-2xl border border-white/5 col-span-2">
-          <p className="text-[10px] text-slate-500 uppercase font-black">Category</p>
-          <p className="text-sm font-bold">{category}</p>
-        </div>
-      )}
+      <div className="glass-card-sovereign p-3 border-white/5 flex flex-col items-center justify-center text-center group hover:border-orange-500/30 transition-all">
+        <Package className="w-4 h-4 text-emerald-500 mb-2 group-hover:scale-110 transition-transform" />
+        <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter mb-1">Status</span>
+        <span className="text-[10px] font-bold text-emerald-400 uppercase">
+          {safeRender(stock, "Available")}
+        </span>
+      </div>
     </div>
   );
 }
@@ -246,12 +258,101 @@ interface WhatsAppButtonProps {
 
 export function SovereignWhatsAppButton({ onClick, text = "Order on WhatsApp" }: WhatsAppButtonProps) {
   return (
-    <button 
+    <button
       onClick={onClick}
       className="w-full bg-orange-600 text-black py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-[0_20px_40px_rgba(234,88,12,0.3)] hover:bg-orange-500 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
     >
       <MessageCircle className="w-6 h-6 fill-current" />
       {text}
     </button>
+  );
+}
+
+// ============================================
+// SOVEREIGN THEME INJECTION
+// ============================================
+// Injects district-specific colors as CSS variables
+
+export interface ThemeConfig {
+  accentColor?: string;
+  gradientFrom?: string;
+  gradientTo?: string;
+  badgeColor?: string;
+}
+
+export function injectSovereignTheme(theme: ThemeConfig | null | undefined) {
+  if (!theme) return;
+
+  const root = document.documentElement;
+
+  if (theme.accentColor) {
+    root.style.setProperty('--sovereign-accent', theme.accentColor);
+    root.style.setProperty('--sovereign-primary', theme.accentColor);
+  }
+
+  if (theme.gradientFrom) {
+    root.style.setProperty('--sovereign-gradient-from', theme.gradientFrom);
+  }
+
+  if (theme.gradientTo) {
+    root.style.setProperty('--sovereign-gradient-to', theme.gradientTo);
+  }
+
+  if (theme.badgeColor) {
+    root.style.setProperty('--sovereign-badge', theme.badgeColor);
+  }
+
+  console.log('🎨 [SOVEREIGN] Theme injected:', theme);
+}
+
+// Default Shahdol theme (Orange)
+export const defaultThemeConfig: ThemeConfig = {
+  accentColor: '#f97316',
+  gradientFrom: '#f97316',
+  gradientTo: '#ea580c',
+  badgeColor: '#22c55e',
+};
+
+// ============================================
+// SOVEREIGN THEME HOOK
+// ============================================
+import { useEffect } from 'react';
+
+export function useSovereignTheme(theme: ThemeConfig | null | undefined) {
+  useEffect(() => {
+    injectSovereignTheme(theme);
+
+    // Cleanup on unmount - restore default
+    return () => {
+      injectSovereignTheme(defaultThemeConfig);
+    };
+  }, [theme]);
+}
+
+// 🛡️ BHARAT-OS: SOVEREIGN CHECKOUT ACTIONS - FIXED UI (TAILWIND)
+export function SovereignCheckoutActions({ onAddToCart, onBuyNow }: { onAddToCart: () => void, onBuyNow: () => void }) {
+  return (
+    <div className="flex flex-col gap-3 mt-6 px-4">
+      <div className="grid grid-cols-2 gap-3">
+        {/* Add to Cart Button - Outlined */}
+        <button
+          onClick={onAddToCart}
+          className="border border-teal-600 text-teal-600 bg-white hover:bg-teal-50"
+        >
+          Add to Cart
+        </button>
+        {/* Buy Now Button - Filled */}
+        <button
+          onClick={onBuyNow}
+          className="bg-teal-600 text-white hover:bg-teal-700"
+        >
+          Buy Now
+        </button>
+      </div>
+      <div className="flex items-center justify-between px-4 py-3 bg-white/5 rounded-xl border border-white/5">
+        <span className="text-[9px] font-bold text-slate-400 uppercase">Cash on Delivery Available</span>
+        <span className="text-[9px] font-black text-emerald-400 uppercase">7-Day Return</span>
+      </div>
+    </div>
   );
 }

@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "name": "stores_default",
+    "endpoint": "/api/marketplace/stores",
+    "params": {
+      "districtId": 2
+    },
+    "timestamp": "2026-04-24T09:37:38.708Z",
+    "districtId": 2,
+    "districtSlug": "shahdol"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "vary": "Origin, Accept-Encoding",
+      "access-control-allow-credentials": "true",
+      "ratelimit-policy": "100;w=3600",
+      "ratelimit-limit": "100",
+      "ratelimit-remaining": "99",
+      "ratelimit-reset": "3600",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "1; mode=block",
+      "cache-control": "no-store, max-age=0",
+      "content-type": "application/json; charset=utf-8",
+      "content-length": "166",
+      "etag": "W/\"a6-1kYCdrUenK0ki0M79ZMUO8PpKY4\"",
+      "date": "Fri, 24 Apr 2026 09:37:38 GMT",
+      "connection": "keep-alive",
+      "keep-alive": "timeout=5"
+    },
+    "data": "{\"success\":true,\"data\":[],\"meta\":{\"timestamp\":\"2026-04-24T09:37:38.704Z\",\"version\":\"1.0\",\"total\":0,\"aiRanked\":true,\"districtId\":2,\"requestId\":\"stores_1777023458704\"}}"
+  }
+}

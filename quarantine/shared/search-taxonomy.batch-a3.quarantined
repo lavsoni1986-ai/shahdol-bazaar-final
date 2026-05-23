@@ -1,0 +1,8 @@
+/**
+ * COGNITION SEARCH TAXONOMY - QUARANTINE BACKUP (Batch A3)
+ * Created by Kilo for Phase 1C-A atomic normalization (service duplicates)
+ * Source: shared/cognition/search-taxonomy.ts (post-A2)
+ * Timestamp: 2026-05-14T22:59:00+05:30
+ */
+
+// Quarantine backup of modified taxonomy (post-A2) for atomic rollback.
