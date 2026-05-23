@@ -19,7 +19,7 @@ export const orderItemDTO = z.object({
   quantity: z.number()
     .int("Quantity must be a whole number")
     .min(1, "Quantity must be at least 1")
-    .max(100, "Cannot order more than 100 items"),
+    .max(20, "Cannot order more than 20 items"),
 });
 
 // ============================================

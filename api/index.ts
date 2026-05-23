@@ -25,18 +25,7 @@ app.use(cors({
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
-// Inline health to avoid hard dependency on routes module
-app.get("/api/health", async (_req, res) => {
-  try {
-    const { verifyDbConnection } = await import("../server/db.js");
-    await verifyDbConnection();
-    return res.json({ status: "ok" });
-  } catch (err: any) {
-    console.error("❌ /api/health failed:", err?.message || err);
-    console.error(err?.stack || err);
-    return res.status(500).json({ status: "error", message: "DB unavailable" });
-  }
-});
+
 
 // Function-level health (no DB)
 app.get("/api/health-fn", (_req, res) => res.json({ status: "ok", scope: "function" }));

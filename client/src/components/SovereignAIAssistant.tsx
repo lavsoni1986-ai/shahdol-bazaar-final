@@ -66,10 +66,9 @@ export function SovereignAIAssistant() {
     setLoading(true);
 
     try {
-      const data = await apiRequest<{ reply?: string; response?: string; results?: any[]; message?: string; requiresLogin?: boolean; actions?: any[] }>("/api/ai/concierge", {
-        method: "POST",
-        body: JSON.stringify({ message: userMessage })
-      });
+const data = await apiRequest("POST", "/ai/concierge", {
+         message: userMessage
+       });
       
       // Handle both response formats (reply or response)
       const aiResponse = data.reply || data.response || "";

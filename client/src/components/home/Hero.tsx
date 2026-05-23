@@ -1,12 +1,13 @@
 interface HeroProps {
   districtName: string;
+  tagline?: string;
   isAuthenticated?: boolean;
   userGreeting?: {
     title: string;
   };
 }
 
-export function Hero({ districtName, isAuthenticated, userGreeting }: HeroProps) {
+export function Hero({ districtName, tagline, isAuthenticated, userGreeting }: HeroProps) {
   return (
     <section className="relative isolate z-10 px-4 pt-16 md:pt-20 pb-8 text-center min-h-[50vh] flex flex-col justify-center overflow-hidden">
 
@@ -30,10 +31,16 @@ export function Hero({ districtName, isAuthenticated, userGreeting }: HeroProps)
           <span className="text-orange-500">{districtName}</span>
         </h1>
 
-        {/* Subheading */}
-        <p className="text-sm md:text-base text-gray-400">
-          Search shops, services & products in Shahdol — instantly with AI
-        </p>
+        {/* Subheading / Tagline */}
+        {tagline ? (
+          <p className="text-sm md:text-base text-orange-400 font-medium mb-10">
+            {tagline}
+          </p>
+        ) : (
+          <p className="text-sm md:text-base text-gray-400 mb-10">
+            Search shops, services & products in Shahdol — instantly with AI
+          </p>
+        )}
 
         {/* Trust line */}
         <p className="text-xs text-gray-500">
@@ -43,3 +50,5 @@ export function Hero({ districtName, isAuthenticated, userGreeting }: HeroProps)
     </section>
   );
 }
+
+export default Hero;

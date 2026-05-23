@@ -1,25 +1,39 @@
 import 'express';
 
 /**
- * Extended Express Request interface for Shahdol Bazaar
- * Adds custom properties used throughout the application
+ * Sovereign Express Request Interface - BharatOS Standard
+ * All custom properties centralized for type safety
  */
 declare global {
   namespace Express {
     interface Request {
-      // Tenant/District context
+      // Legacy transitional fields (keep temporarily)
       districtId?: number | null;
       districtSlug?: string | null;
-      
-      // User context
       userId?: number;
-      user?: import('../auth/jwt.js').JWTPayload;
-      
-      // Vendor context (for merchant routes)
+      user?: import('../auth/jwt').JWTPayload;
       vendorId?: number;
-      
-      // Raw body for webhook verification
+
       rawBody?: Buffer;
+      ip?: string;
+      userAgent?: string;
+      sessionId?: string;
+      requestId?: string;
+      startTime?: number;
+
+      isAdminRoute?: boolean;
+      isPublicRoute?: boolean;
+      requiresAuth?: boolean;
+
+      // 🛡️ CANONICAL SOVEREIGN AUTHORITY
+      ctx?: {
+        districtId: number | null;
+        districtSlug?: string | null;
+        userId?: number;
+        role?: string;
+        isAdmin?: boolean;
+        requestId?: string;
+      };
     }
   }
 }

@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "rec
 import { Shield, Map, Zap, DollarSign, Lock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { apiRequest } from "@/lib/api-client";
 
 // Mock data for revenue chart
 const revenueData = [
@@ -23,8 +24,9 @@ export default function SovereignDashboard() {
   const { data: districtData, isLoading } = useQuery({
     queryKey: ["districts", selectedDistrict],
     queryFn: async () => {
-      const response = await fetch(`/api/admin/districts`);
-      return response.json();
+      const result = await apiRequest("GET", "admin/districts");
+      if (!result.success) throw new Error(result.error || "Failed to fetch districts");
+      return result.data;
     },
     refetchInterval: 30000, // Refresh every 30 seconds
   });
@@ -32,12 +34,11 @@ export default function SovereignDashboard() {
   // 🔒 LOCK DISTRICT MUTATION
   const lockMutation = useMutation({
     mutationFn: async (districtId: number) => {
-      const response = await fetch(`/api/admin/districts/${districtId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: false }),
+      const result = await apiRequest("PATCH", `admin/districts/${districtId}`, {
+        body: { isActive: false },
       });
-      return response.json();
+      if (!result.success) throw new Error(result.error || "Failed to lock district");
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["districts"] });

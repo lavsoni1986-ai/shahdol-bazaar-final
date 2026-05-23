@@ -2,6 +2,8 @@
 // Handles all AI-powered features for district-specific commerce
 
 import { apiRequest } from "./api-client";
+import { CanonicalEntity, normalizeCanonicalEntity } from "@/shared/api/response-normalizers";
+import { getCurrentDistrictSlug } from "@/shared/routing/sovereign-routes";
 
 export interface AISearchResult {
   id: number;
@@ -152,7 +154,7 @@ export async function trackAISignal(
 }
 
 // 🧠 Smart Search with AI Enhancement
-export async function smartSearch(query: string): Promise<AISearchResult[]> {
+export async function smartSearch(query: string): Promise<CanonicalEntity[]> {
   try {
     // Try vector search first (10x more accurate)
     try {
@@ -161,11 +163,12 @@ export async function smartSearch(query: string): Promise<AISearchResult[]> {
         // Track vector search signal
         await trackAISignal('search', undefined, query, 'vector_search');
 
-        return vectorResponse.results.map(result => ({
-          ...result,
-          // Transform vector search results to match AI search format
-          relevanceScore: (result.similarity || 0) * 100 // Convert similarity to relevance score
-        }));
+        return vectorResponse.results.map(result =>
+          normalizeAIEntity({
+            ...result,
+            relevanceScore: (result.similarity || 0) * 100
+          })
+        );
       }
     } catch (vectorError) {
       console.warn('Vector search failed, falling back to regular AI search:', vectorError);
@@ -178,7 +181,7 @@ export async function smartSearch(query: string): Promise<AISearchResult[]> {
       // Track search signal
       await trackAISignal('search', undefined, query);
 
-      return response.results;
+      return response.results.map(result => normalizeAIEntity(result));
     }
 
     return [];
@@ -201,12 +204,12 @@ export async function vectorSearch(query: string, limit: number = 20): Promise<{
 }
 
 // 🎯 Personalized Recommendations
-export async function getPersonalizedRecommendations(): Promise<AIRecommendation[]> {
+export async function getPersonalizedRecommendations(): Promise<CanonicalEntity[]> {
   try {
     const response = await getAIRecommendations(12);
 
     if (response && response.recommendations.length > 0) {
-      return response.recommendations;
+      return response.recommendations.map(rec => normalizeAIEntity(rec));
     }
 
     return [];
@@ -217,12 +220,12 @@ export async function getPersonalizedRecommendations(): Promise<AIRecommendation
 }
 
 // 📈 Trending Products
-export async function getTrendingProducts(): Promise<TrendingItem[]> {
+export async function getTrendingProducts(): Promise<CanonicalEntity[]> {
   try {
     const response = await getAITrending('7d', 15);
 
     if (response && response.trending.length > 0) {
-      return response.trending;
+      return response.trending.map(item => normalizeAIEntity(item));
     }
 
     return [];
@@ -246,4 +249,19 @@ export async function getDSSLBadge(vendorId: number): Promise<DSSLBadge | null> 
     console.error('DSSL Badge fetch failed:', error);
     return null;
   }
+}
+
+// 🧠 AI Entity Normalization
+// Converts AI search/recommendation/trending results to CanonicalEntity
+export function normalizeAIEntity(
+  entity: AISearchResult | AIRecommendation | TrendingItem,
+  districtSlug?: string
+): CanonicalEntity {
+  // Flatten nested vendor rating for canonical normalization
+  const input = {
+    ...entity,
+    rating: entity.vendor?.rating ?? entity.rating,
+  };
+
+  return normalizeCanonicalEntity(input, districtSlug || getCurrentDistrictSlug());
 }

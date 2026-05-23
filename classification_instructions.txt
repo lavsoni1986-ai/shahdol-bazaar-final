@@ -1,0 +1,9 @@
+A: Missing schema field
+B: Wrong field name
+C: Dead experimental logic
+D: Boundary violation
+E: Query mismatch
+F: Contract drift
+G: Runtime impurity
+
+I will now classify each error line from type-errors.txt into exactly one of the above buckets. The resulting mapping will be written to classification_full.txt.

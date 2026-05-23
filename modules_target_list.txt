@@ -1,0 +1,13 @@
+@/shared/api/response-normalizers
+@/shared/routing/sovereign-routes
+@/shared/query-governance
+@shared/contracts/ontology/index
+@/shared/district-intelligence/types
+@/shared/routing/reserved-routes
+@/shared/schema
+@/shared/intent-taxonomy
+@/shared/cognition/search-taxonomy
+@/shared/cognition/entity-search-indexing
+@/shared/domain/canonical-entities
+@/shared/roles
+@/shared/contracts

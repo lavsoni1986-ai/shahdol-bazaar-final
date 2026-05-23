@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
+import { apiRequest, persistPortalContext, getPortalContext } from "@/lib/api-client";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,14 +26,25 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Store, Loader2, ShoppingBag } from "lucide-react";
 
-const authSchema = z.object({
+const loginSchema = z.object({
+  username: z.string().trim().min(1, "Username required"),
+  password: z.string().min(1, "Password required"),
+  districtId: z.string().optional(),
+});
+
+const registerSchema = z.object({
   username: z.string()
     .trim()
     .min(3, "Username must be at least 3 characters")
-    .regex(/^[^\s]+$/, "Username cannot contain spaces"),
+    .max(50, "Username too long")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Username: letters, numbers, -_ only"),
   password: z.string()
-    .min(4, "Password must be at least 4 characters"),
-  districtId: z.string().min(1, "District is required"),
+    .min(12, "Minimum 12 characters required")
+    .regex(/[A-Z]/, "One uppercase letter required")
+    .regex(/[a-z]/, "One lowercase letter required")
+    .regex(/[0-9]/, "One number required")
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, "One special character required"),
+  districtId: z.string().optional(),
 });
 
 const getAuthMode = (): string => {
@@ -78,36 +90,52 @@ export default function AuthPage() {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [districts, setDistricts] = useState<any[]>([]);
   const [fetching, setFetching] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
   
-  const authMode = getAuthMode();
+  const [authMode] = useState<string>(() => {
+    const urlMode = getAuthMode();
+    if (urlMode === "partner") {
+      persistPortalContext("partner");
+      return "partner";
+    }
+    return getPortalContext();
+  });
 
-  const form = useForm<z.infer<typeof authSchema>>({
-    resolver: zodResolver(authSchema),
+
+
+  const loginForm = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { username: "", password: "" },
+    mode: "onSubmit",
+  });
+
+  const registerForm = useForm<z.infer<typeof registerSchema>>({
+    resolver: zodResolver(registerSchema),
     defaultValues: { username: "", password: "", districtId: "" },
     mode: "onSubmit",
   });
 
   useEffect(() => {
-    const fetchDistricts = async () => {
-      try {
-        setFetching(true);
-        console.log("🛰️ Fetching districts from /api/districts...");
-        const res = await fetch('/api/districts');
-        const result = await res.json();
-        
-        // 🛡️ CRITICAL FIX: Check for result.data because backend sends { success: true, data: [...] }
-        if (result.success && Array.isArray(result.data)) {
-          setDistricts(result.data);
-          console.log("✅ Districts Synced:", result.data);
-        } else {
-          console.error("⚠️ Backend sent unexpected format:", result);
-        }
-      } catch (err) {
-        console.error("❌ Network Error while fetching districts:", err);
-      } finally {
-        setFetching(false);
+  const fetchDistricts = async () => {
+    try {
+      setFetching(true);
+      console.log("🛰️ Fetching districts from /districts...");
+      const result = await apiRequest("GET", "/districts");
+      const list = Array.isArray(result?.data) ? result.data : [];
+
+      if (list.length > 0) {
+        setDistricts(list);
+        console.log("✅ Districts Synced:", list);
+        return;
       }
-    };
+
+      console.error("⚠️ Backend sent unexpected format:", result);
+    } catch (err) {
+      console.error("❌ Network Error while fetching districts:", err);
+    } finally {
+      setFetching(false);
+    }
+  };
     fetchDistricts();
   }, []);
 
@@ -131,90 +159,80 @@ export default function AuthPage() {
     }
   }, [location, isAuthenticated, user, authLoading, setLocation]);
 
-  const onSubmit = async (data: z.infer<typeof authSchema>) => {
+  const onSubmit = async (data: any) => {
     console.log("🔵 [AUTH] [SUBMIT] Form submitted for:", activeTab);
+    
+    // ✅ Client-Side Brute Force Protection
+    if (loginAttempts >= 5) {
+      setIsRateLimited(true);
+      toast({
+        title: "Rate Limited",
+        description: "Too many failed attempts. Please wait 5 minutes before trying again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setLoading(true);
     isSubmittingRef.current = true; // Guard: prevent useEffect from redirecting during submission
     
     try {
-      const url = `/api/auth/${activeTab === "login" ? "login" : "register"}`;
-      const userRole = authMode === "partner" ? "seller" : "customer";
-      
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ 
-          username: data.username.trim(), 
-          password: data.password,
-          role: userRole,
-          districtId: data.districtId
-        }),
+      const endpoint = `${activeTab === "login" ? "auth/login" : "auth/register"}`;
+      const isMerchantPortal =
+        authMode === "partner" ||
+        window.location.pathname.includes("partner") ||
+        document.referrer.includes("partner");
+
+      const userRole = isMerchantPortal ? "merchant" : "customer";
+
+      console.log("🛡️ [AUTH ROLE RESOLVE]", {
+        authMode,
+        pathname: window.location.pathname,
+        referrer: document.referrer,
+        resolvedRole: userRole
       });
 
-      if (response.status === 429) {
-        const retryAfter = parseInt(response.headers.get("retry-after") || '900', 10);
-        setRateLimitRemaining(retryAfter);
-        setIsRateLimited(true);
-        toast({
-          variant: "destructive",
-          title: "बहुत ज्यादा कोशिशें!",
-          description: `कृपया ${Math.ceil(retryAfter / 60)} मिनट बाद कोशिश करें।`,
-        });
-        setLoading(false);
-        return;
-      }
-      
-      const contentType = response.headers.get("content-type");
-      let result;
-      
-      if (contentType && contentType.includes("application/json")) {
-        result = await response.json();
-      } else {
-        throw new Error(`Server error: ${response.status}`);
-      }
+      console.log("🚀 [REGISTER REQUEST PAYLOAD]", {
+        username: data.username.trim(),
+        role: userRole,
+        districtId: data.districtId,
+        authMode
+      });
 
-      if (!response.ok) {
-        throw new Error(result.message || `Request failed: ${response.status}`);
-      }
-      
-      // Token is in httpOnly cookie - browser handles it automatically via credentials: 'include'
-      // NO localStorage token storage - pure cookie-based authentication
-      const userData = result.user || result;
-      
+      const result = await apiRequest("POST", endpoint, {
+        username: data.username.trim(),
+        password: data.password,
+        role: userRole,
+        ...(data.districtId && { districtId: data.districtId })
+      });
+
+console.log("🔍 [AUTH] Login Result:", result);
+      const userData = result?.data?.user || result?.user || result?.data;
+
       if (!userData) {
         throw new Error('Login failed: No user data received');
       }
-      
-      const isAdminUser = userData.role?.toLowerCase() === "admin" || userData.role === "SUPER_ADMIN" || userData.role === "superadmin" || userData.isAdmin === true;
-      const isVendorUser = userData.role?.toLowerCase() === "seller" || userData.role === "MERCHANT" || userData.isVendor === true;
-      
-      const userToStore = {
-        id: userData.id, username: userData.username,
-        role: userData.role, 
-        isAdmin: isAdminUser,
-        isVendor: isVendorUser
-      };
 
-      // Store user data in localStorage (token is in httpOnly cookie)
-      localStorage.setItem("user", JSON.stringify(userToStore));
-      
-      const districtIdFromUser = Number((userToStore as any)?.districtId);
-      if (Number.isInteger(districtIdFromUser) && districtIdFromUser > 0) {
-        localStorage.setItem("districtId", String(districtIdFromUser));
-      } else if (!localStorage.getItem("districtId")) {
-        localStorage.setItem("districtId", "3");
-      }
-      
-      // ✅ Use utility function for role-based redirect - pass userToStore with computed isAdmin property
-      const target = getClientRoleRedirectPath(userToStore);
+      // ✅ Reset login attempts on successful login
+      setLoginAttempts(0);
+
+      // ✅ Role-based redirect: trust backend user payload (no synthetic flags)
+      const target = getClientRoleRedirectPath(userData);
       console.log("🛠️ [DEBUG] Login Redirect Target:", target);
       
+      // Wait for browser to receive cookies before redirect
+      await new Promise(res => setTimeout(res, 250));
       window.location.href = target; 
       // Do NOT set loading to false here, let the browser handle the navigation
       
     } catch (error: any) {
       console.error("❌ [AUTH] Error:", error);
+      
+      // ✅ Increment login attempts on failed login
+      if (activeTab === "login") {
+        setLoginAttempts(prev => prev + 1);
+      }
+      
       toast({
         variant: "destructive",
         title: "Gadbad ho gayi",
@@ -246,7 +264,7 @@ export default function AuthPage() {
         </div>
 
         {/* FIX: Use state value for stability - prevent function call on every render */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); loginForm.reset(); registerForm.reset(); }} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="register">Register</TabsTrigger>
@@ -259,10 +277,10 @@ export default function AuthPage() {
                 <CardDescription>अपना खाता खोलें और जारी रखें</CardDescription>
               </CardHeader>
               <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <Form {...loginForm}>
+                  <form onSubmit={loginForm.handleSubmit(onSubmit)} className="space-y-4">
                     <FormField
-                      control={form.control}
+                      control={loginForm.control}
                       name="username"
                       render={({ field }) => (
                         <FormItem>
@@ -275,7 +293,7 @@ export default function AuthPage() {
                       )}
                     />
                     <FormField
-                      control={form.control}
+                      control={loginForm.control}
                       name="password"
                       render={({ field }) => (
                         <FormItem>
@@ -315,19 +333,19 @@ export default function AuthPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <Form {...registerForm}>
+                  <form onSubmit={registerForm.handleSubmit(onSubmit)} className="space-y-4">
                     <FormField
-                      control={form.control}
+                      control={registerForm.control}
                       name="districtId"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Select District</FormLabel>
                           <FormControl>
-                            <select 
+                            <select
                               {...field}
                               className="w-full bg-white/5 border border-white/10 text-white rounded-xl py-3 px-4 text-sm focus:border-orange-500/50 appearance-none cursor-pointer"
-                              onChange={(e) => form.setValue("districtId", e.target.value)}
+                              onChange={(e) => registerForm.setValue("districtId", e.target.value)}
                             >
                               <option value="" className="bg-black">-- चुनें अपना जिला --</option>
                               {districts.map((d) => (
@@ -343,7 +361,7 @@ export default function AuthPage() {
                       )}
                     />
                     <FormField
-                      control={form.control}
+                      control={registerForm.control}
                       name="username"
                       render={({ field }) => (
                         <FormItem>
@@ -356,7 +374,7 @@ export default function AuthPage() {
                       )}
                     />
                     <FormField
-                      control={form.control}
+                      control={registerForm.control}
                       name="password"
                       render={({ field }) => (
                         <FormItem>

@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2026-04-24T09:37:46.319Z",
+  "server": {
+    "port": 5002,
+    "districtId": 2,
+    "districtSlug": "shahdol"
+  },
+  "totalTests": 14,
+  "categories": {
+    "endpoint": 4,
+    "query": 10
+  }
+}

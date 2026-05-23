@@ -11,10 +11,27 @@ const calculateDSSLScore = (vendor: any) => {
 };
 
 const calculateBadgeLevel = (score: number) => {
-  if (score >= 80) return { level: 'elite', color: '#10B981' };
-  if (score >= 60) return { level: 'reliable', color: '#3B82F6' };
-  if (score >= 40) return { level: 'average', color: '#F59E0B' };
-  return { level: 'new', color: '#6B7280' };
+  // Canonical DSSL badge contract — must match client/src/lib/ai-brain.ts DSSLBadge interface
+  if (score >= 80) return {
+    level: 'elite', label: 'Elite Merchant', color: '#10B981',
+    bgColor: 'bg-emerald-500', textColor: 'text-white', icon: '👑',
+    description: 'Top-tier trusted merchant in the district'
+  };
+  if (score >= 60) return {
+    level: 'reliable', label: 'Reliable Partner', color: '#3B82F6',
+    bgColor: 'bg-blue-500', textColor: 'text-white', icon: '✓',
+    description: 'Consistently reliable service and quality'
+  };
+  if (score >= 40) return {
+    level: 'average', label: 'Rising Merchant', color: '#F59E0B',
+    bgColor: 'bg-amber-500', textColor: 'text-white', icon: '↑',
+    description: 'Building trust through consistent service'
+  };
+  return {
+    level: 'new', label: 'New Partner', color: '#6B7280',
+    bgColor: 'bg-slate-500', textColor: 'text-white', icon: '★',
+    description: 'Recently joined the district marketplace'
+  };
 };
 
 const calculateAccountAge = (createdAt: Date) => {

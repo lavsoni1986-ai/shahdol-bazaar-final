@@ -3,13 +3,10 @@ import { requireAuth, requireMerchant } from "../../auth/middleware";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
-import { ErrorCode, sendCreated, sendError, sendSuccess } from "../../middleware/errorHandler";
-import { FEATURES } from "../../config/featureFlags";
+import { success, failure } from "../../lib/apiResponse";
+import { mapProductToDTO, type ProductEntity } from "../../dto/entity.dto";
 import {
-  findActiveProductsByDistrict,
   findProductBySlug,
-  countProductsByVendor,
-  findProductById,
   findMerchantProductsByVendor,
   findMerchantProductById,
   createMerchantProduct,
@@ -21,7 +18,9 @@ import {
 } from "../../repositories/product.repo";
 import { resolveMerchantVendorOrThrow } from "../../repositories/vendor.repo";
 import { prisma } from "../../storage";
-import { getDiscoveryByType } from "../../services/discovery.service";
+import { resolveProductById, normalizeSlug } from "../../services/entity-resolution";
+import { EntityResolutionFailure } from "../../services/entity-resolution/types";
+import { validateProductCreation, GovernanceViolation, DistrictMismatchError } from "../../services/governance";
 
 const router = express.Router();
 
@@ -61,43 +60,99 @@ router.get("/products", async (req: Request, res: Response) => {
     setNoStore(res);
 
     const districtId = req.ctx?.districtId;
+    const vendorId = req.query.vendorId ? Number(req.query.vendorId) : null;
 
     if (!districtId) {
-      return res.status(400).json({ message: "District not resolved" });
+      return res.status(400).json({ success: false, error: { code: "BAD_REQUEST", message: "District not resolved" } });
     }
 
-    const products = await getDiscoveryByType(districtId, "PRODUCT");
+    let products: ProductEntity[] = [];
+    let metaSource;
 
-    const productList = products.map((product: any) => ({
-      id: product.sourceId,
-      name: product.title || "Untitled",
-      title: product.title,
-      slug: product.slug,
-      price: product.meta?.price?.toString() || "0",
-      mrp: product.meta?.mrp?.toString() || null,
-      imageUrl: product.image || null,
-      category: product.subtitle || null,
-      shopName: product.meta?.vendorName || null,
-      stock: product.meta?.stock || 0,
-      isTrending: (product.rankScore || 0) > 85,
-      vendorScore: product.dsslScore || 0,
-      sovereignRanked: true
-    }));
+    if (vendorId) {
+      // Fetch products by vendor from Prisma
+      // Uses sovereign Product.districtId for direct district isolation
+      const vendorProducts = await prisma.product.findMany({
+        where: {
+          vendorId,
+          districtId,
+          approved: true,
+          status: { in: ["approved", "APPROVED", "active", "ACTIVE"] },
+          vendor: {
+            status: "APPROVED",
+            isShadowBanned: false
+          }
+        },
+        include: {
+          vendor: true,
+          images: true
+        }
+      });
 
-    return res.json({
-      data: productList,
-      count: productList.length,
-      meta: {
-        source: "PSR_DISCOVERY_ENGINE"
-      }
-    });
+      products = await Promise.all(vendorProducts.map((product) => mapProductToDTO(product, (product as any).vendor)));
+      metaSource = "VENDOR_PRODUCTS";
+    } else {
+      // Fetch all approved products for discovery from Prisma
+      // Uses sovereign Product.districtId for direct district isolation
+      const discoveryProducts = await prisma.product.findMany({
+        where: {
+          districtId,
+          approved: true,
+          status: { in: ["approved", "APPROVED", "active", "ACTIVE"] },
+          vendor: {
+            status: "APPROVED",
+            isShadowBanned: false
+          }
+        },
+        include: {
+          vendor: true,
+          images: true
+        }
+      });
+
+      products = await Promise.all(discoveryProducts.map((product) => mapProductToDTO(product, (product as any).vendor)));
+      metaSource = "PSR_DISCOVERY_ENGINE";
+    }
+
+    return success(res, products, { source: metaSource });
   } catch (e) {
     console.error("Marketplace products fetch error:", e);
-    return res.status(500).json({ message: "Failed to fetch products" });
+    return failure(res, "SERVER_ERROR", "Failed to fetch marketplace products", 500);
   }
 });
 
-// --- FETCH SINGLE PRODUCT (Public - Only Approved) ---
+// --- FETCH SINGLE PRODUCT BY SLUG (Public - Only Approved) ---
+router.get("/products/slug/:slug", async (req: Request, res: Response) => {
+  try {
+    const setNoStore = (res: Response) => res.setHeader("Cache-Control", "no-store, max-age=0");
+    setNoStore(res);
+
+    const slug = req.params.slug;
+    const districtId = req.ctx?.districtId;
+
+    if (!districtId) {
+      return res.status(400).json({ success: false, error: { code: "BAD_REQUEST", message: "District not resolved" } });
+    }
+
+    if (!slug || typeof slug !== 'string') {
+      return res.status(400).json({ success: false, error: { code: "BAD_REQUEST", message: "Invalid product slug" } });
+    }
+
+    const product = await findProductBySlug(slug, districtId);
+
+    if (!product) {
+      return failure(res, "NOT_FOUND", "Product not found", 404);
+    }
+
+    const dto = await mapProductToDTO(product, (product as any).vendor);
+    return success(res, dto, { source: "PSR_PRODUCT_DETAIL_ENGINE" });
+  } catch (e) {
+    console.error("Fetch product by slug failed", e);
+    return failure(res, "SERVER_ERROR", "Failed to fetch product", 500);
+  }
+});
+
+// --- FETCH SINGLE PRODUCT BY ID (SOVEREIGN CANONICAL RESOLVER) ---
 router.get("/products/:id", async (req: Request, res: Response) => {
   try {
     const setNoStore = (res: Response) => res.setHeader("Cache-Control", "no-store, max-age=0");
@@ -105,44 +160,38 @@ router.get("/products/:id", async (req: Request, res: Response) => {
 
     const id = Number(req.params.id);
     const districtId = req.ctx?.districtId;
+    const requestId = `product_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     if (!districtId) {
-      return res.status(400).json({ message: "District not resolved" });
+      return res.status(400).json({ success: false, error: { code: "BAD_REQUEST", message: "District not resolved" } });
     }
 
     if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: "Invalid product id" });
+      return res.status(400).json({ success: false, error: { code: "BAD_REQUEST", message: "Invalid product id" } });
     }
 
-    const product = await prisma.product.findFirst({
-      where: {
-        id,
-        districtId,
-        approved: true,
-        status: "approved",
-        vendor: {
-          status: "APPROVED" as any,
-          isShadowBanned: false
+    const result = await resolveProductById(id, districtId, requestId);
+
+    if (!result.success) {
+      const fail = result.failure!;
+      return res.status(404).json({
+        success: false,
+        error: "Product not found",
+        _diagnostics: {
+          reason: fail.reason,
+          message: fail.message,
+          productId: id,
+          districtId,
+          requestId,
         }
-      },
-      include: {
-        vendor: true
-      }
-    });
-
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+      });
     }
 
-    return res.json({
-      ...product,
-      meta: {
-        source: "PSR_PRODUCT_DETAIL_ENGINE"
-      }
-    });
+    const dto = await mapProductToDTO(result.data, result.data.vendor);
+    return success(res, dto, { source: "PSR_CANONICAL_RESOLVER" });
   } catch (e) {
     console.error("Fetch product failed", e);
-    return res.status(500).json({ message: "Failed to fetch product" });
+    return failure(res, "SERVER_ERROR", "Failed to fetch product", 500);
   }
 });
 
@@ -154,7 +203,7 @@ router.get("/products/:id", async (req: Request, res: Response) => {
 router.get("/merchant/products", requireAuth, requireMerchant, async (req: Request, res: Response) => {
   try {
     const merchantId = req.ctx?.userId!;
-    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId);
+    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
 
     const merchantProducts = await findMerchantProductsByVendor(vendor.id);
 
@@ -164,68 +213,103 @@ router.get("/merchant/products", requireAuth, requireMerchant, async (req: Reque
       imageUrl: product.imageUrl || (product.images?.[0]?.url || null),
     }));
 
-    return res.json({ data: productsWithImages });
+    return success(res, productsWithImages);
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json({
-        message: "Vendor profile not linked to this merchant account."
-      });
+      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
     }
 
     console.error("Failed to fetch merchant products", e?.message);
-    return res.status(500).json({ message: "Failed to fetch products" });
+    return failure(res, "SERVER_ERROR", "Failed to fetch products", 500);
   }
 });
 
 // --- MERCHANT: CREATE Product ---
 router.post("/merchant/products", requireAuth, requireMerchant, async (req: Request, res: Response) => {
   try {
+    console.log("🛡️ [MERCHANT PRODUCT RAW BODY]", req.body);
+
     const merchantId = req.ctx?.userId!;
-    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId);
+    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
 
     const {
       title,
+      name,
       description,
       categoryId,
+      category,
       price,
       mrp,
       stock,
       isTrending = false,
-      virtualTryOn = false
+      virtualTryOn = false,
+      imageUrl
     } = req.body;
 
-    if (!title || !categoryId || !price) {
-      return res.status(400).json({ message: "Missing required fields" });
+    // M-15A: Normalize frontend-friendly payload aliases
+    const normalizedTitle = String(title || name || "").trim();
+    const normalizedPrice = Number(price || 0);
+
+    // M-15B: Auto category resolver - string → categoryId
+    let normalizedCategoryId = categoryId;
+    if (!normalizedCategoryId && category) {
+      const cleanCategory = String(category || "").trim();
+
+      let matchedCategory = await prisma.category.findFirst({
+        where: {
+          name: { equals: cleanCategory, mode: "insensitive" }
+        }
+      });
+
+      // 🛡️ M-22B Dynamic merchant category seed
+      if (!matchedCategory && cleanCategory) {
+        matchedCategory = await prisma.category.create({
+          data: {
+            name: cleanCategory,
+            slug: cleanCategory.toLowerCase().replace(/\s+/g, "-"),
+            isActive: true
+          }
+        });
+
+        console.log("✅ [DYNAMIC CATEGORY CREATED]", matchedCategory.name, matchedCategory.id);
+      }
+
+      normalizedCategoryId = matchedCategory?.id;
     }
 
-    const districtId = req.ctx?.districtId;
-    if (!districtId) {
-      return res.status(400).json({ message: "District not resolved" });
+    if (!normalizedTitle || !normalizedCategoryId) {
+      return failure(res, "BAD_REQUEST", "Missing required fields", 400, {
+        details: !normalizedTitle ? "title/name is required" : !normalizedCategoryId ? "categoryId or category is required" : null
+      });
     }
 
     const product = await createMerchantProduct({
       vendorId: vendor.id,
-      districtId,
-      title,
+      title: normalizedTitle,
       description,
-      categoryId,
-      price,
+      categoryId: normalizedCategoryId,
+      price: normalizedPrice,
       mrp,
-      stock: stock || 0,
+      stock: stock !== undefined ? stock : 100,
       isTrending,
-      virtualTryOn
+      virtualTryOn,
+      districtId: vendor.districtId
     });
 
-    return res.status(201).json({ data: product });
+    // M-15C: Auto image attach after product create - single modal workflow
+    if (imageUrl) {
+      await createMerchantProductImage(product.id, imageUrl);
+    }
+
+    res.status(201);
+    return success(res, product);
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json({
-        message: "Vendor profile not linked to this merchant account."
-      });
+      return failure(res, "BAD_REQUEST", "Vendor profile not linked to this merchant account.", 400);
     }
 
     console.error("Create product failed", e?.message);
-    return res.status(500).json({ message: "Failed to create product" });
+    return res.status(500).json(failure("SERVER_ERROR", "Failed to create product"));
   }
 });
 
@@ -234,15 +318,15 @@ router.post("/merchant/products/:id/images", requireAuth, requireMerchant, uploa
   try {
     const productId = Number(req.params.id);
     const merchantId = req.ctx?.userId!;
-    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId);
+    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
 
     if (!Number.isInteger(productId)) {
-      return res.status(400).json({ message: "Invalid product id" });
+      return res.status(400).json(failure("BAD_REQUEST", "Invalid product id"));
     }
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
     }
 
     const files = req.files as Express.Multer.File[];
@@ -250,16 +334,15 @@ router.post("/merchant/products/:id/images", requireAuth, requireMerchant, uploa
       files.map((file) => createMerchantProductImage(productId, file.path))
     );
 
-    return res.status(201).json({ data: uploadedImages });
+    res.status(201);
+    return success(res, uploadedImages);
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json({
-        message: "Vendor profile not linked to this merchant account."
-      });
+      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
     }
 
     console.error("Image upload failed", e?.message);
-    return res.status(500).json({ message: "Failed to upload images" });
+    return res.status(500).json(failure("SERVER_ERROR", "Failed to upload images"));
   }
 });
 
@@ -269,24 +352,22 @@ router.delete("/merchant/products/:productId/images/:imageId", requireAuth, requ
     const productId = Number(req.params.productId);
     const imageId = Number(req.params.imageId);
     const merchantId = req.ctx?.userId!;
-    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId);
+    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
     }
 
     await deleteMerchantProductImage(imageId, productId);
-    return res.json({ message: "Image deleted" });
+    return success(res, { message: "Image deleted" });
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json({
-        message: "Vendor profile not linked to this merchant account."
-      });
+      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
     }
 
     console.error("Image deletion failed", e?.message);
-    return res.status(500).json({ message: "Failed to delete image" });
+    return res.status(500).json(failure("SERVER_ERROR", "Failed to delete image"));
   }
 });
 
@@ -295,25 +376,23 @@ router.put("/merchant/products/:id", requireAuth, requireMerchant, async (req: R
   try {
     const productId = Number(req.params.id);
     const merchantId = req.ctx?.userId!;
-    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId);
+    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
     const updates = req.body;
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
     }
 
     const updated = await updateMerchantProduct(productId, vendor.id, updates);
-    return res.json({ data: updated });
+    return success(res, updated);
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json({
-        message: "Vendor profile not linked to this merchant account."
-      });
+      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
     }
 
     console.error("Product update failed", e?.message);
-    return res.status(500).json({ message: "Failed to update product" });
+    return res.status(500).json(failure("SERVER_ERROR", "Failed to update product"));
   }
 });
 
@@ -322,24 +401,22 @@ router.delete("/merchant/products/:id", requireAuth, requireMerchant, async (req
   try {
     const productId = Number(req.params.id);
     const merchantId = req.ctx?.userId!;
-    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId);
+    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
     }
 
     await deleteMerchantProduct(productId, vendor.id);
-    return res.json({ message: "Product deleted" });
+    return success(res, { message: "Product deleted" });
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json({
-        message: "Vendor profile not linked to this merchant account."
-      });
+      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
     }
 
     console.error("Product deletion failed", e?.message);
-    return res.status(500).json({ message: "Failed to delete product" });
+    return res.status(500).json(failure("SERVER_ERROR", "Failed to delete product"));
   }
 });
 
@@ -348,24 +425,22 @@ router.get("/merchant/products/:id/images", requireAuth, requireMerchant, async 
   try {
     const productId = Number(req.params.id);
     const merchantId = req.ctx?.userId!;
-    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId);
+    const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
     }
 
     const images = await getMerchantProductImages(productId);
-    return res.json({ data: images });
+    return success(res, images);
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json({
-        message: "Vendor profile not linked to this merchant account."
-      });
+      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
     }
 
     console.error("Fetch images failed", e?.message);
-    return res.status(500).json({ message: "Failed to fetch images" });
+    return res.status(500).json(failure("SERVER_ERROR", "Failed to fetch images"));
   }
 });
 

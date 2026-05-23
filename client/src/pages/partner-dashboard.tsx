@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { apiRequest } from "@/lib/api-client";
 import { 
   Store, Package, ShoppingBag, Settings, 
   Plus, TrendingUp, Clock, Menu, X, LogOut, Trash2, XCircle
@@ -29,17 +30,19 @@ export default function PartnerDashboard() {
   const loadVendorData = async () => {
     try {
       setLoading(true);
-      const [prodRes, ordRes] = await Promise.all([
-        fetch('/api/vendor/products'),
-        fetch('/api/vendor/orders')
-      ]);
-      
-      const pData = await prodRes.json();
-      const oData = await ordRes.json();
+      const prodRes = await apiRequest("GET", "/merchant/products");
 
-      if (Array.isArray(pData)) setProducts(pData);
-      if (Array.isArray(oData)) setOrders(oData);
+      const products = Array.isArray(prodRes?.data)
+        ? prodRes.data
+        : Array.isArray(prodRes)
+        ? prodRes
+        : [];
+
+      console.log("🟢 [PARTNER] Merchant products loaded:", products);
+      setProducts(products);
+      setOrders([]);
     } catch (err) {
+      console.error("🔴 [PARTNER] API error:", err);
       toast.error("Failed to sync with Command Center");
     } finally {
       setLoading(false);
@@ -49,12 +52,13 @@ export default function PartnerDashboard() {
   useEffect(() => {
     if (authLoading) return;
     
-    if (!isAuthenticated) {
-      setLocation("/auth?role=merchant");
-    } else if (user?.role === "CUSTOMER" || user?.role === "customer") {
+if (!isAuthenticated) {
+       setLocation("/auth?role=partner");
+    } else if (user?.role && ["CUSTOMER", "customer"].includes(user.role)) {
       toast.error("Access Denied: You are not a registered merchant.");
       setLocation("/");
     } else {
+      // Graceful behavior when vendor entity is incomplete will be handled by dashboard APIs
       setStoreSettings({
         shopName: (user as any)?.shopName || "",
         address: (user as any)?.shopAddress || "",
@@ -73,24 +77,23 @@ export default function PartnerDashboard() {
     }
 
     try {
-      const res = await fetch('/api/vendor/products', {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...newProduct,
-          price: parseFloat(newProduct.price),
-          status: "PENDING"
-        })
-      });
-      const data = await res.json();
+      const payload = {
+        ...newProduct,
+        price: parseFloat(newProduct.price),
+        status: "PENDING"
+      };
+
+      console.log("🚀 [PRODUCT CREATE PAYLOAD]", payload);
+
+      const res = await apiRequest("POST", "/merchant/products", payload);
       
-      if (!res.ok) throw new Error(data.message);
-      
+      console.log("🟢 [PARTNER] Product create result:", res);
       toast.success("प्रोडक्ट रिव्यु के लिए भेज दिया गया है! 🚀");
       setShowAddModal(false);
       setNewProduct({ name: "", price: "", category: "", description: "", imageUrl: "" });
       loadVendorData();
     } catch (err: any) {
+      console.error("🔴 [PARTNER] API error:", err);
       toast.error(err.message || "सबमिशन फेल हो गया!");
     }
   };
@@ -104,9 +107,8 @@ export default function PartnerDashboard() {
 
     setUploading(true);
     try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (result.urls && result.urls[0]) {
+      const result = await apiRequest("POST", "/upload", formData);
+      if (result?.urls && result.urls[0]) {
         setNewProduct({ ...newProduct, imageUrl: result.urls[0] });
         toast.success("फोटो अपलोड हो गई! 📸");
       }
@@ -120,28 +122,30 @@ export default function PartnerDashboard() {
   const handleDeleteProduct = async (id: number) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      const res = await fetch(`/api/vendor/products/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
+      await apiRequest("DELETE", `/merchant/products/${id}`);
+      console.log("🟢 [PARTNER] Product deleted:", id);
       toast.success("Product Deleted 🗑️");
       loadVendorData();
     } catch (err) {
+      console.error("🔴 [PARTNER] API error:", err);
       toast.error("Failed to delete product");
     }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Temporarily disabled — backend /vendor/update endpoint not yet mounted
+    // Will be re-enabled when merchant store settings API is live
+    toast.info("Store settings syncing soon — module coming online");
+    return;
     try {
-      const res = await fetch('/api/vendor/update', {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(storeSettings)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      
+      const payload = storeSettings;
+      console.log("🚀 [SETTINGS UPDATE PAYLOAD]", payload);
+
+      await apiRequest("PATCH", 'vendor/update', payload);
       toast.success("Store Settings Saved! ✅");
     } catch (err: any) {
+      console.error("🔴 [PARTNER] API error:", err);
       toast.error(err.message || "Failed to update settings");
     }
   };
@@ -151,7 +155,7 @@ export default function PartnerDashboard() {
       onClick={() => { setActiveTab(key); setSidebarOpen(false); }}
       className={`w-full flex items-center gap-3 px-4 py-3 md:py-3.5 rounded-xl font-bold transition-all border ${
         activeTab === key 
-          ? "text-orange-400 border-orange-500/50 bg-orange-500/5 [box-shadow:inset_0_0_15px_rgba(249,115,22,0.1)] drop-shadow-[0_0_10px_rgba(249,115,22,0.5)]" 
+          ? "text-emerald-400 border-emerald-500/50 bg-emerald-500/5 [box-shadow:inset_0_0_15px_rgba(16,185,129,0.1)] drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]" 
           : "border-transparent text-gray-500 hover:text-white hover:bg-white/5"
       }`}
     >
@@ -161,25 +165,28 @@ export default function PartnerDashboard() {
   );
 
   if (authLoading || loading) return (
-    <div className="min-h-screen bg-[#030003] flex items-center justify-center">
-      <div className="w-10 h-10 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+    <div className="min-h-screen sovereign-bg flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+        <p className="text-xs font-black uppercase text-emerald-500 tracking-[0.2em] animate-pulse">Loading Partner OS</p>
+      </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#030003] text-slate-200 flex flex-col md:flex-row font-['Plus_Jakarta_Sans']">
+    <div className="min-h-screen sovereign-bg text-slate-200 flex flex-col md:flex-row font-['Plus_Jakarta_Sans']">
       
       {sidebarOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      <aside className={`w-64 max-w-[80%] bg-black/80 md:bg-black/40 backdrop-blur-3xl border-r border-white/10 p-4 flex flex-col fixed md:relative h-full max-h-screen overflow-y-auto z-50 transition-transform md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`w-64 max-w-[80%] bg-black/40 backdrop-blur-3xl border-r border-white/10 p-4 flex flex-col fixed md:relative h-full max-h-screen overflow-y-auto z-50 transition-transform md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="mb-10 px-2 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg shadow-[0_0_20px_rgba(249,115,22,0.4)]">
+            <div className="p-2 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.4)]">
               <Store className="w-6 h-6 text-black" />
             </div>
             <div>
               <h2 className="font-black text-white text-lg tracking-tighter uppercase leading-none">Partner OS</h2>
-              <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest mt-1">{user?.username || "My Store"}</p>
+              <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mt-1">{user?.username || "My Store"}</p>
             </div>
           </div>
           <button className="md:hidden text-gray-500 hover:text-white" onClick={() => setSidebarOpen(false)}><X className="w-6 h-6" /></button>
@@ -213,7 +220,7 @@ export default function PartnerDashboard() {
                 { label: "Active Products", val: products.length, icon: Package, color: "text-emerald-500", bg: "bg-emerald-500/10" },
                 { label: "Total Earnings", val: "₹0", icon: TrendingUp, color: "text-orange-500", bg: "bg-orange-500/10" }
               ].map((s, i) => (
-                <div key={i} className="glass-card-3d p-5 md:p-6 border border-white/5 relative group overflow-hidden rounded-2xl">
+                <div key={i} className="glass-card-sovereign p-5 md:p-6 border border-white/5 relative group overflow-hidden rounded-2xl">
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">{s.label}</p>
@@ -226,7 +233,7 @@ export default function PartnerDashboard() {
               ))}
             </div>
 
-            <div className="glass-card-3d p-6 md:p-8 border border-white/10 rounded-2xl">
+            <div className="glass-card-sovereign p-6 md:p-8 border border-white/10 rounded-2xl">
                <h3 className="text-sm font-black text-white uppercase mb-6 tracking-widest border-b border-white/5 pb-4">Quick Actions</h3>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <button onClick={() => { setActiveTab("products"); setShowAddModal(true); }} className="flex items-center gap-4 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 transition-all group text-left">
@@ -253,7 +260,7 @@ export default function PartnerDashboard() {
             </div>
 
             {products.length === 0 ? (
-               <div className="glass-card-3d border border-white/10 p-16 text-center rounded-2xl">
+               <div className="glass-card-sovereign border border-white/10 p-16 text-center rounded-2xl">
                   <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
                     <Package className="text-gray-600 w-8 h-8" />
                   </div>
@@ -261,7 +268,7 @@ export default function PartnerDashboard() {
                   <p className="text-gray-500 text-xs md:text-sm mt-2 mb-6">You haven't added any products to your store yet.</p>
                </div>
             ) : (
-               <div className="glass-card-3d border border-white/10 overflow-x-auto shadow-2xl rounded-xl">
+               <div className="glass-card-sovereign border border-white/10 overflow-x-auto shadow-2xl rounded-xl">
                  <table className="w-full min-w-[700px] text-left border-collapse">
                   <thead>
                     <tr className="bg-white/5 text-[10px] md:text-[11px] font-black uppercase text-gray-500 tracking-widest border-b border-white/10">
@@ -301,7 +308,7 @@ export default function PartnerDashboard() {
              <header className="mb-6">
                 <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Live Orders</h2>
              </header>
-             <div className="glass-card-3d border border-white/10 p-16 text-center rounded-2xl">
+             <div className="glass-card-sovereign border border-white/10 p-16 text-center rounded-2xl">
                 <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
                   <Clock className="text-gray-600 w-8 h-8" />
                 </div>
@@ -315,7 +322,7 @@ export default function PartnerDashboard() {
              <header className="mb-6">
                 <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Store Settings</h2>
              </header>
-             <form onSubmit={handleSaveSettings} className="glass-card-3d border border-white/10 p-6 md:p-8 rounded-2xl space-y-6">
+             <form onSubmit={handleSaveSettings} className="glass-card-sovereign border border-white/10 p-6 md:p-8 rounded-2xl space-y-6">
                 <div className="space-y-4">
                   <div>
                     <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Store Name</label>

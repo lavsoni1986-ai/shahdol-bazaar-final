@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "name": "bus_timing",
+    "endpoint": "/api/search/global",
+    "params": {
+      "q": "bus to rewa",
+      "districtId": 2
+    },
+    "timestamp": "2026-04-24T09:37:41.598Z",
+    "districtId": 2,
+    "districtSlug": "shahdol"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "vary": "Origin, Accept-Encoding",
+      "access-control-allow-credentials": "true",
+      "ratelimit-policy": "100;w=3600",
+      "ratelimit-limit": "100",
+      "ratelimit-remaining": "93",
+      "ratelimit-reset": "3598",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "1; mode=block",
+      "content-type": "application/json; charset=utf-8",
+      "content-length": "180",
+      "etag": "W/\"b4-oukUimKes5SrDO5qckBNxQW/qLQ\"",
+      "date": "Fri, 24 Apr 2026 09:37:41 GMT",
+      "connection": "keep-alive",
+      "keep-alive": "timeout=5"
+    },
+    "data": "{\"success\":true,\"data\":{\"results\":[],\"intent\":{\"keywords\":[\"bus\",\"rewa\"],\"openNow\":false,\"intent\":\"service\",\"urgency\":\"medium\",\"preferences\":[],\"timeContext\":\"general\"},\"total\":0}}"
+  }
+}

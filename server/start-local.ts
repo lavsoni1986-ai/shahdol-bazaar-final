@@ -38,7 +38,7 @@ async function main() {
   // Step 2: Try to import and test DB
   console.log('📊 Step 2: Testing Database Connection...');
   try {
-    const { prisma } = await import('./storage.js');
+    const { prisma } = await import('./storage');
     
     const count = await prisma.product.count();
     console.log(`   ✅ Database connected`);

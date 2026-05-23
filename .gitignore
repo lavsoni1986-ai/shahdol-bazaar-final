@@ -1,6 +1,12 @@
 node_modules/
+.next/
 dist/
+build/
+coverage/
+.cache/
 .env
+.env.local
+.env.production.local
 *.log
 .cursor/
 terminals/
@@ -23,3 +29,18 @@ temp_restore/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo

@@ -1,15 +1,18 @@
-// Vercel Force Update 1.0.2
+// 🛡️ BHARAT-OS: SOVEREIGN PRODUCT DETAIL PAGE (UNIFIED)
+// Premium commerce experience with proper image governance, content hierarchy,
+// trust signals, and mobile bottom-sheet pattern.
+// Canonical detail renderer for all product routes.
+
 import { useRoute } from "wouter";
+import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
@@ -19,18 +22,37 @@ import {
   ArrowLeft,
   Package,
   MapPin,
-  Phone,
   ShieldCheck,
   Star,
   MessageCircle,
+  Sparkles,
+  ChevronLeft,
+  Heart,
+  Share2,
+  Phone,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { useDistrict } from "@/contexts/DistrictContext";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
+import { apiRequest } from "@/lib/api-client";
+import {
+  ProductImage,
+  ProductDetailSkeleton,
+  PricingStack,
+  TrustBadgeRow,
+  PrimaryCTAGroup,
+  SellerInfoCard,
+  DetailSection,
+  RelatedProducts,
+  StickyMobileCTA,
+} from "@/shared/product-detail-components";
+import { resolveTrustLevel } from "@/components/shared/SovereignTrustBadge";
 
 type Product = {
   id: string | number;
   name: string;
+  title?: string;
   price: string;
   category: string;
   imageUrl?: string;
@@ -39,6 +61,14 @@ type Product = {
   description?: string;
   shopId: number;
   vendorId?: number;
+  vendorName?: string;
+  vendor?: {
+    name?: string;
+    address?: string;
+    phone?: string;
+    mobile?: string;
+    mapsLink?: string;
+  };
   shopName?: string;
   shopAddress?: string;
   contactNumber?: string;
@@ -51,32 +81,53 @@ type Product = {
     contactNumber?: string;
     mapsLink?: string;
   };
+  stock?: number;
+  mrp?: string | number;
+  isVerified?: boolean;
+  dsslScore?: number;
+  partner?: {
+    name: string;
+    slug: string;
+    phone?: string;
+    address?: string;
+    mapsLink?: string;
+    isVerified?: boolean;
+    dsslScore?: number;
+  };
+  relatedProducts?: any[];
 };
 
-const fetchProduct = async (id: string): Promise<Product> => {
-  const safeId = encodeURIComponent(id);
-  const res = await fetch(`/api/products/${safeId}`);
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({ message: "Unknown error" }));
-    throw new Error(errorData.message || "Product not found");
+const fetchProduct = async (productKey: string): Promise<Product> => {
+  if (!productKey) {
+    throw new Error("Missing product identifier");
   }
-  return res.json();
+
+  const isNumericId = /^[0-9]+$/.test(productKey);
+
+  if (isNumericId) {
+    const res = await apiRequest("GET", `marketplace/products/${Number(productKey)}`);
+    return (res as any)?.data ?? res;
+  }
+
+  const safeSlug = encodeURIComponent(productKey);
+  const res = await apiRequest("GET", `marketplace/products/slug/${safeSlug}`);
+  return (res as any)?.data ?? res;
 };
 
 export default function ProductDetail() {
-  const [, params] = useRoute<{ id: string }>("/product/:id");
-  const productId = params?.id;
+  const [, slugParams] = useRoute("/product/:slug");
+  const [, idParams] = useRoute("/product/:id");
+  const [, districtSlugParams] = useRoute("/:district/product/:slug");
+  const [, marketplaceIdParams] = useRoute("/marketplace/products/:id");
+  const [, marketplaceSlugParams] = useRoute("/marketplace/products/:slug");
+  const productKey = marketplaceIdParams?.id || marketplaceSlugParams?.slug || slugParams?.slug || idParams?.id || districtSlugParams?.slug;
   const { addToCart } = useCart();
+  const { currentDistrict } = useDistrict();
+  const districtId = currentDistrict?.id;
   const queryClient = useQueryClient();
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
-  const [upiStatus, setUpiStatus] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customerData, setCustomerData] = useState({ name: "", phone: "", address: "" });
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
-  const [imageError, setImageError] = useState(false);
 
   // Fetch product
   const {
@@ -84,45 +135,48 @@ export default function ProductDetail() {
     isLoading: productLoading,
     error: productError,
   } = useQuery({
-    queryKey: ["product", productId],
-    queryFn: () => fetchProduct(productId!),
-    enabled: !!productId,
+    queryKey: ["product", productKey, districtId],
+    queryFn: () => fetchProduct(productKey!),
+    enabled: !!productKey,
+    retry: 1,
+    staleTime: 2 * 60 * 1000,
   });
 
   const {
     data: reviews,
     isLoading: reviewsLoading,
   } = useQuery({
-    queryKey: ["reviews", productId],
+    queryKey: ["reviews", product?.id, districtId],
     queryFn: async () => {
-      if (!productId) return [];
-      const res = await fetch(`/api/reviews/${productId}`);
-      if (!res.ok) throw new Error("Failed to load reviews");
-      return res.json();
+      if (!product?.id) return [];
+      try {
+        const res = await apiRequest("GET", `marketplace/reviews/${product.id}`);
+        return (res as any)?.data ?? res ?? [];
+      } catch (err: any) {
+        if ((err?.message || "").toLowerCase().includes("not found")) return [];
+        throw err;
+      }
     },
-    enabled: !!productId,
+    enabled: !!product?.id,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const addReviewMutation = useMutation({
     mutationFn: async (payload: { rating: number; comment: string }) => {
-      if (!productId) throw new Error("Missing product");
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: Number(productId),
-          customerName: "Guest",
-          rating: payload.rating,
-          comment: payload.comment,
-        }),
+      if (!product?.id) throw new Error("Missing product");
+      const res = await apiRequest("POST", "marketplace/reviews", {
+        productId: Number(product.id),
+        customerName: "Guest",
+        rating: payload.rating,
+        comment: payload.comment,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Failed to submit review");
-      return data;
+      return res;
     },
     onSuccess: () => {
       toast.success("Thank you! Your review is pending approval.");
-      queryClient.invalidateQueries({ queryKey: ["reviews", productId] });
+      queryClient.invalidateQueries({ queryKey: ["reviews", product?.id, districtId] });
     },
     onError: (err: any) => {
       toast.error(err?.message || "Review submit failed");
@@ -131,83 +185,54 @@ export default function ProductDetail() {
 
   const handleAddToCart = () => {
     if (!product) return;
-    // Use vendorId if available, otherwise fall back to shopId
-    const vendorOrShopId = product.vendorId ?? product.shopId;
-    if (!vendorOrShopId) {
-      toast.error("Cannot add this product to cart - missing shop information");
+    const vendorId = product.vendorId;
+    if (!vendorId) {
+      toast.error("Cannot add this product - missing vendor information");
       return;
     }
     addToCart({
       id: product.id,
       productId: Number(product.id),
       name: product.name,
-      price: product.price,
+      price: Number(product.price),
       imageUrl: product.images?.[0] || product.imageUrls?.[0] || product.imageUrl,
-      shopId: Number(vendorOrShopId),
-      vendorId: product.vendorId ? Number(product.vendorId) : undefined,
+      vendorId: Number(vendorId),
     });
     toast.success(`${product.name} added to cart!`);
   };
 
-  const handleBuyNow = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleWhatsApp = () => {
     if (!product) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: product.id,
-          shopId: product.shopId,
-          customerName: customerData.name,
-          customerPhone: customerData.phone,
-          customerAddress: customerData.address,
-          quantity: 1,
-          totalPrice: product.price,
-          status: paymentMethod === "upi" ? "payment_pending_verification" : "pending",
-          paymentMethod,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to place order");
-      toast.success(
-        paymentMethod === "upi"
-          ? "Payment verification in progress. Your order will be confirmed shortly."
-          : "Order Placed Successfully! 📦"
-      );
-      setIsCheckoutOpen(false);
-      setCustomerData({ name: "", phone: "", address: "" });
-      setPaymentMethod("cod");
-      setUpiStatus("");
-    } catch (err: any) {
-      toast.error(err?.message || "Order failed. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+    const phone = (product as any).seller?.contactNumber || product.contactNumber || product.sellerPhone || (product as any).phone || (product as any).vendor?.phone || "";
+    if (!phone) {
+      toast.warning("Seller WhatsApp number not available");
+      return;
     }
+    const message = encodeURIComponent(
+      `Hi, I'm interested in ${product.name} - ₹${product.price}. Please confirm availability.`
+    );
+    window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=${message}`, "_blank");
   };
 
-  if (productLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="animate-spin text-orange-600 h-12 w-12 mx-auto mb-4" />
-          <p className="text-slate-600 font-medium">Loading product...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleCall = () => {
+    if (!product) return;
+    const phone = (product as any).seller?.phone || (product as any).vendor?.phone || product.sellerPhone || product.contactNumber || "";
+    if (phone) window.open(`tel:${phone.replace(/\D/g, "")}`, "_blank");
+  };
+
+  if (productLoading) return <ProductDetailSkeleton />;
 
   if (productError || !product) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-sovereign-bg flex items-center justify-center p-6">
         <div className="text-center max-w-md">
-          <Package className="text-slate-300 h-16 w-16 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">Product Not Found</h1>
-          <p className="text-slate-600 mb-6">
+          <Package className="h-16 w-16 text-zinc-600 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">Product Not Found</h1>
+          <p className="text-zinc-400 mb-6">
             The product you're looking for doesn't exist or has been removed.
           </p>
           <Link href="/">
-            <Button className="bg-orange-500 hover:bg-orange-600">
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl">
               <ArrowLeft size={16} className="mr-2" />
               Back to Home
             </Button>
@@ -217,8 +242,8 @@ export default function ProductDetail() {
     );
   }
 
-const defaultImage =
-  "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?auto=format&fit=crop&q=80&w=800";
+  const defaultImage =
+    "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?auto=format&fit=crop&q=80&w=800";
 
   const toAbsolute = (url?: string) => {
     if (!url) return "";
@@ -226,428 +251,189 @@ const defaultImage =
     const filename = url.split("/").pop() || url;
     return `/uploads/${filename}`;
   };
+
   const priceNum = parseFloat(product.price) || 0;
-  const originalPrice = Math.max(priceNum * 1.25, priceNum + 120);
-  const discountPercent = originalPrice > 0 ? Math.round((1 - priceNum / originalPrice) * 100) : 0;
+  const mrpValue = product.mrp ? (typeof product.mrp === "string" ? parseFloat(product.mrp) : product.mrp) : null;
+  const originalPrice = mrpValue || Math.max(priceNum * 1.25, priceNum + 120);
+  const discountPercent = mrpValue && mrpValue > priceNum
+    ? Math.round((1 - priceNum / mrpValue) * 100)
+    : originalPrice > 0
+      ? Math.round((1 - priceNum / originalPrice) * 100)
+      : 0;
   const sameDay = true;
-  const rating = 4.8;
   const primaryImage = toAbsolute(product.images?.[0] || product.imageUrls?.[0] || product.imageUrl || defaultImage);
-  const sellerName = product.seller?.shopName || product.shopName || "Soni Electronics Shahdol";
-  const sellerAddress = product.seller?.shopAddress || product.shopAddress || "Address not provided";
-  const sellerPhone =
+  const sellerName = product.vendorName || product.vendor?.name || product.shopName || "Local Seller";
+  const sellerAddress = product.vendor?.address || product.shopAddress || null;
+  const sellerPhoneVal =
+    (product as any)?.phone ||
+    (product as any)?.vendor?.phone ||
+    (product as any)?.vendor?.mobile ||
     product.contactNumber ||
-    (product as any)?.seller?.contactNumber ||
-    (product as any)?.seller?.mobile ||
-    (product as any)?.seller?.phone ||
     product.sellerPhone ||
     "";
-  const sellerMaps = product.seller?.mapsLink;
+  const sellerMaps = product.vendor?.mapsLink || product.seller?.mapsLink;
+  const categoryName = typeof product.category === 'object' && product.category !== null
+    ? (product.category as any)?.name || "General"
+    : product.category || "General";
+
+  const trustLevel = resolveTrustLevel({
+    isVerified: (product as any).isVerified,
+    dsslScore: (product as any).dsslScore
+  });
+
+  const districtSlug = currentDistrict?.slug || "shahdol";
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header with Back Button */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <Link href="/">
-            <Button
-              variant="ghost"
-              className="text-slate-600 hover:text-orange-600"
-            >
-              <ArrowLeft size={18} className="mr-2" />
-              Back to Home
-            </Button>
-          </Link>
-        </div>
-      </div>
+    <div className="bg-sovereign-bg">
+      {/* 🛡️ HEADER is now rendered by Layout.tsx (route-aware)
+          No duplicate sticky header here. Layout handles back/share/save.
+      */}
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-          {/* Product Image */}
-          <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-lg">
-            <div className="aspect-square relative bg-slate-50">
-              {!imageError && primaryImage ? (
-                <img
-                  src={primaryImage}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <img
-                  src={defaultImage}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
-              )}
-            </div>
-          </div>
+      {/* ─── MAIN CONTENT ─── */}
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
+          {/* ── LEFT: PRODUCT MEDIA ── */}
+          <div className="space-y-4">
+            <ProductImage
+              src={primaryImage}
+              alt={product.name}
+              aspectRatio="square"
+              maxHeight={320}
+              priority
+            />
 
-          {/* Product Details */}
-          <div className="space-y-6">
-            {/* Category Badge */}
-            <div>
-              <span className="inline-block px-4 py-1.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold uppercase tracking-wider">
-                {product.category}
-              </span>
-            </div>
-
-            {/* Product Name */}
-            <h1 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight">
-              {product.name}
-            </h1>
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <div className="flex items-center gap-1">
-                {Array.from({ length: 5 }).map((_, idx) => (
-                  <Star key={idx} size={16} className="text-orange-500 fill-orange-500" />
-                ))}
-              </div>
-              <span className="font-bold text-orange-600">{rating.toFixed(1)}</span>
-            </div>
-
-            {/* Price */}
-            <div className="flex items-baseline gap-3">
-              <span className="text-5xl font-black text-orange-600">
-                ₹{priceNum.toLocaleString()}
-              </span>
-              <span className="text-lg line-through text-slate-400">
-                ₹{originalPrice.toLocaleString()}
-              </span>
-              {discountPercent > 0 && (
-                <span className="text-sm font-black text-green-600 bg-green-50 border border-green-200 px-2 py-1 rounded-full">
-                  {discountPercent}% OFF
-                </span>
-              )}
-            </div>
-            {sameDay && (
-              <div className="flex items-center gap-2 text-sm font-bold text-green-600">
-                <ShieldCheck size={16} className="text-green-500" />
-                Same Day Delivery in Shahdol
+            {primaryImage && primaryImage !== defaultImage && (
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-orange-500/50 bg-zinc-800 shrink-0">
+                  <img src={primaryImage} alt="" className="w-full h-full object-contain" />
+                </div>
               </div>
             )}
+          </div>
+
+          {/* ── RIGHT: PRODUCT DETAILS ── */}
+          <div className="space-y-5 md:space-y-6">
+            {/* Identity */}
+            <div className="space-y-3">
+              <span className="inline-flex items-center gap-1.5 bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase tracking-[0.25em] px-3 py-1.5 rounded-full border border-orange-500/20">
+                <Sparkles className="w-3 h-3" />
+                {categoryName}
+              </span>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
+                {product.name}
+              </h1>
+
+              {/* Seller */}
+              <div className="inline-flex items-center gap-2 bg-white/[0.04] px-4 py-2 rounded-full">
+                <Store className="w-4 h-4 text-orange-400" />
+                <span className="text-sm font-semibold text-zinc-300">{sellerName}</span>
+                <span className="text-[10px] font-black text-orange-400/60 bg-orange-500/10 px-2 py-0.5 rounded-full">
+                  Seller
+                </span>
+              </div>
+            </div>
+
+            {/* Trust Badges */}
+            <TrustBadgeRow trustLevel={trustLevel} />
+
+            {/* Pricing */}
+            <PricingStack
+              price={priceNum}
+              originalPrice={originalPrice}
+              discountPercent={discountPercent}
+              deliveryInfo="Same Day Delivery in Shahdol"
+            />
+
+            {/* CTA */}
+            <PrimaryCTAGroup
+              onAddToCart={handleAddToCart}
+              onWhatsApp={handleWhatsApp}
+              onCall={handleCall}
+              sellerPhone={sellerPhoneVal}
+              productName={product.name}
+              productPrice={product.price}
+            />
 
             {/* Description */}
             {product.description && (
-              <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
-                <h2 className="text-lg font-bold text-slate-900 mb-3">
-                  Product Description
-                </h2>
-                <p className="text-slate-700 leading-relaxed whitespace-pre-line">
+              <DetailSection title="Description" icon={<Sparkles className="w-3.5 h-3.5" />}>
+                <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">
                   {product.description}
                 </p>
-              </div>
+              </DetailSection>
             )}
 
-            {/* Add to Cart Button */}
-            {(product as any).stock !== undefined && (product as any).stock <= 0 ? (
-              <Button
-                disabled
-                className="w-full bg-amber-100 text-amber-700 py-6 text-lg font-black rounded-xl cursor-not-allowed"
-                size="lg"
-              >
-                Contact Store
-              </Button>
-            ) : (
-              <Button
-                onClick={handleAddToCart}
-                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-6 text-lg font-black rounded-xl shadow-lg hover:shadow-xl transition-all"
-                size="lg"
-              >
-                <ShoppingCart size={20} className="mr-2" />
-                Add to Cart
-              </Button>
-            )}
-
-            {/* WhatsApp Order Button - Lav's Gold Theme */}
-            {((product as any).seller?.contactNumber || (product as any).contactNumber || (product as any).sellerPhone) && (
-              <Button
-                asChild
-                className="w-full bg-[#FFB800] hover:bg-[#E6A600] text-black py-4 text-lg font-black rounded-xl shadow-lg hover:shadow-xl transition-all"
-                size="lg"
-              >
-                <a
-                  href={`https://wa.me/${((product as any).seller?.contactNumber || (product as any).contactNumber || (product as any).sellerPhone)?.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi, I'm interested in ${product?.name || 'this product'} - ₹${product?.price || ''}. Please confirm availability.`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <MessageCircle size={20} className="mr-2" />
-                  Order on WhatsApp
-                </a>
-              </Button>
-            )}
-
-            {/* Buy Now Button */}
-            {(product as any).stock !== undefined && (product as any).stock <= 0 ? (
-              <Button
-                disabled
-                className="w-full bg-amber-100 text-amber-700 py-4 text-lg font-black rounded-xl cursor-not-allowed"
-                size="lg"
-              >
-                Contact Store
-              </Button>
-            ) : (
-              <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  onClick={() => setIsCheckoutOpen(true)}
-                  className="w-full bg-black hover:bg-orange-700 text-white py-4 text-lg font-black rounded-xl shadow-lg hover:shadow-xl transition-all"
-                  size="lg"
-                >
-                  Buy Now
-                </Button>
-              </DialogTrigger>
-            <DialogContent className="bg-white rounded-3xl max-w-[420px] w-[95%] max-h-[85vh] overflow-y-auto p-6 space-y-4">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold text-slate-900">Order Details</DialogTitle>
-                  <DialogDescription className="sr-only">Checkout</DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleBuyNow} className="space-y-3 max-h-[85vh] overflow-y-auto pr-1">
-                  <input
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                    placeholder="Full Name"
-                    required
-                    value={customerData.name}
-                    onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
-                  />
-                  <input
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                    placeholder="Mobile Number"
-                    type="tel"
-                    maxLength={10}
-                    required
-                    value={customerData.phone}
-                    onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
-                  />
-                  <input
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                    placeholder="Full Address"
-                    required
-                    value={customerData.address}
-                    onChange={(e) => setCustomerData({ ...customerData, address: e.target.value })}
-                  />
-
-                  <div className="space-y-2">
-                    <p className="text-sm font-bold text-slate-800">Payment Method</p>
-                    <div className="flex gap-3">
-                      <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} />
-                        Cash on Delivery
-                      </label>
-                      <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <input type="radio" checked={paymentMethod === "upi"} onChange={() => setPaymentMethod("upi")} />
-                        Pay via UPI QR
-                      </label>
-                    </div>
-                    {paymentMethod === "upi" && (
-                      <div className="rounded-xl border bg-orange-50 border-orange-200 p-3 space-y-3">
-                        <p className="text-sm font-bold text-orange-800">Scan & Pay (UPI)</p>
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=lav@upi&pn=ShahdolBazaar&am=${product.price}&cu=INR`)}`}
-                      alt="UPI QR Code"
-                      className="w-48 h-48 rounded-lg border mx-auto object-contain"
-                      loading="lazy"
-                      onError={(e) => {
-                        // Fallback if QR service is down
-                        (e.target as HTMLImageElement).src = '/maskable_icon_x192.png';
-                      }}
-                    />
-                        <p className="text-xs text-slate-600 text-center">
-                          Pay to: lav@upi • Amount: ₹{product.price}
-                        </p>
-                    <div className="space-y-2">
-                      <Button
-                        type="button"
-                        className="w-full bg-orange-600"
-                        onClick={() => setUpiStatus("Payment verification in progress. Your order will be confirmed shortly.")}
-                      >
-                        I have paid
-                      </Button>
-                      {upiStatus && (
-                        <div className="text-xs font-bold text-orange-700 text-center">{upiStatus}</div>
-                      )}
-                    </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-orange-600 h-12 text-lg font-bold"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "Confirm Order"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-            )}
-            <button
-              onClick={() => {
-                const shopNumber = (sellerPhone || "").replace(/\D/g, "");
-                if (!shopNumber) {
-                  toast.warning("Seller WhatsApp number missing");
-                  return;
-                }
-                const waNumber = shopNumber || (localStorage.getItem("waNumber") || "910000000000").replace(/\+/g, "");
-                const shopLine = sellerName ? `दुकान: ${sellerName}\n` : "";
-                // Use dynamic public URL for sharing (works in dev and production)
-                const publicUrl = window.location.origin;
-                const productUrl = `${publicUrl}/product/${product.id}`;
-                const message = `नमस्ते! मुझे यह खरीदना है:\n${product.name}\nकीमत: ₹${product.price}\n${shopLine}लिंक: ${productUrl}`;
-                const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
-                window.open(url, "_blank");
-              }}
-              className="w-full mt-3 border-2 border-[#FFB800] text-[#FFB800] hover:bg-[#FFB800] hover:text-black py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-              disabled={!sellerPhone}
-            >
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-              {sellerPhone ? "WhatsApp पर आर्डर करें" : "WhatsApp नंबर नहीं मिला"}
-            </button>
-
-            {/* Sticky mobile order bar */}
-            <div className="fixed md:hidden bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 shadow-2xl p-4 flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-lg font-black text-orange-600">₹{priceNum.toLocaleString()}</span>
-                <span className="text-xs text-slate-500">Same Day Delivery</span>
-              </div>
-                <Button
-                  className="bg-[#FFB800] hover:bg-[#E5A600] text-black font-black px-4 py-3 rounded-xl shadow"
-                  onClick={() => {
-                    const shopNumber = (sellerPhone || "").replace(/\D/g, "");
-                    if (!shopNumber) {
-                      toast.warning("Seller WhatsApp number missing");
-                      return;
-                    }
-                    const waNumber = shopNumber || (localStorage.getItem("waNumber") || "910000000000").replace(/\+/g, "");
-                    const shopLine = sellerName ? `दुकान: ${sellerName}\n` : "";
-                    // Use dynamic public URL for sharing (works in dev and production)
-                const publicUrl = window.location.origin;
-                const productUrl = `${publicUrl}/product/${product.id}`;
-                const message = `नमस्ते! मुझे यह खरीदना है:\n${product.name}\nकीमत: ₹${product.price}\n${shopLine}लिंक: ${productUrl}`;
-                    const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
-                    window.open(url, "_blank");
-                  }}
-                  disabled={!sellerPhone}
-                >
-                  Order via WhatsApp
-                </Button>
-            </div>
-
-            {/* Seller Information */}
-            {product && product.seller && (
-              <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
-                <div className="flex items-center gap-2">
-                  <Store size={18} className="text-slate-500" />
-                  <h3 className="text-lg font-bold text-slate-900">{sellerName}</h3>
-                  <span className="flex items-center gap-1 text-xs font-black text-blue-600">
-                    <ShieldCheck size={14} className="text-blue-500" /> Verified Local Seller
-                  </span>
+            {/* Product details */}
+            <DetailSection title="Product Details" icon={<Package className="w-3.5 h-3.5" />}>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between py-1.5 border-b border-white/5">
+                  <span className="text-zinc-500">Category</span>
+                  <span className="text-zinc-200 font-medium">{categoryName}</span>
                 </div>
-                <div className="flex items-start gap-2 text-sm text-slate-700">
-                  <MapPin size={16} className="text-slate-400 mt-0.5" />
-                  <span>{sellerAddress}</span>
+                <div className="flex justify-between py-1.5">
+                  <span className="text-zinc-500">Delivery</span>
+                  <span className="text-emerald-400 font-semibold">Same Day</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-slate-700">
-                  <span className="font-bold text-slate-800">Category:</span>
-                  <span>{product.category}</span>
-                </div>
-                {(sellerAddress || sellerMaps) && (
-                  <Button
-                    variant="outline"
-                    className="w-fit border-orange-200 text-orange-600 hover:bg-orange-50"
-                    onClick={() => {
-                      const url = sellerMaps
-                        ? sellerMaps
-                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                            sellerAddress || ""
-                          )}`;
-                      window.open(url, "_blank");
-                    }}
-                  >
-                    View on Google Maps
-                  </Button>
-                )}
               </div>
+            </DetailSection>
+
+            {/* Seller Info */}
+            {(sellerName || sellerAddress) && (
+              <SellerInfoCard
+                name={sellerName}
+                address={sellerAddress}
+                phone={sellerPhoneVal}
+                mapsLink={sellerMaps}
+                trustLevel={trustLevel}
+              />
             )}
 
             {/* Reviews */}
-            <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-900">Reviews</h3>
+            <DetailSection title="Reviews" icon={<Star className="w-3.5 h-3.5" />}>
+              <div className="flex items-center justify-between mb-3">
                 <Button
                   onClick={() => setReviewDialogOpen(true)}
-                  className="bg-orange-600 text-white px-3 py-2 rounded-lg text-sm font-black"
+                  className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-xl text-xs font-black"
+                  size="sm"
                 >
                   Write a Review
                 </Button>
               </div>
               {reviewsLoading ? (
-                <p className="text-sm text-slate-500">Loading reviews...</p>
+                <p className="text-sm text-zinc-500">Loading reviews...</p>
               ) : !reviews || reviews.length === 0 ? (
-                <p className="text-sm text-slate-500">No reviews yet.</p>
+                <p className="text-sm text-zinc-500">No reviews yet. Be the first to review!</p>
               ) : (
                 <div className="space-y-2">
                   {reviews.map((r: any) => (
-                    <div key={r.id} className="bg-white border rounded-xl p-3 shadow-sm">
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                    <div key={r.id} className="bg-white/[0.03] border border-white/5 rounded-xl p-3">
+                      <div className="flex items-center gap-2 text-sm font-bold text-zinc-200">
                         <span>{r.customerName || "Customer"}</span>
-                        <span className="text-orange-600">{"★".repeat(r.rating || 0)}</span>
+                        <span className="text-orange-400">{Array.from({ length: r.rating || 0 }).map(() => "★").join("")}</span>
                       </div>
-                      <p className="text-sm text-slate-700 mt-1">{r.comment}</p>
+                      <p className="text-sm text-zinc-400 mt-1">{r.comment}</p>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* Seller Information */}
-            <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center gap-2">
-                <Store size={18} className="text-slate-500" />
-                <h3 className="text-lg font-bold text-slate-900">
-                  {product.seller?.shopName || product.shopName || "Soni Electronics Shahdol"}
-                </h3>
-                <span className="flex items-center gap-1 text-xs font-black text-blue-600">
-                  <ShieldCheck size={14} className="text-blue-500" /> Verified Local Seller
-                </span>
-              </div>
-              <div className="flex items-start gap-2 text-sm text-slate-700">
-                <MapPin size={16} className="text-slate-400 mt-0.5" />
-                <span>{product.seller?.shopAddress || product.shopAddress || "Address not provided"}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-700">
-                <span className="font-bold text-slate-800">Category:</span>
-                <span>{product.category}</span>
-              </div>
-              {(product.seller?.shopAddress || product.shopAddress || sellerMaps) && (
-                <Button
-                  variant="outline"
-                  className="w-fit border-orange-200 text-orange-600 hover:bg-orange-50"
-                  onClick={() => {
-                    const url = sellerMaps
-                      ? sellerMaps
-                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                          product.seller?.shopAddress || product.shopAddress || ""
-                        )}`;
-                    window.open(url, "_blank");
-                  }}
-                >
-                  View on Google Maps
-                </Button>
-              )}
-            </div>
+            </DetailSection>
           </div>
         </div>
       </div>
 
+      {/* ─── STICKY MOBILE CTA ─── */}
+      <StickyMobileCTA
+        price={priceNum}
+        onAddToCart={handleAddToCart}
+        onWhatsApp={handleWhatsApp}
+      />
+
       {/* Review Dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent className="bg-white rounded-2xl max-w-[420px] w-[95%] p-6 space-y-4">
+        <DialogContent className="bg-zinc-900 rounded-2xl max-w-[420px] w-[95%] p-6 space-y-4 border border-white/10">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-slate-900">Write a Review</DialogTitle>
-            <DialogDescription className="text-sm text-slate-600">
+            <DialogTitle className="text-lg font-bold text-white">Write a Review</DialogTitle>
+            <DialogDescription className="text-sm text-zinc-400">
               Share your experience. Your review will appear once approved.
             </DialogDescription>
           </DialogHeader>
@@ -655,7 +441,7 @@ const defaultImage =
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!productId) return;
+              if (!product?.id) return;
               addReviewMutation.mutate({ rating: reviewRating, comment: reviewComment });
               setReviewDialogOpen(false);
               setReviewComment("");
@@ -663,15 +449,16 @@ const defaultImage =
             }}
           >
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-800">Rating</label>
+              <label className="text-sm font-medium text-zinc-200">Rating</label>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
                     type="button"
-                    className={`p-2 rounded-lg border ${
-                      reviewRating >= star ? "bg-orange-100 border-orange-300 text-orange-700" : "border-slate-200"
-                    }`}
+                    className={`p-2 rounded-lg border text-xl ${reviewRating >= star
+                      ? "bg-orange-500/20 border-orange-500/40 text-orange-400"
+                      : "border-white/10 text-zinc-500"
+                      }`}
                     onClick={() => setReviewRating(star)}
                   >
                     ★
@@ -680,17 +467,18 @@ const defaultImage =
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-800">Comment</label>
+              <label className="text-sm font-medium text-zinc-200">Comment</label>
               <Textarea
                 value={reviewComment}
                 onChange={(e) => setReviewComment(e.target.value)}
                 placeholder="How was the product?"
                 required
+                className="bg-white/5 border-white/10 text-white"
               />
             </div>
             <Button
               type="submit"
-              className="w-full bg-orange-600 text-white"
+              className="w-full bg-orange-600 text-white hover:bg-orange-700"
               disabled={addReviewMutation.isPending}
             >
               {addReviewMutation.isPending ? "Submitting..." : "Submit Review"}
@@ -701,4 +489,3 @@ const defaultImage =
     </div>
   );
 }
-

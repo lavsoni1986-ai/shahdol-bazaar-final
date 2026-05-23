@@ -1,0 +1,38 @@
+
+> rest-express@1.0.0 dev:backend
+> cross-env NODE_ENV=development tsx server/index.ts
+
+🔮 [AI_PROVIDER] Provider detected: GROK
+✅ Critical environment validation passed
+🔵 [HELMET] Development mode: CSP disabled
+✅ All Env Variables Synced - Cashfree, Groq, Twilio all configured!
+🔵 [DB] Testing database connection...
+✅ [DB] Database connection verified
+✅ [DB] Database connection successful!
+🔵 [INDEX] ========================================
+🔵 [INDEX] Step 1: Registering API routes...
+✅ Routes registered: /api/auth, /api/ai, /api/admin, /districts, /stats, /local, /merchant, /upload, /marketplace, /analytics, /orders, /banners
+✅ [INDEX] /api routes mounted
+✅ [INDEX] Swagger UI mounted at /api/docs
+🔵 [INDEX] ========================================
+🔍 [DEBUG] Attempting to listen on port 5002...
+🚀 [BharatOS] Sovereign Server Live on port 5002
+🌍 URL: http://localhost:5002
+📚 Docs: http://localhost:5002/api/docs
+🔍 [DEBUG] Server listen callback executed successfully
+🔍 [DEBUG] Skipping background workers for now...
+✅ [SUCCESS] Server successfully listening on port 5002
+[2026-05-15T13:11:11.506Z] POST /api/auth/login - IP:127.0.0.1 - User:anonymous - District:unknown - ReqID:unknown
+🍪 [AFTER BODY PARSER] Cookies: [Object: null prototype] {}
+🏢 [TENANT] POST /api/auth/login | Slug: MISSING
+🔵 [REQUEST] 527ad7f7-e182-4714-b75b-c1f2846089b7 POST /api/auth/login {
+  userAgent: 'Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.19041.6456',
+  ip: '127.0.0.1',
+  userId: 'anonymous'
+}
+[LOGIN] request received
+[LOGIN] username received: lavsoni
+[LOGIN] user found: true
+[LOGIN] role: SUPER_ADMIN
+[LOGIN] password compare start
+[LOGIN] password compare success: false

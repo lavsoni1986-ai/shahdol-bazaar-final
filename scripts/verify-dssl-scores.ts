@@ -3,8 +3,8 @@
  */
 
 import 'dotenv/config';
-import { db } from "../server/storage.js";
-import { products } from "../shared/schema.js";
+import { db } from "../server/storage";
+import { products } from "../shared/schema";
 
 async function verifyDSSLScores() {
   try {

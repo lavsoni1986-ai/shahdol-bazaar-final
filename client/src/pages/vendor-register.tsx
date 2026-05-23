@@ -4,19 +4,14 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-import { Store, User, Mail, Phone, Lock, ArrowLeft, MapPin, Building2, CheckCircle } from "lucide-react";
+import { User, ArrowLeft, Building2, Store, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { useDistricts } from "@/hooks/useDistricts";
-
-interface District {
-  id: number;
-  name: string;
-  slug: string;
-}
+import { apiRequest } from "@/lib/api-client";
 
 export default function VendorRegister() {
   const [, setLocation] = useLocation();
@@ -41,47 +36,20 @@ export default function VendorRegister() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: data.username,
-          password: data.password,
-          role: "merchant",
-          phone: data.phone,
-          email: data.email,
-          shopName: data.businessName,
-          shopAddress: data.address,
-          districtId: data.districtId ? parseInt(data.districtId) : null,
-        }),
+      return apiRequest("POST", "auth/register", {
+        username: data.username,
+        password: data.password,
+        role: "merchant",
+        phone: data.phone,
+        email: data.email,
+        shopName: data.businessName,
+        shopAddress: data.address,
+        districtId: data.districtId ? parseInt(data.districtId) : null,
       });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Registration failed");
-      }
-      return res.json();
     },
     onSuccess: async () => {
-      // Auto-login after registration
-      const loginRes = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: 'include',
-        body: JSON.stringify({
-          username: formData.username,
-          password: formData.password,
-        }),
-      });
-
-      if (loginRes.ok) {
-        toast.success("Registration complete! Setting up your dashboard...");
-        setTimeout(() => {
-          setLocation("/vendor/dashboard");
-        }, 1500);
-      } else {
-        toast.success("Account created! Please login.");
-        setLocation("/auth");
-      }
+      toast.success("Account created! Please login.");
+      setLocation("/auth?role=partner");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Registration failed");
@@ -344,8 +312,8 @@ export default function VendorRegister() {
             </form>
 
             <p className="text-center text-slate-400 text-sm mt-6">
-              Already have an account?{" "}
-              <Link href="/auth" className="text-orange-500 hover:underline">
+Already have an account?{" "}
+               <Link href="/auth?role=partner" className="text-orange-500 hover:underline">
                 Sign In
               </Link>
             </p>

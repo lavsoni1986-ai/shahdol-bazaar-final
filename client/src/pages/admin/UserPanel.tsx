@@ -4,6 +4,7 @@ import React from "react";
 import AdminLayout from "./AdminLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api-client";
+import { safeData } from "@/lib/admin-response";
 import { useDistrict } from "@/contexts/DistrictContext";
 
 /**
@@ -32,7 +33,7 @@ export default function UserPanel() {
       if (selectedStatus !== "ALL") params.set("status", selectedStatus);
 
       const response = await apiRequest("GET", `/admin/users?${params}`);
-      return response?.data || [];
+      return safeData<any[]>(response, []);
     },
   });
 

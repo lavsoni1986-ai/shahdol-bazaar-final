@@ -71,7 +71,7 @@ export async function createAuthenticatedRequest(
   baseContext: any,
   token: string,
   districtSlug: string = 'shahdol',
-  districtId: number = 2
+  districtId: number = parseInt(process.env.DISTRICT_ID || '3')
 ) {
   return await baseContext.newContext({
     extraHTTPHeaders: {

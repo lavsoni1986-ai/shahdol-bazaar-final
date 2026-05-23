@@ -1,12 +1,12 @@
 import { Link } from "wouter";
-import { Package, Store } from "lucide-react";
+import { Store } from "lucide-react";
 
 interface CategoriesSectionProps {
-  categories: any[];
+  categories?: any[];
   onTrack?: (action: string, item: string) => void;
 }
 
-export function CategoriesSection({ categories, onTrack }: CategoriesSectionProps) {
+export function CategoriesSection({ categories = [], onTrack }: CategoriesSectionProps) {
   if (!categories || categories.length === 0) return null;
 
   return (
@@ -15,7 +15,6 @@ export function CategoriesSection({ categories, onTrack }: CategoriesSectionProp
 
       <div className="flex gap-2 overflow-x-auto pb-2">
         {categories.map((cat: any) => {
-          const IconComponent = Package;
           return (
             <Link
               key={cat.id}
@@ -34,3 +33,5 @@ export function CategoriesSection({ categories, onTrack }: CategoriesSectionProp
     </section>
   );
 }
+
+export default CategoriesSection;

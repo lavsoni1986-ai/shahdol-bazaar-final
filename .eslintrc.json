@@ -1,0 +1,98 @@
+{
+  "extends": [
+    "eslint:recommended",
+    "@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint", "prettier"],
+  "rules": {
+    "prettier/prettier": "error",
+
+    // SOVEREIGN ARCHITECTURE GUARDRAILS - P0 ENFORCEMENT
+
+    // 🚫 BAN RAW FETCH - Must use apiRequest
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.name='fetch']",
+        "message": "🚫 FORBIDDEN: Use apiRequest() instead of raw fetch. See ARCHITECTURE_GUARDRAILS.md"
+      }
+    ],
+
+    // 🚫 BAN DIRECT PRISMA IN ROUTES - Must use repositories
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "MemberExpression[object.name='prisma']",
+        "message": "🚫 FORBIDDEN: Use repository layer instead of direct Prisma. See ARCHITECTURE_GUARDRAILS.md"
+      }
+    ],
+
+    // 🚫 BAN RAW RES.JSON - Must use sovereign response helpers
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.object.name='res'][callee.property.name='json']",
+        "message": "🚫 FORBIDDEN: Use sovereignSuccess/sovereignFailure instead of res.json. See ARCHITECTURE_GUARDRAILS.md"
+      }
+    ],
+
+    // 🚫 BAN CONSOLE.LOG IN PRODUCTION CODE
+    "no-console": [
+      "error",
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
+
+    // 🚫 BAN UNGUARDED API RESPONSE ACCESS
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "MemberExpression[object.name='response'][property.name='data']",
+        "message": "🚫 FORBIDDEN: Response must be validated first. Use apiRequest pattern. See ARCHITECTURE_GUARDRAILS.md"
+      }
+    ],
+
+    // 🚫 BAN RAW BUSINESS TYPE USAGE
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "MemberExpression[property.name='businessType']",
+        "message": "🚫 FORBIDDEN: Use normalizeBusinessType() instead of raw businessType. See ARCHITECTURE_GUARDRAILS.md"
+      }
+    ],
+
+    // ✅ MANDATORY COGNITION LOGGING
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.spec.ts", "**/tests/**"],
+      "rules": {
+        "no-console": "off",
+        "no-restricted-syntax": "off"
+      }
+    },
+    {
+      "files": ["**/repositories/**"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "MemberExpression[object.name='prisma']",
+            "message": "✅ ALLOWED: Repository layer may use Prisma directly"
+          }
+        ]
+      }
+    }
+  ]
+}

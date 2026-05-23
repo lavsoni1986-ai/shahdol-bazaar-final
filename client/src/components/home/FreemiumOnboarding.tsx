@@ -33,7 +33,7 @@ export default function FreemiumOnboarding() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4">
-          <Link href="/auth">
+          <Link href="/auth?role=partner&mode=register">
             <Button size="lg" className="bg-white text-orange-600 hover:bg-orange-50 font-black text-lg px-10 h-16 rounded-2xl shadow-xl transition-all hover:-translate-y-1">
               Abhi Register Karein
             </Button>

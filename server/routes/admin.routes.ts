@@ -10,9 +10,13 @@ import { parseDistrictId } from "../utils/parse";
 import bcrypt from "bcryptjs";
 
 // Services
-import { calculateDSSLScore } from "../services/brain.service";
+import { calculateDSSLScore } from "./ai/dssl.engine";
 import { computeUserIntelligence, applyUserActions } from "../services/user.intelligence";
 import { checkSystemLockdown, getPriorityAlerts, autoTunePolicies, processAdminFeedback } from "../services/system.health";
+import { applyFraudActions, calculateFraudScore } from "../services/fraud.engine";
+
+// Search indexing
+import { buildVendorSearchText } from "../../shared/cognition/entity-search-indexing";
 
 // 🧮 Deterministic Re-rank Hook
 async function recalcVendorScore(vendorId: number) {
@@ -359,17 +363,18 @@ router.get("/dssl-thresholds/:districtId", requireAuth, requireSuperAdmin, async
   try {
     const districtId = parseInt(req.params.districtId);
 
-    const config = await prisma.dsslConfig.findUnique({
-      where: { districtId }
-    });
+    // const config = await prisma.dsslConfig.findUnique({
+    //   where: { districtId }
+    // });
 
-    const thresholds = config?.thresholds || {
-      suspend: 20,
-      restrict: 40,
-      boost: 80
-    };
+    // const thresholds = config?.thresholds || {
+    //   suspend: 20,
+    //   restrict: 40,
+    //   boost: 80
+    // };
 
-    return res.json({ success: true, thresholds });
+    // return res.json({ success: true, thresholds });
+    return res.json({ error: "DSSL config temporarily unavailable for pilot" });
   } catch (error: any) {
     console.error("🚨 DSSL Thresholds Fetch Failed:", error.message);
     return res.status(500).json({ success: false, message: "Failed to fetch thresholds" });
@@ -400,54 +405,28 @@ router.patch("/dssl-thresholds/:districtId", requireAuth, requireSuperAdmin, asy
       }
     }
 
-    const updatedConfig = await prisma.dsslConfig.upsert({
-      where: { districtId },
-      update: {
-        thresholds: { suspend, restrict, boost },
-        ...(weights && { weights })
-      },
-      create: {
-        districtId,
-        thresholds: { suspend, restrict, boost },
-        weights: weights || { dssl: 0.4, ml: 0.25, behavior: 0.25, context: 0.1 }
-      }
-    });
+    // const updatedConfig = await prisma.dsslConfig.upsert({
+    //   where: { districtId },
+    //   update: {
+    //     thresholds: { suspend, restrict, boost },
+    //     ...(weights && { weights })
+    //   },
+    //   create: {
+    //     districtId,
+    //     thresholds: { suspend, restrict, boost },
+    //     weights: weights || { dssl: 0.4, ml: 0.25, behavior: 0.25, context: 0.1 }
+    //   }
+    // });
 
-    return res.json({ success: true, thresholds: updatedConfig.thresholds, weights: updatedConfig.weights });
+    // return res.json({ success: true, thresholds: updatedConfig.thresholds, weights: updatedConfig.weights });
+    return res.json({ error: "DSSL config temporarily unavailable for pilot" });
   } catch (error: any) {
     console.error("🚨 DSSL Thresholds Update Failed:", error.message);
     return res.status(500).json({ success: false, message: "Failed to update thresholds" });
   }
 });
 
-// 🚨 ANTI-FRAUD CONTROLS
-router.post("/update-fraud-scores", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
-  try {
-    const districtId = parseInt(req.query.districtId as string) || 1;
 
-    const { updateVendorFraudScore } = await import("../../services/fraud.detection");
-
-    const vendors = await prisma.vendor.findMany({
-      where: { districtId },
-      select: { id: true }
-    });
-
-    let updated = 0;
-    for (const vendor of vendors) {
-      await updateVendorFraudScore(vendor.id);
-      updated++;
-    }
-
-    res.json({
-      success: true,
-      message: `Updated fraud scores for ${updated} vendors`,
-      districtId
-    });
-  } catch (error: any) {
-    console.error("🚨 Fraud Score Update Failed:", error.message);
-    return res.status(500).json({ success: false, message: "Failed to update fraud scores" });
-  }
-});
 
 // 📊 ML SIGNAL COMPUTATION
 router.post("/compute-signals", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
@@ -986,19 +965,29 @@ router.post("/vendors", requireAuth, requireSuperAdmin, async (req: Request, res
     const { name, category, initialScore } = req.body;
 
     // 🛡️ BHARAT-OS: Validating and creating new vendor
+    const vendorData = {
+      name,
+      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+      category: category || "GROCERY",
+      status: 'APPROVED', // एडमिन बना रहा है तो सीधे Approve
+      dsslScore: parseFloat(initialScore) || 5.0,
+      districtId: 1, // Default to Shahdol (ID: 1)
+      businessType: 'RETAIL',
+      images: [],
+      specialties: [],
+      safetyBadges: ["new-vendor"]
+    };
+
+    // Build search text using cognition taxonomy
+    vendorData.searchText = buildVendorSearchText({
+      name: vendorData.name,
+      category: vendorData.category,
+      businessType: vendorData.businessType,
+      districtSlug: 'shahdol' // Default district
+    });
+
     const newVendor = await prisma.vendor.create({
-      data: {
-        name,
-        slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-        category: category || "GROCERY",
-        status: 'APPROVED', // एडमिन बना रहा है तो सीधे Approve
-        dsslScore: parseFloat(initialScore) || 5.0,
-        districtId: 1, // Default to Shahdol (ID: 1)
-        businessType: 'RETAIL',
-        images: [],
-        specialties: [],
-        safetyBadges: ["new-vendor"]
-      }
+      data: vendorData
     });
 
     console.log(`🎊 Sovereign Success: ${name} added to the Empire.`);
@@ -1235,102 +1224,96 @@ router.post("/kill-switch", requireSuperAdmin, async (req: Request, res: Respons
   }
 });
 
-// Fraud alerts API
+// Sovereign Fraud Summary
+router.get("/fraud-summary", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const districtId = req.ctx?.districtId;
+
+    const vendors = await prisma.vendor.findMany({
+      where: req.ctx?.role === "SUPER_ADMIN" ? {} : { districtId },
+      select: { id: true, status: true }
+    });
+
+    const fraudHistory = await prisma.fraudHistory.findMany({
+      where: req.ctx?.role === "SUPER_ADMIN" ? {} : {
+        vendor: { districtId }
+      },
+      orderBy: { id: "desc" },
+      take: 100
+    });
+
+    const pendingAlerts = fraudHistory.filter(f => !(f.flags as any)?.resolved).length;
+    const resolvedToday = fraudHistory.filter(f => (f.flags as any)?.resolved === true).length;
+    const highRiskVendors = new Set(fraudHistory.filter(f => f.score >= 70).map(f => f.vendorId)).size;
+
+    return res.json({
+      success: true,
+      data: {
+        pendingAlerts,
+        resolvedToday,
+        highRiskVendors,
+        trend: pendingAlerts > 5 ? "rising" : "stable"
+      }
+    });
+  } catch (e) {
+    console.error("Fraud summary error", e);
+    return res.status(500).json({ success: false, error: "Failed to fetch fraud summary" });
+  }
+});
+// Sovereign Fraud Alerts
 router.get("/fraud-alerts", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
-    // Get recent high-risk vendors
-    const highRiskVendors = await prisma.vendor.findMany({
-      where: {
-        OR: [
-          { fraudScore: { gte: 70 } },
-          { dsslScore: { lte: 30 } }
-        ]
-      },
-      select: {
-        id: true,
-        name: true,
-        fraudScore: true,
-        dsslScore: true,
-        status: true,
-        updatedAt: true
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: 10
-    });
+    const districtId = req.ctx?.districtId;
 
-    // Get high-risk users
-    const highRiskUsers = await prisma.userIntelligence.findMany({
-      where: { riskScore: { gte: 70 } },
+    if (!districtId) {
+      return res.status(403).json({ success: false, error: "District assignment required" });
+    }
+
+    const alerts = await prisma.fraudHistory.findMany({
+      where: {
+        vendor: { districtId }
+      },
       include: {
-        user: {
-          select: { id: true, username: true, email: true }
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+            status: true
+          }
         }
       },
-      orderBy: { updatedAt: 'desc' },
-      take: 10
+      orderBy: { id: "desc" },
+      take: 50
     });
 
-    const alerts = [
-      ...highRiskVendors.map(v => ({
-        id: `vendor-${v.id}`,
-        title: `High Risk Vendor: ${v.name}`,
-        description: "Vendor flagged for suspicious activity",
-        severity: v.fraudScore >= 80 ? 'CRITICAL' : 'HIGH',
-        entityType: 'VENDOR',
-        entityId: v.id,
-        fraudScore: v.fraudScore,
-        confidence: Math.min(95, v.fraudScore + 20), // Base confidence on score + pattern analysis
-        createdAt: v.updatedAt,
-        reasons: [
-          { text: "High fraud score", confidence: 85 },
-          v.dsslScore <= 30 ? { text: "Low DSSL score", confidence: 78 } : null
-        ].filter(Boolean),
-        recommendations: "Review vendor activity and consider temporary suspension"
-      })),
-      ...highRiskUsers.map(u => ({
-        id: `user-${u.userId}`,
-        title: `High Risk User: ${u.user.username}`,
-        description: "User flagged for suspicious behavior",
-        severity: u.riskScore >= 80 ? 'CRITICAL' : 'HIGH',
-        entityType: 'USER',
-        entityId: u.userId,
-        fraudScore: u.riskScore,
-        confidence: Math.min(95, u.riskScore + 15),
-        createdAt: u.lastActive || u.updatedAt,
-        reasons: [
-          u.riskScore >= 80 ? { text: "Critical risk score", confidence: 88 } : null,
-          u.meta?.trustBreakdown?.fraudHistory > 5 ? { text: "Extensive fraud history", confidence: 82 } : null,
-          u.meta?.behaviorShiftPenalty > 0 ? { text: "Behavior shift detected", confidence: 76 } : null
-        ].filter(Boolean),
-        recommendations: "Quarantine user and investigate activity"
-      }))
-    ];
-
-    res.json({
-      success: true,
-      data: alerts.sort((a, b) => {
-        const severityOrder = { CRITICAL: 3, HIGH: 2, MEDIUM: 1, LOW: 0 };
-        return severityOrder[b.severity] - severityOrder[a.severity];
-      })
-    });
-  } catch (error) {
-    console.error("[FRAUD_ALERTS_ERROR]", error);
-    res.status(500).json({ success: false, error: "Failed to get fraud alerts" });
+    return res.json({ success: true, data: alerts });
+  } catch (e) {
+    console.error("Fraud alerts error", e);
+    return res.status(500).json({ success: false, error: "Failed to fetch fraud alerts" });
   }
 });
 
-// Resolve fraud alert API
-router.patch("/fraud-alerts/:alertId/resolve", requireSuperAdmin, async (req: Request, res: Response) => {
+// Sovereign Fraud Alert Resolution
+router.patch("/fraud-alerts/:id/resolve", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
-    const { alertId } = req.params;
+    const vendorId = parseInt(req.params.id);
     const { action } = req.body;
 
-    // In a real implementation, you'd log this action and update the entity status
-    console.log(`Fraud alert ${alertId} resolved with action: ${action}`);
+    await applyFraudActions(vendorId);
+
+    await prisma.adminLog.create({
+      data: {
+        adminId: req.user?.id,
+        action: "FRAUD_ALERT_RESOLVED",
+        targetId: vendorId,
+        details: `Fraud alert resolved with action: ${action}`,
+        meta: { vendorId, action }
+      }
+    });
 
     res.json({
       success: true,
-      message: `Alert resolved with action: ${action}`
+      message: `Fraud alert resolved for vendor ${vendorId}`
     });
   } catch (error) {
     console.error("[RESOLVE_ALERT_ERROR]", error);

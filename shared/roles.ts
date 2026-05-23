@@ -61,7 +61,7 @@ const LEGACY_ROLE_MAP: Record<string, UserRole> = {
 
 /**
  * Normalize any role string to canonical UserRole
- * Uses aggressive matching to handle all edge cases
+ * Uses LEGACY_ROLE_MAP to handle old JWT tokens + new roles
  * 
  * @param role - Role string from database or API (case-insensitive)
  * @returns Canonical UserRole enum value
@@ -77,27 +77,23 @@ const LEGACY_ROLE_MAP: Record<string, UserRole> = {
  */
 export function normalizeRole(role: string | undefined | null): UserRole {
   if (!role) return UserRole.CUSTOMER;
-  
-  // Aggressive normalization: remove spaces, underscores, convert to lowercase
-  const r = role.toLowerCase().replace(/[\s_]/g, '');
-  
-  // Super Admin matching
-  if (r === 'admin' || r === 'superadmin' || r === 'superadmin') return UserRole.SUPER_ADMIN;
-  
-  // City/District Admin matching
-  if (r === 'cityadmin' || r === 'districtadmin') return UserRole.CITY_ADMIN;
-  
-  // Merchant/Seller/Vendor matching
-  if (r === 'seller' || r === 'merchant' || r === 'vendor' || r === 'shopkeeper') return UserRole.MERCHANT;
-  
-  // Also check legacy map for any missed variants
-  if (r in LEGACY_ROLE_MAP) {
-    return LEGACY_ROLE_MAP[r];
+
+  const r = role.trim().toUpperCase();
+
+  // First check: exact enum values
+  if (Object.values(UserRole).includes(r as UserRole)) {
+    return r as UserRole;
   }
-  
-  // Default to CUSTOMER for unknown roles (safe fallback)
-  console.warn(`[ROLES] Unknown role "${role}" (normalized: "${r}") - defaulting to CUSTOMER`);
-  return UserRole.CUSTOMER;
+
+  // Second check: legacy role mapping (for old JWT tokens)
+  const legacy = LEGACY_ROLE_MAP[r.toLowerCase()];
+  if (legacy) {
+    return legacy;
+  }
+
+  // Strictly fallback to Customer if anything is suspicious
+  console.warn(`⚠️ [ROLES] Unknown role, defaulting to CUSTOMER: ${role}`);
+  return UserRole.CUSTOMER; 
 }
 
 /**

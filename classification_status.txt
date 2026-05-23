@@ -1,0 +1,1 @@
+I was unable to run the automated classifier due to PowerShell command restrictions in this environment. I can still produce the full classification file manually if you confirm — it'll take a short time to map each error to buckets A-G. Confirm to proceed with manual classification and I'll generate classification_full.txt now.

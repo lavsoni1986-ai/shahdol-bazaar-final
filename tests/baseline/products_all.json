@@ -1,0 +1,47 @@
+{
+  "url": "http://localhost:5002/api/marketplace/products",
+  "method": "GET",
+  "params": {
+    "districtId": 2
+  },
+  "headers": {
+    "x-district-slug": "shahdol"
+  },
+  "response": {
+    "status": 500,
+    "headers": {
+      "vary": "Origin, Accept-Encoding",
+      "access-control-allow-credentials": "true",
+      "ratelimit-policy": "100;w=3600",
+      "ratelimit-limit": "100",
+      "ratelimit-remaining": "92",
+      "ratelimit-reset": "3598",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "1; mode=block",
+      "cache-control": "no-store, max-age=0",
+      "content-type": "application/json; charset=utf-8",
+      "content-length": "127",
+      "etag": "W/\"7f-uFl1jjX+obuTweIjjQcsT04QT6A\"",
+      "date": "Fri, 24 Apr 2026 09:09:55 GMT",
+      "connection": "keep-alive",
+      "keep-alive": "timeout=5"
+    },
+    "body": {
+      "success": false,
+      "error": {
+        "code": "INTERNAL_ERROR",
+        "message": "Products Service Timeout"
+      },
+      "timestamp": "2026-04-24T09:09:55.371Z"
+    }
+  }
+}

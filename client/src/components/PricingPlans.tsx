@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Check, Sparkles, Zap, Crown, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/api-client";
 
 interface Plan {
   id: string;
@@ -18,14 +19,14 @@ interface Plan {
 
 const plans: Plan[] = [
   {
-    id: "BASIC",
-    name: "Basic",
+    id: "SILVER",
+    name: "Silver",
     price: 299,
-    priceId: "BASIC",
-    description: "Perfect for small businesses getting started",
+    priceId: "SILVER",
+    description: "Perfect for growing businesses",
     features: [
       "Basic listing on Shahdol Bazaar",
-      "Product uploads (up to 10)",
+      "Product uploads (up to 50)",
       "Business profile page",
       "Contact form integration",
       "Basic analytics dashboard",
@@ -34,16 +35,16 @@ const plans: Plan[] = [
     color: "from-blue-500 to-cyan-500",
   },
   {
-    id: "PREMIUM",
-    name: "Premium",
-    price: 999,
-    priceId: "PREMIUM",
-    description: "AI Boost for growing businesses",
+    id: "GOLD",
+    name: "Gold",
+    price: 500,
+    priceId: "GOLD",
+    description: "AI Boost for established businesses",
     popular: true,
     features: [
-      "Everything in Basic",
+      "Everything in Silver",
       "AI-Powered concierge",
-      "Product uploads (unlimited)",
+      "Product uploads (up to 100)",
       "Priority search results",
       "WhatsApp notifications",
       "Advanced analytics",
@@ -100,6 +101,27 @@ export default function PricingPlans() {
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
+  // Handle payment verification after redirect
+  useEffect(() => {
+    if (success) {
+      const orderId = localStorage.getItem("cashfree_order_id");
+      const plan = localStorage.getItem("cashfree_plan");
+
+      if (orderId && plan) {
+        // Call verify endpoint
+        apiRequest("POST", "payments/verify", { orderId, plan })
+          .then(() => {
+            // Clear stored data
+            localStorage.removeItem("cashfree_order_id");
+            localStorage.removeItem("cashfree_plan");
+          })
+          .catch((error) => {
+            console.error("Payment verification failed:", error);
+          });
+      }
+    }
+  }, [success]);
+
   const handleSubscribe = async (plan: Plan) => {
     setLoading(plan.id);
     try {
@@ -109,18 +131,12 @@ export default function PricingPlans() {
         return;
       }
 
-      const response = await fetch("/api/payments/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // Token is in httpOnly cookie - credentials: 'include' handles it
-        },
-        credentials: 'include', // Send httpOnly cookies
-        body: JSON.stringify({ plan: plan.priceId }),
-      });
-
-      const data = await response.json();
+      const data = await apiRequest("POST", "payments/create", { plan: plan.priceId });
       if (data.payment_session_id) {
+        // Store order details for verification after redirect
+        localStorage.setItem("cashfree_order_id", data.order_id);
+        localStorage.setItem("cashfree_plan", plan.priceId);
+
         await loadCashfreeSdk();
         const mode = String(data.cashfree_mode || "sandbox").toLowerCase() === "production"
           ? "production"

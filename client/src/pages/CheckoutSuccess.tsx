@@ -4,15 +4,16 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useDistrict } from "@/contexts/DistrictContext";
-import { 
-  CheckCircle, 
-  PartyPopper, 
-  Sparkles, 
+import {
+  CheckCircle,
+  PartyPopper,
+  Sparkles,
   ArrowRight,
   ShoppingBag,
   MapPin,
   Phone,
-  Clock
+  Clock,
+  MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,6 +48,31 @@ export default function CheckoutSuccess() {
   }, [searchParams]);
 
   const districtName = currentDistrict?.name || "Shahdol";
+
+  const triggerSovereignCelebration = () => {
+    const duration = 3000;
+    const end = Date.now() + duration;
+
+    const frame = () => {
+      // Confetti removed for performance
+
+      if (Date.now() < end) {
+        requestAnimationFrame(frame);
+      }
+    };
+    frame();
+
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance("बधाई हो! आपका ऑर्डर सफलतापूर्वक दर्ज हो गया है।");
+      utterance.lang = 'hi-IN';
+      utterance.rate = 0.9;
+      speechSynthesis.speak(utterance);
+    }
+  };
+
+  useEffect(() => {
+    triggerSovereignCelebration();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4 overflow-hidden relative">
@@ -147,6 +173,19 @@ export default function CheckoutSuccess() {
           >
             <ShoppingBag className="w-5 h-5 mr-2" />
             View My Orders
+          </Button>
+          
+          <Button
+            onClick={() => {
+              const message = orderId 
+                ? `Hi! I just placed an order #${orderId} on Shahdol Bazaar. Please confirm.`
+                : `Hi! I just placed an order on Shahdol Bazaar. Please confirm.`;
+              window.open(`https://wa.me/919999999999?text=${encodeURIComponent(message)}`, '_blank');
+            }}
+            className="w-full bg-[#25D366] hover:bg-[#20BD5A] h-12 text-lg"
+          >
+            <MessageCircle className="w-5 h-5 mr-2" />
+            WhatsApp Receipt
           </Button>
           
           <div className="flex gap-3">

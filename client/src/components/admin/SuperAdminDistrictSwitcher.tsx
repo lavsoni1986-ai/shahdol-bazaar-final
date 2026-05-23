@@ -22,7 +22,7 @@ export function SuperAdminDistrictSwitcher() {
       localStorage.setItem(SOVEREIGN_CONFIG.STORAGE_KEYS.DISTRICT_ID, String(selected.id));
       localStorage.setItem(SOVEREIGN_CONFIG.STORAGE_KEYS.DISTRICT_SLUG, selected.slug);
       
-      await refreshDistrict();
+      if (refreshDistrict) await refreshDistrict();
       window.location.href = `/${selected.slug}`;
     }
   };

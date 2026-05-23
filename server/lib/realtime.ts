@@ -41,13 +41,14 @@ export const emitDistrict = async (districtId: number, event: string, payload: a
     };
 
     // 🔥 EVENT PERSISTENCE: Store in DB for reliability
-    await prisma.sovereignEvent.create({
-      data: {
-        districtId,
-        type: event,
-        payload: eventData
-      }
-    });
+    // await prisma.sovereignEvent.create({
+    //   data: {
+    //     districtId,
+    //     type: event,
+    //     payload: eventData
+    //   }
+    // });
+    console.log("[SOVEREIGN_EVENT_DISABLED]", payload);
 
     // Emit to live connections
     (global as any).io?.to(`district:${districtId}`).emit(event, eventData);

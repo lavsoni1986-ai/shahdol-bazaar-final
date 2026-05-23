@@ -1,0 +1,11 @@
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:112:client/src/shared/api/response-normalizers.ts(158,3): error TS2300: Duplicate identifier 'recommendations'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:113:client/src/shared/api/response-normalizers.ts(191,3): error TS2300: Duplicate identifier 'recommendations'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:497:server/services/district-memory.service.ts(833,9): error TS2393: Duplicate function implementation.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:500:server/services/district-memory.service.ts(1217,9): error TS2393: Duplicate function implementation.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:735:shared/contracts/ontology/assertions.ts(7,10): error TS2300: Duplicate identifier 'CanonicalSignal'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:736:shared/contracts/ontology/assertions.ts(7,27): error TS2300: Duplicate identifier 'UserIntentSignal'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:737:shared/contracts/ontology/assertions.ts(7,68): error TS2300: Duplicate identifier 'SignalProvenance'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:740:shared/contracts/ontology/assertions.ts(40,10): error TS2300: Duplicate identifier 'CanonicalSignal'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:741:shared/contracts/ontology/assertions.ts(40,27): error TS2300: Duplicate identifier 'UserIntentSignal'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:742:shared/contracts/ontology/assertions.ts(40,45): error TS2300: Duplicate identifier 'SignalProvenance'.
+C:\Users\LAV\Downloads\Shahdol-Bazaar-MVP\type-errors.txt:753:shared/contracts/ontology/signal-engine.ts(63,27): error TS2300: Duplicate identifier 'TTL_CONFIG'.

@@ -4,6 +4,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { safeText } from "@/lib/admin-response";
 
+import AdminLayout from "./AdminLayout";
+import { toast } from "react-hot-toast";
+
+interface Vendor {
+  id: number;
+  name: string;
+  category?: string;
+  dsslScore?: number;
+  aiConfidence?: number;
+  isSponsored?: boolean;
+  status?: string;
+}
+
 export default function VendorManagement() {
   const queryClient = useQueryClient();
   const { currentDistrict } = useDistrict();
@@ -20,27 +33,27 @@ export default function VendorManagement() {
       const response = await apiRequest("PATCH", `/admin/vendors/${id}/status`, { status });
       return response;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-vendors", districtId] });
-      alert("🛡️ Sovereign Authority: Status Updated!");
-    }
-  });
+      onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["admin-vendors", districtId] });
+       toast.success("Status Updated");
+     }
+   });
 
   const createVendorMutation = useMutation({
     mutationFn: async (newVendor: any) => {
       const response = await apiRequest("POST", "/admin/vendors", newVendor);
       return response;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-vendors", districtId] });
-      alert("🎊 BharatOS: New Vendor Added to the Empire!");
-      setIsModalOpen(false);
-      // Reset form
-      setVendorName("");
-      setCategory("");
-      setInitialScore(5.0);
-    }
-  });
+      onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["admin-vendors", districtId] });
+       toast.success("New vendor added");
+       setIsModalOpen(false);
+       // Reset form
+       setVendorName("");
+       setCategory("");
+       setInitialScore(5.0);
+     }
+   });
 
   const toggleSponsorshipMutation = useMutation({
     mutationFn: async ({ id, sponsored }: { id: number, sponsored: boolean }) => {
@@ -65,6 +78,7 @@ export default function VendorManagement() {
   };
 
   return (
+    <AdminLayout>
     <div className="p-6">
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-2xl font-bold">Market Registry: Shahdol</h2>
@@ -215,5 +229,6 @@ export default function VendorManagement() {
         </div>
       )}
     </div>
+    </AdminLayout>
   );
 }

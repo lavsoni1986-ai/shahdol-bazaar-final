@@ -109,7 +109,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // PRODUCTION MODE: Network-First with Stale-While-Revalidate
-  // Skip API requests (always use network)
+  // Skip API requests (always use network) - /api and /api/ai both
   if (event.request.url.includes('/api/')) {
     return;
   }

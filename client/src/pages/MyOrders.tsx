@@ -5,11 +5,12 @@ import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDistrict } from "@/contexts/DistrictContext";
-import { 
-  Package, 
-  ArrowLeft, 
-  Clock, 
-  CheckCircle, 
+import { apiRequest } from "@/lib/api-client";
+import {
+  Package,
+  ArrowLeft,
+  Clock,
+  CheckCircle,
   XCircle,
   MapPin,
   Phone,
@@ -72,15 +73,19 @@ export default function MyOrders() {
   useEffect(() => {
     if (!user?.id) return;
 
-    fetch(`/api/orders/user/${user.id}`, { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        setOrders(data.orders || []);
+    (async () => {
+      try {
+        // ✅ Sovereign canonical endpoint: GET /orders/ with JWT auth filters by user
+        const res = await apiRequest("GET", "orders/");
+        // apiRequest returns { success, data } — NOT raw Response
+        const list = res?.data || [];
+        setOrders(Array.isArray(list) ? list : []);
+      } catch {
+        // Orders unavailable — degrade gracefully
+      } finally {
         setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-      });
+      }
+    })();
   }, [user?.id]);
 
   if (!isAuthenticated) {
@@ -157,7 +162,7 @@ export default function MyOrders() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Link>
-          
+
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
               <ShoppingBag className="w-6 h-6 text-white" />
@@ -205,9 +210,9 @@ export default function MyOrders() {
                           <div className="flex items-center gap-3">
                             {/* Product Image */}
                             {order.product?.imageUrl ? (
-                              <img 
-                                src={order.product.imageUrl} 
-                                alt={order.product.name} 
+                              <img
+                                src={order.product.imageUrl}
+                                alt={order.product.name}
                                 className="w-16 h-16 rounded-lg object-cover border"
                               />
                             ) : (
@@ -245,8 +250,8 @@ export default function MyOrders() {
                               )}
                             </div>
                             {order.vendor.phone && (
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 className="text-green-600 border-green-200 hover:bg-green-50"
                                 onClick={() => window.open(`https://wa.me/91${order.vendor?.phone?.replace(/\D/g, '')}`, '_blank')}
@@ -265,13 +270,13 @@ export default function MyOrders() {
                             const isCompleted = index <= currentIndex;
                             const isCurrent = index === currentIndex;
                             const StageIcon = stage.icon;
-                            
+
                             return (
                               <div key={stage.key} className="flex flex-col items-center flex-1">
                                 <div className={`
                                   w-8 h-8 rounded-full flex items-center justify-center mb-1
-                                  ${isCompleted 
-                                    ? 'bg-green-500 text-white' 
+                                  ${isCompleted
+                                    ? 'bg-green-500 text-white'
                                     : 'bg-slate-200 text-slate-400'
                                   }
                                   ${isCurrent && !['completed', 'delivered'].includes(order.status) ? 'ring-2 ring-orange-400' : ''}
@@ -316,9 +321,9 @@ export default function MyOrders() {
                           <div className="flex items-center gap-3">
                             {/* Product Image */}
                             {order.product?.imageUrl ? (
-                              <img 
-                                src={order.product.imageUrl} 
-                                alt={order.product.name} 
+                              <img
+                                src={order.product.imageUrl}
+                                alt={order.product.name}
                                 className="w-16 h-16 rounded-lg object-cover border"
                               />
                             ) : (
@@ -356,8 +361,8 @@ export default function MyOrders() {
                               )}
                             </div>
                             {order.vendor.phone && (
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 className="text-green-600 border-green-200 hover:bg-green-50"
                                 onClick={() => window.open(`https://wa.me/91${order.vendor?.phone?.replace(/\D/g, '')}`, '_blank')}
@@ -376,13 +381,13 @@ export default function MyOrders() {
                             const isCompleted = index <= currentIndex;
                             const isCurrent = index === currentIndex;
                             const StageIcon = stage.icon;
-                            
+
                             return (
                               <div key={stage.key} className="flex flex-col items-center flex-1">
                                 <div className={`
                                   w-8 h-8 rounded-full flex items-center justify-center mb-1
-                                  ${isCompleted 
-                                    ? 'bg-green-500 text-white' 
+                                  ${isCompleted
+                                    ? 'bg-green-500 text-white'
                                     : 'bg-slate-200 text-slate-400'
                                   }
                                   ${isCurrent && !['completed', 'delivered'].includes(order.status) ? 'ring-2 ring-blue-400' : ''}

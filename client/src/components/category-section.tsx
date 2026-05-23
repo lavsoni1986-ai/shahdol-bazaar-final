@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/api-client";
 
 type Category = {
   id: number;
@@ -16,7 +17,7 @@ export function CategorySection() {
   const { data, isLoading, error, status } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
-      const res = await fetch("/api/categories");
+      const res = await apiRequest("GET", "/categories");
       
       if (!res.ok) {
         throw new Error(`Failed to fetch categories: ${res.status}`);

@@ -1,5 +1,6 @@
+import { apiRequest } from "@/lib/api-client";
+
 const WHATSAPP_NUMBER = "917696888881";
-const API_BASE = "/api";
 
 export interface LeadData {
   source?: string;
@@ -16,21 +17,17 @@ export interface LeadData {
 
 export async function trackLead(data: LeadData): Promise<void> {
   try {
-    await fetch(`${API_BASE}/leads`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: data.source || "WHATSAPP_INQUIRY",
-        action: data.action || "click",
-        itemId: data.itemId,
-        itemName: data.itemName,
-        category: data.category,
-        searchTerm: data.searchTerm,
-        productId: data.productId,
-        vendorId: data.vendorId,
-        districtId: data.districtId,
-        metadata: data.metadata || {},
-      }),
+    await apiRequest("POST", "/leads", {
+      source: data.source || "WHATSAPP_INQUIRY",
+      action: data.action || "click",
+      itemId: data.itemId,
+      itemName: data.itemName,
+      category: data.category,
+      searchTerm: data.searchTerm,
+      productId: data.productId,
+      vendorId: data.vendorId,
+      districtId: data.districtId,
+      metadata: data.metadata || {},
     });
   } catch (error) {
     console.error("Lead tracking failed:", error);

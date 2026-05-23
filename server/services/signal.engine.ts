@@ -2,6 +2,7 @@
 // Daily cron job to compute ML signals from raw user events
 
 import { emitSignalsUpdate } from "../lib/realtime";
+import { prisma } from '../storage';
 
 export async function computeVendorSignals(vendorId: number): Promise<void> {
   // 🚨 SIGNAL DECAY: Only use recent data (7 days for freshness)
