@@ -100,12 +100,14 @@ if (effectiveIsProduction) {
 }
 
 // Global exception handler - log why the process is dying
+// 🛡️ DO NOT exit process — host process manager (PM2/Docker) handles restart
+// exit(1) would drop all active connections, in-flight orders, and real-time sockets
 process.on("uncaughtException", (err) => {
   console.error("❌ [FATAL] Uncaught Exception:", err.message);
   if (process.env.NODE_ENV !== "production") {
     console.error("❌ [FATAL] Stack:", err.stack);
   }
-  process.exit(1);
+  // process.exit(1) deliberately removed for pilot stability
 });
 
 process.on("unhandledRejection", (reason, promise) => {
@@ -467,33 +469,109 @@ app.use('/api', apiCacheMiddleware);
 // ============================================
 // CASHFREE WEBHOOK (MUST be before express.json())
 // ============================================
+// 🛡️ Raw body middleware required for HMAC signature verification
 app.use("/api/payments/webhook/cashfree", express.raw({ type: "application/json" }));
 
 // ============================================
-// CASHFREE WEBHOOK HANDLER FOR SUBSCRIPTIONS
+// CASHFREE WEBHOOK HANDLER — HMAC SHA256 VERIFIED
 // ============================================
+// 🛡️ SECURITY LAYER:
+//   1. HMAC SHA256 verification via crypto.timingSafeEqual
+//   2. Timestamp freshness validation (rejects > 5 min old)
+//   3. Rejects missing x-webhook-signature header
+//   4. Timing-attack resistant comparison with length pre-check
+//   5. No business logic execution — webhook is validation + log only
+//   6. Replay prevention requires idempotency key tracking (see notes)
 app.post("/api/payments/webhook/cashfree", async (req, res) => {
   try {
-    const payload = JSON.parse(req.body.toString());
+    // ============================================
+    // 🛡️ STEP 1: Extract & validate signature header
+    // ============================================
+    const signature = req.headers["x-webhook-signature"] as string | undefined;
+    if (!signature) {
+      console.error("🚨 [WEBHOOK_SECURITY] Missing x-webhook-signature header");
+      return res.status(401).json({ success: false, error: "Missing signature" });
+    }
+
+    const rawBody = req.body as Buffer;
+    if (!rawBody || rawBody.length === 0) {
+      console.error("🚨 [WEBHOOK_SECURITY] Empty request body");
+      return res.status(400).json({ success: false, error: "Empty body" });
+    }
+
+    // ============================================
+    // 🛡️ STEP 2: Timestamp freshness validation
+    // ============================================
+    // Prevents replay of old webhook events
+    const timestamp = req.headers["x-webhook-timestamp"] as string | undefined;
+    if (timestamp) {
+      const webhookTime = new Date(timestamp).getTime();
+      const now = Date.now();
+      const FIVE_MINUTES_MS = 5 * 60 * 1000;
+      if (isNaN(webhookTime) || (now - webhookTime) > FIVE_MINUTES_MS) {
+        console.error("🚨 [WEBHOOK_SECURITY] Request expired or invalid timestamp");
+        return res.status(401).json({ success: false, error: "Expired request" });
+      }
+    }
+
+    // ============================================
+    // 🛡️ STEP 3: HMAC SHA256 verification
+    // ============================================
+    const webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET || process.env.CASHFREE_SECRET_KEY;
+    if (!webhookSecret) {
+      console.error("🚨 [WEBHOOK_SECURITY] CASHFREE_WEBHOOK_SECRET not configured");
+      return res.status(500).json({ success: false, error: "Server configuration error" });
+    }
+
+    const expectedSignature = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(rawBody)
+      .digest("base64");
+
+    // 🛡️ SAFE TIMING-ATTACK RESISTANT COMPARISON
+    // Length pre-check prevents timingSafeEqual from crashing on mismatch
+    const signatureBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSignature);
+
+    if (signatureBuf.length !== expectedBuf.length ||
+      !crypto.timingSafeEqual(signatureBuf, expectedBuf)) {
+      console.error("🚨 [WEBHOOK_SECURITY] Invalid signature — possible forgery attempt");
+      return res.status(401).json({ success: false, error: "Invalid signature" });
+    }
+
+    console.log("✅ [WEBHOOK_SECURITY] Signature verification passed");
+
+    // ============================================
+    // 🛡️ STEP 4: Parse verified payload
+    // ============================================
+    const payload = JSON.parse(rawBody.toString("utf8"));
 
     // Validate webhook structure
     if (!payload?.data?.order?.order_id || !payload?.data?.order?.order_status) {
-      console.error("Invalid webhook payload structure");
+      console.error("❌ [WEBHOOK] Invalid webhook payload structure");
       return res.status(400).json({ success: false });
     }
 
     const { order_id, order_status } = payload.data.order;
 
-    // Only process paid orders - log and acknowledge
+    // ============================================
+    // ⚠️ BUSINESS LOGIC BOUNDARY
+    // ============================================
+    // 🛡️ Keep business logic out of webhook handlers.
+    // 🛡️ Webhook should only validate, log, and acknowledge.
+    // 🛡️ Actual processing (subscription upgrades, boost activation)
+    //    happens in the verify endpoint (server/routes/payments.cashfree.routes.ts)
+    //    which re-validates payment status with Cashfree API directly.
+    // ============================================
     if (order_status === "PAID") {
       console.log(`💳 [WEBHOOK] Payment received for order ${order_id}`);
-      // Payment processing logic moved to payments.cashfree.routes.ts
+      // Business logic intentionally excluded — see payment verify endpoint
     }
 
     return res.json({ success: true });
 
   } catch (err) {
-    console.error("Webhook processing failed:", err);
+    console.error("❌ [WEBHOOK] Processing failed:", err);
     return res.status(500).json({ success: false });
   }
 });

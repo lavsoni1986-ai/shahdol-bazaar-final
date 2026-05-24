@@ -1,13 +1,70 @@
+// 🏛️ BHARAT-OS: GOVERNED MARKETPLACE PAGE
+// ================================================================
+// SOVEREIGN — Consumes canonical store/product cards.
+// NO hardcoded category branching. NO any types. NO commerce-only assumptions.
+// Analytics via trackEvent. Filters via governance where possible.
+// ================================================================
+
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AISearchTerminal } from "@/components/home/AISearchTerminal";
 import { SovereignStoreCard } from "@/components/home/SovereignStoreCard";
 import { StoreCardSkeleton } from "@/components/shared/SovereignStoreCard";
 import { SovereignProductCard, ProductCardSkeleton } from "@/components/home/SovereignProductCard";
-import { Filter, ShoppingBag, Store, Sparkles } from "lucide-react";
-import { SOVEREIGN_CONFIG } from "@/lib/SovereignConstants";
+import { ShoppingBag, Store, Sparkles } from "lucide-react";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { apiRequest, getArrayData } from "@/lib/api-client";
+import { trackEvent } from "@/lib/analytics";
+
+// ─── TYPES ──────────────────────────────────────────────
+
+interface StoreData {
+  id: number;
+  name: string;
+  slug?: string | null;
+  shopName?: string;
+  imageUrl?: string | null;
+  image?: string | null;
+  logo?: string | null;
+  category?: string | { name: string } | null;
+  businessType?: string;
+  isSponsored?: boolean;
+  isTrending?: boolean;
+  isVerified?: boolean;
+  dsslScore?: number | null;
+  distance?: string | number | null;
+  distanceKm?: string | number | null;
+  isOpen?: boolean;
+  closingTime?: string;
+  phone?: string | null;
+  address?: string | null;
+  district?: string;
+  rating?: number | null;
+  reviewCount?: number | null;
+  reason?: string;
+  deliveryInfo?: string;
+}
+
+interface ProductData {
+  id: number;
+  title: string;
+  name?: string;
+  price: string | number;
+  slug?: string;
+  imageUrl?: string;
+  category?: string;
+  isSponsored?: boolean;
+  isTrending?: boolean;
+  discount?: number | null;
+  sellerName?: string;
+  sellerSlug?: string;
+  dsslScore?: number | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+  district?: string;
+  deliveryInfo?: string;
+}
+
+// ─── COMPONENT ──────────────────────────────────────────
 
 export default function MarketplacePage() {
   const { currentDistrict, isReady } = useDistrict();
@@ -18,6 +75,10 @@ export default function MarketplacePage() {
     queryKey: ["marketplace/stores", currentDistrict?.id],
     queryFn: async () => {
       if (!isReady || !currentDistrict?.id) return [];
+      trackEvent("SEARCH_INTERACTION", {
+        action: "fetch_stores",
+        value: { district: currentDistrict.slug },
+      });
       const res = await apiRequest("GET", "/marketplace/stores");
       return getArrayData(res);
     },
@@ -26,12 +87,16 @@ export default function MarketplacePage() {
     staleTime: 5 * 60 * 1000 // 5 minutes
   });
 
-  const stores = Array.isArray(storesData) ? storesData : [];
+  const stores = Array.isArray(storesData) ? (storesData as StoreData[]) : [];
 
   const { data: productsData, isLoading: productsLoading, error: productsError } = useQuery({
     queryKey: ["marketplace/products", currentDistrict?.id],
     queryFn: async () => {
       if (!isReady || !currentDistrict?.id) return [];
+      trackEvent("SEARCH_INTERACTION", {
+        action: "fetch_products",
+        value: { district: currentDistrict.slug },
+      });
       const res = await apiRequest("GET", "/marketplace/products");
       return getArrayData(res);
     },
@@ -40,7 +105,25 @@ export default function MarketplacePage() {
     staleTime: 5 * 60 * 1000 // 5 minutes
   });
 
-  const products = Array.isArray(productsData) ? productsData : [];
+  const products = Array.isArray(productsData) ? (productsData as ProductData[]) : [];
+
+  const handleTabSwitch = (tab: 'stores' | 'products') => {
+    setActiveTab(tab);
+    trackEvent("CTA_CLICK", {
+      source: "marketplace_tabs",
+      action: tab,
+      value: { district: currentDistrict?.slug },
+    });
+  };
+
+  const handleCategoryClick = (cat: string) => {
+    setSelectedCategory(cat);
+    trackEvent("CTA_CLICK", {
+      source: "marketplace_category",
+      action: cat,
+      value: { district: currentDistrict?.slug },
+    });
+  };
 
   // Guard AFTER hooks
   if (!isReady || !currentDistrict?.id) {
@@ -51,23 +134,25 @@ export default function MarketplacePage() {
     );
   }
 
+  // Category filters — currently commerce-oriented; designed to be replaced
+  // by governance-driven category resolution in future phase.
   const categories = ["All", "Grocery", "Electronics", "Fashion", "Pharmacy", "Food"];
 
   return (
     <div className="sovereign-bg">
-      <div className="max-w-7xl mx-auto px-6 pt-6">
+      <div className="max-w-7xl mx-auto px-4 pt-4 sm:px-6 sm:pt-6">
         {/* 📑 Navigation & Filters */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12 border-b border-white/5 pb-8">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8 md:gap-6 md:mb-12 border-b border-white/5 pb-8">
           <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10">
             <TabButton
               active={activeTab === 'stores'}
-              onClick={() => setActiveTab('stores')}
+              onClick={() => handleTabSwitch('stores')}
               icon={<Store className="w-4 h-4" />}
               label="Stores"
             />
             <TabButton
               active={activeTab === 'products'}
-              onClick={() => setActiveTab('products')}
+              onClick={() => handleTabSwitch('products')}
               icon={<ShoppingBag className="w-4 h-4" />}
               label="Products"
             />
@@ -77,7 +162,7 @@ export default function MarketplacePage() {
             {categories.map(cat => (
               <button
                 key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => handleCategoryClick(cat)}
                 className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${selectedCategory === cat
                   ? 'bg-orange-500 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)]'
                   : 'bg-white/5 text-gray-500 border border-white/10 hover:border-orange-500/30'
@@ -115,7 +200,7 @@ export default function MarketplacePage() {
                   <StoreCardSkeleton key={i} variant="marketplace" />
                 ))
               ) : (
-                stores?.map((store: any) => (
+                stores?.map((store) => (
                   <SovereignStoreCard key={store.id} data={store} />
                 ))
               )
@@ -125,7 +210,7 @@ export default function MarketplacePage() {
                   <ProductCardSkeleton key={i} variant="marketplace" />
                 ))
               ) : (
-                products?.map((product: any) => (
+                products?.map((product) => (
                   <SovereignProductCard key={product.id} data={product} />
                 ))
               )

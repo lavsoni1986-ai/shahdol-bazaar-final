@@ -36,13 +36,14 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === "development" 
-    ? ["error", "warn"] 
+// 🔧 prismaRaw = unextended client (for internal use only — audit helpers, bootstrap)
+const prismaRaw = globalForPrisma.prisma ?? new PrismaClient({
+  log: process.env.NODE_ENV === "development"
+    ? ["error", "warn"]
     : ["error"],
 });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prismaRaw;
 
 // ============================================
 // PRISMA EXTENSION FOR TENANT ISOLATION + AUDIT LOGGING
@@ -53,7 +54,8 @@ let lastAuditHash = "00000000000000000000000000000000000000000000000000000000000
 
 async function getLastAuditHash(): Promise<string> {
   try {
-    const lastEntry = await prisma.auditLog.findFirst({
+    // Use prismaRaw to bypass extension — audit chain must never self-intercept
+    const lastEntry = await prismaRaw.auditLog.findFirst({
       orderBy: { createdAt: "desc" },
       select: { hash: true }
     });
@@ -86,7 +88,8 @@ async function logAuditEntry(
     const dataToHash = JSON.stringify({ action, targetType, targetId, districtId, timestamp: new Date().toISOString() });
     const hash = computeAuditHash(dataToHash, prevHash);
 
-    await prisma.auditLog.create({
+    // ⚡ Use prismaRaw — audit chain must never self-intercept via extension
+    await prismaRaw.auditLog.create({
       data: {
         action,
         userId,
@@ -99,21 +102,21 @@ async function logAuditEntry(
         hash,
         prevHash
       }
-    }).catch(() => {});
+    }).catch(() => { });
   } catch (error) {
     console.warn("⚠️ [AUDIT] Background logging failed:", error);
   }
 }
 
-// Apply the extension
-const extendedPrisma = prisma.$extends({
+// Apply the extension to the RAW client
+const extendedPrisma = prismaRaw.$extends({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
         const tenantScopedOperations = [
           'findMany', 'findFirst', 'findFirstOrThrow',
-          'update', 'updateMany', 
-          'delete', 'deleteMany', 
+          'update', 'updateMany',
+          'delete', 'deleteMany',
           'count', 'countDocuments'
         ];
 
@@ -192,7 +195,7 @@ const extendedPrisma = prisma.$extends({
         // Background audit logging for write operations (non-blocking)
         if (writeOperations.includes(operation) && !shouldSkipAudit(model)) {
           let targetId: number | undefined;
-          
+
           if (args && typeof args === 'object') {
             if ('where' in args && (args as any).where && typeof (args as any).where === 'object' && 'id' in (args as any).where) {
               targetId = Number((args as any).where.id);
@@ -200,7 +203,7 @@ const extendedPrisma = prisma.$extends({
               targetId = Number((args as any).data.id);
             }
           }
-          
+
           setImmediate(() => {
             logAuditEntry(
               `${operation}_${model}`,
@@ -218,8 +221,10 @@ const extendedPrisma = prisma.$extends({
   }
 });
 
-// Replace prisma with extended version
-export const db = extendedPrisma as typeof prisma;
+// EXTENDED CLIENT — exported as `prisma` for every external importer
+export const prisma = extendedPrisma as typeof prismaRaw;
+// Legacy alias (avoid using — prefer `prisma`)
+export const db = prisma;
 
 // Database connection status tracking
 let dbConnected = false;
@@ -231,7 +236,7 @@ let dbConnectionChecked = false;
  */
 export async function checkDatabaseConnection(): Promise<boolean> {
   if (dbConnectionChecked && dbConnected) return true;
-  
+
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbConnected = true;
@@ -510,7 +515,7 @@ export const storage: IStorage = {
     if (!districtId) {
       throw new Error('STORAGE_VIOLATION: districtId is required for data access');
     }
-    
+
     const where: Prisma.ProductWhereInput = {};
     if (approved !== null && approved !== undefined) {
       where.approved = approved;
@@ -526,9 +531,9 @@ export const storage: IStorage = {
 
     return prisma.product.findMany({
       where,
-      include: { 
-        vendor: { include: { vendorMLProfile: true } }, 
-        category: true 
+      include: {
+        vendor: { include: { vendorMLProfile: true } },
+        category: true
       },
       orderBy: { createdAt: "desc" },
     });
@@ -583,12 +588,12 @@ export const storage: IStorage = {
       categoryName: product.categoryName ?? (product.category ?? null),
       categoryId: product.categoryId ?? undefined,
       approved: product.approved ?? false,
-       status: product.status ?? "pending",
-       ...(product.vectorEmbedding !== undefined && {
-         vectorEmbedding: product.vectorEmbedding as Prisma.InputJsonValue,
-       }),
-       districtId: product.districtId,
-     };
+      status: product.status ?? "pending",
+      ...(product.vectorEmbedding !== undefined && {
+        vectorEmbedding: product.vectorEmbedding as Prisma.InputJsonValue,
+      }),
+      districtId: product.districtId,
+    };
 
     return prisma.product.create({ data });
   },
@@ -678,13 +683,13 @@ export const storage: IStorage = {
     if (!districtId) {
       throw new Error('STORAGE_VIOLATION: districtId is required for data access');
     }
-    
+
     try {
-      return await prisma.offer.findMany({ 
-        where: { 
+      return await prisma.offer.findMany({
+        where: {
           isActive: true,
           districtId  // REQUIRED - no more optional
-        } 
+        }
       });
     } catch (error) {
       console.error('[Storage] getOffers error:', error);
@@ -790,7 +795,7 @@ export const storage: IStorage = {
         districtId,
         ...(phone ? { customerPhone: phone } : {})
       };
-      
+
       const orders = await prisma.order.findMany({
         where,
         orderBy: { createdAt: "desc" },
@@ -928,7 +933,7 @@ export const storage: IStorage = {
         where.isApproved = false;
       }
       where.product = { districtId };
-      
+
       const reviews = await prisma.review.findMany({
         where,
         include: {
@@ -948,7 +953,7 @@ export const storage: IStorage = {
         },
         orderBy: { createdAt: 'desc' }
       });
-      
+
       return reviews;
     } catch (error) {
       console.error('[Storage] getReviews error:', error);
@@ -1100,14 +1105,14 @@ export const storage: IStorage = {
     if (!districtId) {
       throw new Error('STORAGE_VIOLATION: districtId is required for data access');
     }
-    
+
     try {
       const vendors = await prisma.vendor.findMany({
         where: { districtId },  // REQUIRED - no more optional
         take: limit,
         orderBy: { id: 'desc' }
       });
-      
+
       return vendors;
     } catch (error) {
       console.error('[Storage] getVendors error:', error);
@@ -1166,7 +1171,7 @@ export const storage: IStorage = {
       where: { districtId },
       orderBy: { name: 'asc' }
     });
-    
+
     // Map vendor fields to frontend expected format
     return vendors.map(vendor => ({
       id: vendor.id,
@@ -1200,7 +1205,7 @@ export const storage: IStorage = {
 
   async getPendingVendorCountByDistrict(districtId: number): Promise<number> {
     return prisma.vendor.count({
-      where: { 
+      where: {
         districtId,
         status: 'PENDING'
       }
@@ -1214,7 +1219,7 @@ export const storage: IStorage = {
       select: { id: true }
     });
     const vendorIds = vendorsInDistrict.map(v => v.id);
-    
+
     return prisma.product.count({
       where: { vendorId: { in: vendorIds } }
     });
@@ -1228,13 +1233,13 @@ export const storage: IStorage = {
 
   async getPendingVendorsByDistrict(districtId: number): Promise<any[]> {
     const vendors = await prisma.vendor.findMany({
-      where: { 
+      where: {
         districtId,
         status: 'PENDING'
       },
       orderBy: { createdAt: 'desc' }
     });
-    
+
     return vendors.map(vendor => ({
       id: vendor.id,
       name: vendor.name,

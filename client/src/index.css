@@ -4,6 +4,67 @@
 
 /* बाकी का कोड इसके नीचे आए... */
 
+/* ===============================
+   LOW-END ANDROID PERFORMANCE MODE
+   ===============================
+   These classes are applied by performance-mode.ts
+   when the device is identified as low-end.
+   =============================== */
+
+/* 🎯 Master low-perf toggle — reduces all GPU-heavy operations */
+.low-perf-mode * {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+/* 🚫 Disable backdrop-blur — biggest GPU killer on Android */
+.no-blur * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 📉 Reduce effect opacity layers — flatten glow/neon */
+.reduce-effects .animate-pulse {
+  animation: none !important;
+}
+
+.reduce-effects [class*="blur-"],
+.reduce-effects [class*="shadow-"] {
+  opacity: 0.3 !important;
+}
+
+.reduce-effects .hover\:scale-*:hover,
+.reduce-effects [class*="hover:scale-"]:hover {
+  transform: none !important;
+}
+
+.reduce-effects [class*="drop-shadow-"] {
+  filter: none !important;
+}
+
+/* 📸 Image performance — bounded rendering */
+.low-perf-mode img {
+  image-rendering: auto;
+  will-change: auto;
+}
+
+.low-perf-mode [class*="aspect-"] img {
+  max-height: 300px;
+  object-fit: contain;
+}
+
+/* 🧱 Fixed/sticky layer containment */
+.low-perf-mode [class*="fixed"],
+.low-perf-mode [class*="sticky"] {
+  will-change: transform;
+}
+
+/* 🚫 Disable expensive gradient animations in low-perf */
+.low-perf-mode [class*="bg-gradient"] {
+  background-attachment: scroll !important;
+}
+
 /* Tailwind v4 Theme Configuration */
 @theme {
   /* === SOVEREIGN-NIGHT PALETTE === */
@@ -102,6 +163,11 @@
 
   .gap-fluid {
     gap: clamp(16px, 3vw, 24px);
+  }
+
+  /* Mobile readability — ensures minimum readable text on small viewports */
+  .text-readable-mobile {
+    font-size: clamp(0.8125rem, 1vw + 0.5rem, 0.875rem);
   }
 
   /* Scrollbar hide utility */

@@ -78,6 +78,29 @@ export { ENTITY_KIND_METADATA, ENTITY_INTELLIGENCE_GOVERNANCE } from "./entity-i
 export { ENTITY_POLICY_GOVERNANCE } from "./entity-policies";
 export { SOVEREIGN_ORCHESTRATOR_GOVERNANCE } from "./sovereign-orchestrator";
 
+// ── Entity Route Resolver ──
+export {
+    resolveEntityRoute,
+    resolveMarketplaceRoute,
+    resolveProductRoute,
+    resolveServiceRoute,
+} from "./entity-route-resolver";
+export type {
+    ResolvableEntityKind,
+    EntityRouteInput,
+    EntityRouteResult,
+} from "./entity-route-resolver";
+
+// ── Entity Experience Resolver ──
+export {
+    resolveEntityExperience,
+    isEntityCommerce,
+} from "./entity-experience-resolver";
+export type {
+    ExperienceInput,
+    ResolvedExperience,
+} from "./entity-experience-resolver";
+
 // ── Version info ──
 export const GOVERNANCE_VERSION = "1.1.0";
 export const GOVERNANCE_CREATED = "2026-05-23";

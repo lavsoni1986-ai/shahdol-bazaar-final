@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { prisma } from "../storage";
 import { analyzeProductImage } from "../services/autoCatalog";
 import { TierManager } from "../services/tier.manager";
+import { generateUniqueProductSlug } from "../repositories/product.repo";
 
 const router = express.Router();
 
@@ -33,9 +34,11 @@ router.post("/auto-catalog", async (req: Request, res: Response) => {
     const productData = await analyzeProductImage(imageUrl);
 
     // Add vendor ID and create product
+    const slug = await generateUniqueProductSlug(productData.title || productData.name || "product");
     const fullProductData = {
       ...productData,
       vendorId,
+      slug,
       districtId: req.districtId, // 🎯 अब यह यूज़र के असली जिले से जुड़ा है
       approved: false // Requires admin approval
     };

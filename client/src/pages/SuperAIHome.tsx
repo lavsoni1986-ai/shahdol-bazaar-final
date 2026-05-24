@@ -61,10 +61,10 @@ export default function SuperAIHome() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white pb-24 selection:bg-orange-500/30">
+    <div className="min-h-screen bg-[#050505] text-white pb-[88px] selection:bg-orange-500/30">
 
       {/* 🥇 1. GPT-STYLE HERO SECTION */}
-      <section className="pt-12 pb-8 px-4 text-center overflow-hidden relative">
+      <section className="pt-14 pb-6 px-4 text-center overflow-hidden relative">
         {/* Sovereign glow effect */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[120%] h-[500px] bg-radial-gradient from-orange-500/10 via-transparent to-transparent blur-[120px] pointer-events-none -z-10" />
         <motion.div initial="hidden" animate="show" variants={stagger}>
@@ -126,7 +126,7 @@ export default function SuperAIHome() {
         )}
       </section>
 
-      <div className="space-y-12 mt-12">
+      <div className="space-y-8 md:space-y-12 mt-8 md:mt-12">
 
         {/* 🥉 3. SPONSORED SPOTLIGHTS (THE REVENUE LAYER) */}
         <motion.section

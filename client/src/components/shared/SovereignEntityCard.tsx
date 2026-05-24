@@ -16,7 +16,6 @@ import {
     Stethoscope,
     MapPin,
     Phone,
-    Star,
     ArrowRight,
     UtensilsCrossed,
     Briefcase,
@@ -25,8 +24,9 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SovereignProductCard, type ProductCardData } from "@/components/shared/SovereignProductCard";
-import type { CanonicalEntity, CanonicalEntityKind } from "@/shared/api/response-normalizers";
-import { resolveEntityCTAs, hasCommerceDisplay } from "@/governance";
+import type { CanonicalEntity } from "@/shared/api/response-normalizers";
+import { resolveEntityCTAs, hasCommerceDisplay, resolveEntityExperience } from "@/governance";
+import { trackEvent } from "@/lib/analytics";
 
 // 🏛️ Canonical entity icon map — uses EntityKind (not old kind strings)
 const ENTITY_ICON_MAP: Partial<Record<string, React.ComponentType<any>>> = {

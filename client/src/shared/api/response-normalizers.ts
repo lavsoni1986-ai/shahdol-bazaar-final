@@ -13,7 +13,8 @@
 // ============================================
 
 import { normalizePartnerEntity, type CanonicalPartner } from "../canonical/partner.adapter";
-import { partnerRoutes, productRoutes, serviceRoutes, getCurrentDistrictSlug } from "../routing/sovereign-routes";
+import { getCurrentDistrictSlug } from "../routing/sovereign-routes";
+import { resolveEntityRoute } from "../../governance/entity-route-resolver";
 
 export type CanonicalEntityKind = 'partner' | 'hospital' | 'school' | 'service' | 'product';
 
@@ -81,14 +82,22 @@ function buildEntityRoute(kind: CanonicalEntityKind, districtSlug: string, slug:
     districtSlug = getCurrentDistrictSlug();
   }
 
-  switch (kind) {
-    case 'product':
-      return productRoutes.detail(districtSlug, slug);
-    case 'service':
-      return serviceRoutes.detail(districtSlug, slug);
-    default:
-      return partnerRoutes.profile(districtSlug, slug);
-  }
+  // Map CanonicalEntityKind to ResolvableEntityKind
+  const kindMap: Record<string, string> = {
+    product: 'product',
+    service: 'service',
+    hospital: 'healthcare',
+    school: 'education',
+    partner: 'marketplace',
+  };
+
+  const result = resolveEntityRoute({
+    entityKind: (kindMap[kind] || 'marketplace') as any,
+    slug,
+    districtSlug,
+  });
+
+  return result.href;
 }
 
 export function normalizeCanonicalEntity(entity: any, districtSlug?: string, kindHint?: CanonicalEntityKind): CanonicalEntity {

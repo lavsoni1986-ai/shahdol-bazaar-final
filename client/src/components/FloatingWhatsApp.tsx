@@ -9,7 +9,7 @@ const trackLead = async (source: string, action: string) => {
     await apiRequest('POST', 'leads', {
       source,
       action,
-      metadata: { 
+      metadata: {
         timestamp: new Date().toISOString(),
         userAgent: navigator.userAgent
       }
@@ -31,7 +31,7 @@ export function FloatingWhatsApp() {
       onClick={handleClick}
       aria-label="WhatsApp Support"
       title="Chat on WhatsApp"
-      className="fixed bottom-24 right-6 md:bottom-24 md:right-8 z-[9999] w-14 h-14 md:w-16 md:h-16 rounded-full bg-green-500 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all duration-300 shadow-[0_0_30px_rgba(37,211,102,0.6)]"
+      className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-green-500 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all duration-300 shadow-[0_0_15px_rgba(37,211,102,0.4)]"
     >
       <MessageCircle size={28} className="text-white" />
     </button>

@@ -1,10 +1,15 @@
-// AI-Powered Recommendations Section
-// Displays personalized recommendations and trending products using AI District Brain
+// 🏛️ BHARAT-OS: AI RECOMMENDATIONS — CANONICAL ENTITY CONSUMER
+// ================================================================
+// Consumes CanonicalEntity[] from ai-brain (AI district intelligence).
+// Renders custom recommendation cards using raw payload for vendor/order data.
+// ================================================================
 
 import { useEffect, useState } from "react";
-import { getPersonalizedRecommendations, getTrendingProducts, type AIRecommendation, type TrendingItem } from "@/lib/ai-brain";
+import { getPersonalizedRecommendations, getTrendingProducts } from "@/lib/ai-brain";
+import type { CanonicalEntity } from "@/shared/api/response-normalizers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
 import { Star, TrendingUp, Sparkles, ShoppingBag } from "lucide-react";
 
 interface AIRecommendationsProps {
@@ -12,8 +17,8 @@ interface AIRecommendationsProps {
 }
 
 export function AIRecommendations({ className = "" }: AIRecommendationsProps) {
-  const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
-  const [trending, setTrending] = useState<TrendingItem[]>([]);
+  const [recommendations, setRecommendations] = useState<CanonicalEntity[]>([]);
+  const [trending, setTrending] = useState<CanonicalEntity[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -64,30 +69,36 @@ export function AIRecommendations({ className = "" }: AIRecommendationsProps) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recommendations.slice(0, 6).map((item) => (
-                <div
-                  key={item.id}
-                  className="p-4 border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => window.location.href = `/product/${item.id}`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-sm line-clamp-2">{item.title}</h3>
-                    <Badge variant="secondary" className="text-xs">
-                      AI {item.dsslScore.toFixed(1)}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1 mb-2">
-                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                    <span className="text-xs text-gray-600">
-                      {item.vendor.rating?.toFixed(1) || 'N/A'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">{item.vendor.name}</p>
-                  {item.price && (
-                    <p className="text-sm font-bold text-green-600 mt-1">₹{item.price}</p>
-                  )}
-                </div>
-              ))}
+              {recommendations.slice(0, 6).map((item) => {
+                const raw = item.raw ?? {};
+                const vendorName = raw.vendor?.name ?? item.subtitle ?? "Unknown";
+                const vendorRating = raw.vendor?.rating ?? null;
+                const dssl = item.dsslScore ?? raw.dsslScore ?? 0;
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.route}
+                    className="block p-4 border border-white/10 rounded-xl hover:border-orange-500/40 hover:bg-white/5 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold text-sm text-white line-clamp-2">{item.title}</h3>
+                      <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-400 border-orange-500/30">
+                        AI {dssl.toFixed(1)}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-1 mb-2">
+                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                      <span className="text-xs text-gray-400">
+                        {vendorRating?.toFixed(1) || 'N/A'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500">{vendorName}</p>
+                    {item.price != null && (
+                      <p className="text-sm font-bold text-emerald-400 mt-1">₹{item.price}</p>
+                    )}
+                  </Link>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -104,31 +115,38 @@ export function AIRecommendations({ className = "" }: AIRecommendationsProps) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {trending.slice(0, 8).map((item) => (
-                <div
-                  key={item.id}
-                  className="p-4 border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => window.location.href = `/product/${item.id}`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-sm line-clamp-2">{item.title}</h3>
-                    <div className="flex items-center gap-1">
-                      <ShoppingBag className="w-3 h-3 text-green-500" />
-                      <span className="text-xs text-green-600">{item.orderCount}</span>
+              {trending.slice(0, 8).map((item) => {
+                const raw = item.raw ?? {};
+                const vendorName = raw.vendor?.name ?? item.subtitle ?? "Unknown";
+                const vendorRating = raw.vendor?.rating ?? null;
+                const dssl = item.dsslScore ?? raw.dsslScore ?? 0;
+                const orderCount = raw.orderCount ?? 0;
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.route}
+                    className="block p-4 border border-white/10 rounded-xl hover:border-orange-500/40 hover:bg-white/5 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold text-sm text-white line-clamp-2">{item.title}</h3>
+                      <div className="flex items-center gap-1">
+                        <ShoppingBag className="w-3 h-3 text-emerald-500" />
+                        <span className="text-xs text-emerald-500">{orderCount}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1 mb-2">
-                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                    <span className="text-xs text-gray-600">
-                      {item.vendor.rating?.toFixed(1) || 'N/A'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">{item.vendor.name}</p>
-                  <Badge variant="outline" className="text-xs mt-2">
-                    DSSL: {item.dsslScore.toFixed(1)}
-                  </Badge>
-                </div>
-              ))}
+                    <div className="flex items-center gap-1 mb-2">
+                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                      <span className="text-xs text-gray-400">
+                        {vendorRating?.toFixed(1) || 'N/A'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500">{vendorName}</p>
+                    <Badge variant="outline" className="text-xs mt-2 border-orange-500/30 text-orange-400">
+                      DSSL: {dssl.toFixed(1)}
+                    </Badge>
+                  </Link>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

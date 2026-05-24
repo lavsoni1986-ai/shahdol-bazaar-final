@@ -9,8 +9,8 @@
 //   - All text sizes use semantic Tailwind classes (NO arbitrary `text-[...]`)
 //   - All shadows use `shadow-lg`/`shadow-xl`/`shadow-2xl` (NO arbitrary `shadow-[...]`)
 
-import { memo, useState, useCallback } from "react";
-import { MapPin, PhoneCall, Store, ShieldCheck, Navigation } from "lucide-react";
+import { memo } from "react";
+import { MapPin, PhoneCall, Store, Navigation } from "lucide-react";
 import { Link } from "wouter";
 import { partnerRoutes, getCurrentDistrictSlug } from "@/shared/routing/sovereign-routes";
 import { SovereignTrustBadge, resolveTrustLevel, type TrustLevel } from "./SovereignTrustBadge";
@@ -20,6 +20,8 @@ import {
     LocalityBadge,
     type DistrictBadgeSize,
 } from "./DistrictIntelligencePrimitives";
+import { resolveEntityExperience, resolveEntityCTAs } from "@/governance";
+import { trackEvent } from "@/lib/analytics";
 
 // ─── TYPES ────────────────────────────────────────────────
 
@@ -206,7 +208,16 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
         ? partnerRoutes.profile(getCurrentDistrictSlug(), data.slug)
         : null;
 
+    // 🏛️ Governance — derive experience and CTAs for store/vendor surfaces
+    const experience = resolveEntityExperience({ entityKind: "marketplace" });
+    const ctas = resolveEntityCTAs({ kind: "marketplace" });
+    const ctaLabel = ctas.primaryCTA.label;
+
     const handleClick = () => {
+        trackEvent("VENDOR_VIEW", {
+            source: variant,
+            value: { entityType: "store", entityId: data.id, district },
+        });
         onTrack?.("click", data.id);
     };
 
@@ -216,6 +227,9 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
         if (data.phone) {
             window.location.href = `tel:${data.phone}`;
         }
+        trackEvent("CALL_CLICK", {
+            value: { entityType: "store", entityId: data.id, district },
+        });
         onTrack?.("call", data.id);
     };
 

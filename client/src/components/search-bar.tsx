@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { aiRouter } from "@/lib/ai-router";
@@ -14,9 +14,20 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import VoiceSearch from "@/components/VoiceSearch";
+import { trackEvent } from "@/lib/analytics";
 
-// Stub for trackAISignal until analytics wired
-const trackAISignal = (..._args: any[]) => { };
+// 🏛️ Canonical tracking — forwards to sovereign analytics
+const trackAISignal = (action: string, entityId?: any, query?: string, type?: string, meta?: any) => {
+  trackEvent("SEARCH_INTERACTION", {
+    action,
+    value: {
+      entityId: entityId?.toString(),
+      searchQuery: query,
+      entityType: type,
+      ...(meta || {}),
+    },
+  });
+};
 
 type SearchResult = {
   hospitals: Array<{
@@ -233,7 +244,7 @@ export function SearchBar({
       <div className="w-full">
         <form onSubmit={handleSubmit}>
           <div className="flex items-center gap-2 w-full max-w-2xl mx-auto">
-            <div className="flex-grow flex items-center bg-white/5 border border-white/10 rounded-full px-4 py-2.5 backdrop-blur-sm focus-within:border-orange-500/50 transition-all">
+            <div className="flex-grow flex items-center bg-white/5 border border-white/10 rounded-full px-4 py-2.5 focus-within:border-orange-500/50 transition-colors">
               <Search className="text-gray-400 w-5 h-5 mr-2" />
               <input
                 value={searchQuery}

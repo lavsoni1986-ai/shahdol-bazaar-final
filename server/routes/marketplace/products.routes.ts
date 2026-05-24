@@ -18,7 +18,7 @@ import {
 } from "../../repositories/product.repo";
 import { resolveMerchantVendorOrThrow } from "../../repositories/vendor.repo";
 import { prisma } from "../../storage";
-import { resolveProductById, normalizeSlug } from "../../services/entity-resolution";
+import { resolveProductById, resolveProductByEntityKey, normalizeSlug } from "../../services/entity-resolution";
 import { EntityResolutionFailure } from "../../services/entity-resolution/types";
 import { validateProductCreation, GovernanceViolation, DistrictMismatchError } from "../../services/governance";
 
@@ -152,13 +152,13 @@ router.get("/products/slug/:slug", async (req: Request, res: Response) => {
   }
 });
 
-// --- FETCH SINGLE PRODUCT BY ID (SOVEREIGN CANONICAL RESOLVER) ---
-router.get("/products/:id", async (req: Request, res: Response) => {
+// --- FETCH SINGLE PRODUCT BY ID OR SLUG (SOVEREIGN CANONICAL RESOLVER) ---
+router.get("/products/:entityKey", async (req: Request, res: Response) => {
   try {
     const setNoStore = (res: Response) => res.setHeader("Cache-Control", "no-store, max-age=0");
     setNoStore(res);
 
-    const id = Number(req.params.id);
+    const entityKey = req.params.entityKey;
     const districtId = req.ctx?.districtId;
     const requestId = `product_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -166,11 +166,11 @@ router.get("/products/:id", async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: { code: "BAD_REQUEST", message: "District not resolved" } });
     }
 
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ success: false, error: { code: "BAD_REQUEST", message: "Invalid product id" } });
+    if (!entityKey) {
+      return res.status(400).json({ success: false, error: { code: "BAD_REQUEST", message: "Invalid product identifier" } });
     }
 
-    const result = await resolveProductById(id, districtId, requestId);
+    const result = await resolveProductByEntityKey(entityKey, districtId, requestId);
 
     if (!result.success) {
       const fail = result.failure!;
@@ -180,7 +180,7 @@ router.get("/products/:id", async (req: Request, res: Response) => {
         _diagnostics: {
           reason: fail.reason,
           message: fail.message,
-          productId: id,
+          productIdentifier: entityKey,
           districtId,
           requestId,
         }

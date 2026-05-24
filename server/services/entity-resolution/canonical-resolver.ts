@@ -684,6 +684,37 @@ export async function resolveProductBySlug(
     }
 }
 
+/**
+ * RESOLVE PRODUCT BY ENTITY KEY
+ *
+ * Single resolver supporting both slug and numeric ID resolution.
+ * - If entityKey is numeric (e.g. "123" or 123), it resolves by ID first.
+ * - Otherwise, it resolves by slug.
+ */
+export async function resolveProductByEntityKey(
+    entityKey: string | number,
+    districtId: number,
+    requestId?: string,
+): Promise<EntityResolutionResult<any>> {
+    const keyStr = String(entityKey).trim();
+    
+    // Check if key is numeric (non-empty integer > 0)
+    const isNumeric = /^\d+$/.test(keyStr);
+    
+    if (isNumeric) {
+        const idVal = parseInt(keyStr, 10);
+        const idResult = await resolveProductById(idVal, districtId, requestId);
+        if (idResult.success) {
+            return idResult;
+        }
+        // Fallback to slug lookup in case of numeric slug mapping
+        return resolveProductBySlug(keyStr, districtId, requestId);
+    } else {
+        // Resolve by slug
+        return resolveProductBySlug(keyStr, districtId, requestId);
+    }
+}
+
 // ============================================
 // HELPER
 // ============================================
@@ -697,6 +728,7 @@ export default {
     resolveVendorById,
     resolveProductById,
     resolveProductBySlug,
+    resolveProductByEntityKey,
     normalizeSlug,
     isValidSlug,
     vendorVisibilityFilter,
