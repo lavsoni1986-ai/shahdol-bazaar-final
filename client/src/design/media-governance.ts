@@ -16,13 +16,20 @@
 // ─── MEDIA TYPE ───────────────────────────────────────────
 
 export type MediaType =
-    | "product"     // phones, electronics, groceries, food items
-    | "poster"      // doctor posters, vertical pamphlets, announcements
-    | "flyer"       // wedding flyers, promotional ads, horizontal handouts
-    | "portrait"    // person/doctor portraits, headshots
-    | "storefront"  // shop exteriors, clinic signage, restaurant fronts
-    | "banner"      // wide promo banners, hero graphics, event banners
-    | "logo";       // brand logos, store logos
+    | "product"         // phones, electronics, groceries, food items
+    | "poster"          // doctor posters, vertical pamphlets, announcements
+    | "flyer"           // wedding flyers, promotional ads, horizontal handouts
+    | "portrait"        // person/doctor portraits, headshots
+    | "storefront"      // shop exteriors, clinic signage, restaurant fronts
+    | "banner"          // wide promo banners, hero graphics, event banners
+    | "logo"            // brand logos, store logos
+    // ── SEMANTIC ENTITY-SPECIFIC TYPES ──
+    | "doctor_banner"   // doctor/clinic hero images — 16:9, bounded
+    | "hospital_banner" // hospital/medical facility images
+    | "restaurant_cover" // restaurant/food cover images
+    | "service_poster"  // service provider vertical posters
+    | "education_banner" // school/college banners
+    | "marketplace_card"; // generic marketplace entity card images
 
 // ─── GOVERNANCE RULES ─────────────────────────────────────
 
@@ -163,6 +170,102 @@ export const MEDIA_GOVERNANCE: Record<MediaType, MediaGovernance> = {
         paddingClass: "p-6",
         backgroundClass: "bg-transparent",
         borderRadiusClass: "rounded-2xl",
+        borderClass: "border border-white/5",
+        objectPositionClass: "object-center",
+    },
+
+    // ── DOCTOR BANNER ─────────────────────────────────────
+    // Best for: doctor/clinic hero images
+    // Strategy: 16:9 landscape, cover, bounded — NOT viewport-dominating
+    doctor_banner: {
+        label: "doctor_banner",
+        aspectClass: "aspect-[16/9]",
+        containStrategy: "cover",
+        maxHeightClass: "max-h-[36vh]",
+        minHeightClass: "min-h-[200px]",
+        paddingClass: "",
+        backgroundClass: "bg-zinc-800",
+        borderRadiusClass: "rounded-2xl",
+        borderClass: "border border-white/5",
+        objectPositionClass: "object-center",
+    },
+
+    // ── HOSPITAL BANNER ───────────────────────────────────
+    // Best for: hospital/medical facility images
+    // Strategy: 16:9 cover, slightly taller than doctor
+    hospital_banner: {
+        label: "hospital_banner",
+        aspectClass: "aspect-[16/9]",
+        containStrategy: "cover",
+        maxHeightClass: "max-h-[40vh]",
+        minHeightClass: "min-h-[220px]",
+        paddingClass: "",
+        backgroundClass: "bg-zinc-800",
+        borderRadiusClass: "rounded-2xl",
+        borderClass: "border border-white/5",
+        objectPositionClass: "object-center",
+    },
+
+    // ── RESTAURANT COVER ─────────────────────────────────
+    // Best for: restaurant/food cover images
+    // Strategy: 4:3 landscape, cover, vibrant treatment
+    restaurant_cover: {
+        label: "restaurant_cover",
+        aspectClass: "aspect-[4/3]",
+        containStrategy: "cover",
+        maxHeightClass: "max-h-[38vh]",
+        minHeightClass: "min-h-[220px]",
+        paddingClass: "",
+        backgroundClass: "bg-zinc-800",
+        borderRadiusClass: "rounded-2xl",
+        borderClass: "border border-white/5",
+        objectPositionClass: "object-center",
+    },
+
+    // ── SERVICE POSTER ────────────────────────────────────
+    // Best for: service provider vertical posters
+    // Strategy: 3:4 portrait, contain, capped lower than portrait mode
+    service_poster: {
+        label: "service_poster",
+        aspectClass: "aspect-[3/4]",
+        containStrategy: "contain",
+        maxHeightClass: "max-h-[40vh]",
+        minHeightClass: "min-h-[240px]",
+        paddingClass: "p-3",
+        backgroundClass: "bg-black/30",
+        borderRadiusClass: "rounded-2xl",
+        borderClass: "border border-white/10",
+        objectPositionClass: "object-center",
+    },
+
+    // ── EDUCATION BANNER ──────────────────────────────────
+    // Best for: school/college banners
+    // Strategy: 16:9 cover, clean background
+    education_banner: {
+        label: "education_banner",
+        aspectClass: "aspect-[16/9]",
+        containStrategy: "cover",
+        maxHeightClass: "max-h-[34vh]",
+        minHeightClass: "min-h-[180px]",
+        paddingClass: "",
+        backgroundClass: "bg-zinc-800",
+        borderRadiusClass: "rounded-2xl",
+        borderClass: "border border-white/5",
+        objectPositionClass: "object-center",
+    },
+
+    // ── MARKETPLACE CARD ──────────────────────────────────
+    // Best for: generic marketplace entity card images
+    // Strategy: 1:1 square, contain with padding, compact
+    marketplace_card: {
+        label: "marketplace_card",
+        aspectClass: "aspect-square",
+        containStrategy: "contain",
+        maxHeightClass: "max-h-[32vh]",
+        minHeightClass: "min-h-[160px]",
+        paddingClass: "p-1",
+        backgroundClass: "bg-white/[0.03]",
+        borderRadiusClass: "rounded-xl",
         borderClass: "border border-white/5",
         objectPositionClass: "object-center",
     },

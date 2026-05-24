@@ -291,22 +291,26 @@ router.patch("/vendors/:id/status", requireAuth, requireCityAdmin, async (req: R
       },
     });
 
-    // Audit log
-    await prisma.adminActionLog.create({
-      data: {
-        adminId: req.ctx?.userId!,
-        action: 'VENDOR_STATUS_UPDATE',
-        details: {
-          targetId: vendorId,
-          targetType: 'vendor',
-          beforeValue: existingVendor.status,
-          afterValue: status,
-          decision: status,
-          reason: `Status changed from ${existingVendor.status} to ${status}`,
-          districtId: districtId
+    // Audit log — wrapped: audit failure must NEVER crash governance routes
+    try {
+      await prisma.adminActionLog.create({
+        data: {
+          adminId: req.ctx?.userId!,
+          action: 'VENDOR_STATUS_UPDATE',
+          details: {
+            targetId: vendorId,
+            targetType: 'vendor',
+            beforeValue: existingVendor.status,
+            afterValue: status,
+            decision: status,
+            reason: `Status changed from ${existingVendor.status} to ${status}`,
+            districtId: districtId
+          }
         }
-      }
-    });
+      });
+    } catch (auditErr) {
+      console.error("[AUDIT_FAIL] VENDOR_STATUS_UPDATE:", auditErr);
+    }
 
     return success(res, vendor);
   } catch (e) {
@@ -349,20 +353,24 @@ router.patch("/vendors/:id/ban", requireAuth, requireCityAdmin, adminActionLimit
       data: { status: "REJECTED", isShadowBanned: true }
     });
 
-    // Audit log
-    await prisma.adminActionLog.create({
-      data: {
-        adminId: req.ctx?.userId!,
-        action: "BANNED_VENDOR",
-        details: {
-          targetId: vendorId,
-          targetType: "vendor",
-          decision: "BANNED",
-          reason: "Vendor banned by admin",
-          districtId: districtId
+    // Audit log — wrapped: audit failure must NEVER crash governance routes
+    try {
+      await prisma.adminActionLog.create({
+        data: {
+          adminId: req.ctx?.userId!,
+          action: "BANNED_VENDOR",
+          details: {
+            targetId: vendorId,
+            targetType: "vendor",
+            decision: "BANNED",
+            reason: "Vendor banned by admin",
+            districtId: districtId
+          }
         }
-      }
-    });
+      });
+    } catch (auditErr) {
+      console.error("[AUDIT_FAIL] BANNED_VENDOR:", auditErr);
+    }
 
     return res.json({ success: true, data: vendor });
   } catch (e) {
@@ -405,20 +413,24 @@ router.patch("/vendors/:id/approve", requireAuth, requireCityAdmin, adminActionL
       data: { status: "APPROVED", isShadowBanned: false }
     });
 
-    // Audit log
-    await prisma.adminActionLog.create({
-      data: {
-        adminId: req.ctx?.userId!,
-        action: "VENDOR_APPROVED",
-        details: {
-          targetId: vendorId,
-          targetType: "vendor",
-          decision: "APPROVED",
-          reason: "Vendor approved by admin",
-          districtId: req.ctx?.districtId!
+    // Audit log — wrapped: audit failure must NEVER crash governance routes
+    try {
+      await prisma.adminActionLog.create({
+        data: {
+          adminId: req.ctx?.userId!,
+          action: "VENDOR_APPROVED",
+          details: {
+            targetId: vendorId,
+            targetType: "vendor",
+            decision: "APPROVED",
+            reason: "Vendor approved by admin",
+            districtId: req.ctx?.districtId!
+          }
         }
-      }
-    });
+      });
+    } catch (auditErr) {
+      console.error("[AUDIT_FAIL] VENDOR_APPROVED:", auditErr);
+    }
 
     return res.json({
       success: true,

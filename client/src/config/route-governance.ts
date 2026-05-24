@@ -118,15 +118,26 @@ export const routePatterns: RoutePattern[] = [
         ],
         config: productDetailConfig,
     },
-    // Partner/service/school detail pages
+    // Store/partner detail pages (immersive — no floating search)
     {
         patterns: [
+            /^\/marketplace\/stores\//,
+            /^\/marketplace\/vendors\//,
             /^\/partner\//,
             /^\/service\//,
             /^\/school\//,
             /^\/shop\//,
         ],
-        config: detailPageConfig,
+        config: {
+            headerMode: "immersive",
+            showSearch: false,
+            showBottomNav: true,
+            safeAreaMode: "commerce",
+            isProductRoute: false,
+            isDetailPage: true,
+            showStickyCTA: false,
+            bottomPaddingClass: "pb-[120px]",
+        },
     },
     // Marketplace listing page
     {

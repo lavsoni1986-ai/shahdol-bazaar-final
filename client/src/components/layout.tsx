@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Store, ShoppingCart, Home as HomeIcon, User, LogOut, Package, Search, Sparkles, Menu, MapPin, Brain, ChevronLeft, Share2, Heart } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -30,6 +30,7 @@ import {
   isProductDetailRoute,
   getProductBackHref,
 } from "@/config/route-governance";
+import { applyPerformanceMode, initPerformanceModeListener, shouldReduceEffects } from "@/design/performance-mode";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -46,6 +47,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, logout } = useAuth();
   const cartItemCount = getTotalItems();
   const districtName = currentDistrict?.name || "Shahdol";
+
+  // ⚡ PERFORMANCE MODE — detect low-end Android and apply CSS classes
+  useEffect(() => {
+    applyPerformanceMode();
+    initPerformanceModeListener();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -221,7 +228,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* 🛡️ SEARCH BAR — suppressed on ALL product/detail/admin routes */}
       {!isAdminOrVendor && !isDetailPage && !isProductRoute && (
         <div
-          className={`fixed top-[88px] left-0 w-full z-[90] flex justify-center transition-all duration-300 py-3 px-4 ${scrollY > 200 ? 'opacity-100 translate-y-0 bg-[#050505]/98 backdrop-blur-3xl border-b border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)]' : 'opacity-0 -translate-y-10 pointer-events-none'
+          className={`fixed top-[88px] left-0 w-full z-[90] flex justify-center transition-all duration-500 py-3 px-4 will-change-transform ${scrollY > 150 ? 'opacity-100 translate-y-0 bg-[#050505]/98 backdrop-blur-3xl border-b border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)]' : 'opacity-0 -translate-y-10 pointer-events-none'
             }`}
         >
           <div className="relative z-[90] w-full max-w-xl">
@@ -305,7 +312,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Floating WA - Direct render, no wrapper */}
       {!isAdminOrVendor && (
-        <div className="fixed bottom-20 right-4 md:bottom-24 md:right-8 z-[9999] flex flex-col gap-4 items-end">
+        <div className="fixed bottom-[140px] right-4 md:bottom-[144px] md:right-8 z-[9999] flex flex-col gap-4 items-end">
           <FloatingWhatsApp />
         </div>
       )}

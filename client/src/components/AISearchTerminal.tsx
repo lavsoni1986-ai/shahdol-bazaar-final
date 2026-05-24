@@ -5,10 +5,10 @@ import { motion } from "framer-motion";
 import { fadeUp } from "@/lib/motion.config";
 import { apiRequest } from "@/lib/api-client";
 import { ACTION_TYPES } from "@/constants/action-types";
+import type { CanonicalEntity } from "@/shared/api/response-normalizers";
+import { normalizeCanonicalEntity } from "@/shared/api/response-normalizers";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { SovereignEntityCard } from "@/components/shared/SovereignEntityCard";
-import { CanonicalEntity } from "@/shared/api/response-normalizers";
-import { normalizeCanonicalEntity } from "@/shared/api/response-normalizers";
 
 export default function AISearchTerminal() {
   const [query, setQuery] = useState("");
@@ -119,11 +119,10 @@ export default function AISearchTerminal() {
             onClick={startVoice}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className={`px-4 py-3 rounded-lg transition-all duration-200 ${
-              isListening
-                ? "bg-red-600 animate-pulse text-white shadow-lg shadow-red-500/25"
-                : "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/25"
-            }`}
+            className={`px-4 py-3 rounded-lg transition-all duration-200 ${isListening
+              ? "bg-red-600 animate-pulse text-white shadow-lg shadow-red-500/25"
+              : "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/25"
+              }`}
           >
             🎤
           </motion.button>
@@ -232,7 +231,7 @@ export default function AISearchTerminal() {
                 const rawVendor = safeResults[index];
 
                 return (
-                  <div key={`${entity.canonicalId || entity.id || 'unknown'}-${index}`} className="mb-3">
+                  <div key={`${entity.id || 'unknown'}-${index}`} className="mb-3">
                     <SovereignEntityCard
                       entity={entity}
                       variant="search"
@@ -255,7 +254,9 @@ export default function AISearchTerminal() {
                           <button
                             key={action.type}
                             onClick={() => {
-                              trackAction(entity.id, ACTION_TYPES[action.type.toUpperCase() + "_VENDOR"] || action.type, query);
+                              const actionKey = (action.type.toUpperCase() + "_VENDOR") as keyof typeof ACTION_TYPES;
+                              const resolvedAction = ACTION_TYPES[actionKey] || action.type;
+                              trackAction(entity.id, resolvedAction, query);
                               if (action.type === "CALL") {
                                 window.location.href = `tel:${action.value}`;
                               } else if (action.type === "WHATSAPP") {

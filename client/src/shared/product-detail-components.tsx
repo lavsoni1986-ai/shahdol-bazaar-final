@@ -4,7 +4,7 @@
 
 import { memo, useState, useCallback, type ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ShoppingCart, ShieldCheck, MapPin, Star, Store, MessageCircle, Phone, Clock, Zap, Package, Calendar, CalendarCheck, GraduationCap, UtensilsCrossed } from "lucide-react";
+import { ShoppingCart, ShieldCheck, MapPin, Star, Store, MessageCircle, Phone, Clock, Zap, Package, Calendar, CalendarCheck, GraduationCap, UtensilsCrossed, PhoneCall } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -567,9 +567,11 @@ export function StickyMobileCTA({
 }: StickyMobileCTAProps) {
     const isOutOfStock = stock !== undefined && stock <= 0;
 
-    // 🏛️ Governance-driven CTA label
+    // 🏛️ Governance-driven CTA label — no longer hardcoded to "Add to Cart"
+    // Resolves correctly for ALL entity kinds: product → "Add to Cart", service → "Book Service", etc.
     const ctas = resolveEntityCTAs({ kind: entityKind as any });
-    const ctaLabel = CTA_METADATA.add_to_cart.label; // Mobile sticky always commerce
+    const ctaLabel = ctas.primaryCTA.label;
+    const ctaIcon = ctas.primaryCTA.icon;
 
     return (
         <div

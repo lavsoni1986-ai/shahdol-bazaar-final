@@ -9,7 +9,7 @@ interface HeroProps {
 
 export function Hero({ districtName, tagline, isAuthenticated, userGreeting }: HeroProps) {
   return (
-    <section className="relative isolate z-10 px-4 pt-16 md:pt-20 pb-8 text-center min-h-[50vh] flex flex-col justify-center overflow-hidden">
+    <section className="relative isolate z-10 px-4 pt-16 md:pt-20 pb-8 text-center min-h-[35vh] md:min-h-[50vh] flex flex-col justify-center overflow-hidden">
 
 
       {/* Background glow - ONLY gradient, no bg-black conflict */}

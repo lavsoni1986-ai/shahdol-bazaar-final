@@ -145,12 +145,12 @@ export async function trackAISignal(
   districtId: number;
 }> {
   return apiRequest('POST', 'ai/track', {
-      type,
-      productId,
-      searchQuery,
-      category,
-      metadata
-    });
+    type,
+    productId,
+    searchQuery,
+    category,
+    metadata
+  });
 }
 
 // 🧠 Smart Search with AI Enhancement
@@ -260,7 +260,6 @@ export function normalizeAIEntity(
   // Flatten nested vendor rating for canonical normalization
   const input = {
     ...entity,
-    rating: entity.vendor?.rating ?? entity.rating,
   };
 
   return normalizeCanonicalEntity(input, districtSlug || getCurrentDistrictSlug());

@@ -10,12 +10,13 @@
 //   - All spacing uses consistent Tailwind scale
 
 import { memo, useState, useCallback } from "react";
-import { ShoppingCart, Star, Clock } from "lucide-react";
+import { ShoppingCart, Star, Clock, Phone, MessageCircle, Calendar, Navigation } from "lucide-react";
 import { Link } from "wouter";
 import { productRoutes, getCurrentDistrictSlug } from "@/shared/routing/sovereign-routes";
 import { SovereignTrustBadge, resolveTrustLevel, type TrustLevel } from "./SovereignTrustBadge";
 import { MEDIA_DEBUG_BADGE_CLASS } from "@/design/media-governance";
-import { resolveEntityCTAs } from "@/governance";
+import { resolveEntityExperience, resolveEntityCTAs, type InteractionMode } from "@/governance";
+import { trackEvent } from "@/lib/analytics";
 
 // ─── TYPES ───────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ const ProductImage = memo(function ProductImage({
                 loading="lazy"
                 onLoad={onLoad}
                 onError={onError}
-                className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110 p-1"
+                className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 p-1"
             />
         </>
     );
@@ -264,7 +265,7 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                         <img
                             src={imageSrc}
                             alt={title}
-                            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-110 p-1"
+                            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 p-1"
                             loading="lazy"
                         />
                     ) : (
@@ -298,7 +299,7 @@ export const SovereignProductCard = memo(function SovereignProductCard({
         return (
             <Link
                 href={route}
-                className={`group relative flex flex-col rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] transition-all duration-500 hover:border-orange-500/50 hover:shadow-2xl hover:shadow-orange-500/20 ${className}`}
+                className={`group relative flex flex-col rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] transition-all duration-300 hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/20 ${className}`}
                 onClick={handleClick}
             >
                 {/* Image section — dominant */}
@@ -441,11 +442,11 @@ export const SovereignProductCard = memo(function SovereignProductCard({
     return (
         <Link
             href={route}
-            className={`group relative flex flex-col rounded-3xl overflow-hidden border border-white/10 bg-white/[0.03] transition-all duration-500 hover:border-orange-500/50 hover:bg-white/[0.06] hover:shadow-2xl hover:shadow-orange-500/10 ${className}`}
+            className={`group relative flex flex-col rounded-3xl overflow-hidden border border-white/10 bg-white/[0.03] transition-all duration-300 hover:border-orange-500/50 hover:bg-white/[0.06] hover:shadow-lg hover:shadow-orange-500/10 ${className}`}
             onClick={handleClick}
         >
             {/* 🖼️ IMAGE — primary commerce anchor */}
-            <div className="relative aspect-square overflow-hidden bg-zinc-900/70">
+            <div className="relative aspect-square max-h-[260px] sm:max-h-none overflow-hidden bg-zinc-900/70">
                 <ProductImage
                     src={imageSrc}
                     alt={title}
@@ -530,7 +531,7 @@ export const SovereignProductCard = memo(function SovereignProductCard({
             </div>
 
             {/* 🌌 Sovereign glow accent */}
-            <div className="absolute -bottom-16 -right-16 w-36 h-36 bg-orange-500/8 blur-[70px] pointer-events-none rounded-full" />
+            <div className="absolute -bottom-16 -right-16 w-36 h-36 bg-orange-500/8 blur-3xl pointer-events-none rounded-full" />
         </Link>
     );
 });

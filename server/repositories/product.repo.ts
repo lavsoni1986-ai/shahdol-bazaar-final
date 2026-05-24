@@ -1,4 +1,5 @@
 import { prisma } from "../storage";
+import { baseSlug, appendSuffix } from "../utils/slug";
 
 export async function findProductsByCategory(category: string, districtId: number) {
   const vendors = await prisma.vendor.findMany({
@@ -157,7 +158,27 @@ export async function findMerchantProductById(productId: number, vendorId: numbe
   });
 }
 
+export async function generateUniqueProductSlug(title: string): Promise<string> {
+  const base = baseSlug(title);
+  let slug = base;
+  let counter = 1;
+  while (true) {
+    const existing = await prisma.product.findFirst({
+      where: { slug }
+    });
+    if (!existing) {
+      break;
+    }
+    counter++;
+    slug = appendSuffix(base, counter);
+  }
+  return slug;
+}
+
 export async function createMerchantProduct(data: any) {
+  if (!data.slug && (data.title || data.name)) {
+    data.slug = await generateUniqueProductSlug(data.title || data.name);
+  }
   return prisma.product.create({ data });
 }
 
