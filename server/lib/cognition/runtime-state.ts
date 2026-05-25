@@ -1,6 +1,9 @@
 // Cognition Runtime State Management
 // BharatOS Phase 4 - Deterministic Orchestration
 
+import type { CognitionResult } from './types';
+export type { CognitionResult };
+
 export enum CognitionStage {
   INIT = 'INIT',
   NORMALIZATION = 'NORMALIZATION',
@@ -24,20 +27,6 @@ export interface CognitionError {
   code: string;
   message: string;
   timestamp: number;
-}
-
-export interface CognitionResult {
-  query: string;
-  normalizedQuery: string;
-  intent: 'search' | 'route' | 'command' | 'unknown';
-  entities: any[];
-  confidence: number;
-  metadata: Record<string, any>;
-  domain?: string;
-  entity?: string;
-  locality?: string;
-  searchTerms?: string[];
-  responseMode?: string;
 }
 
 export interface ConfidenceResult {

@@ -3,7 +3,9 @@
 
 // Runtime
 export { CognitionStage, createExecutionState } from './runtime-state';
-export type { CognitionError, CognitionResult, CognitionExecutionState } from './runtime-state';
+export type { CognitionError, CognitionExecutionState } from './runtime-state';
+// Canonical CognitionResult from single source of truth
+export type { CognitionResult } from './types';
 export { advanceStage, failStage, validateExecutionState, executeEngine } from './runtime-orchestrator';
 export { finalizeCognitionResponse } from './response-finalizer';
 

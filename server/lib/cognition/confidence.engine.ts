@@ -3,7 +3,8 @@
 
 export const ENGINE_VERSION = "1.0.0";
 
-import { CognitionResult, RankedEntity } from './ranking.engine';
+import type { CognitionResult } from './types';
+import { RankedEntity } from './ranking.engine';
 
 export interface ConfidenceContext {
   cognition: CognitionResult;

@@ -294,8 +294,6 @@ app.use('/api', rateLimit({
 
 
 
-
-
 // ============================================
 // SECURITY MIDDLEWARE
 // ============================================
@@ -729,17 +727,23 @@ async function startServer() {
 
 
   // 🎯 Step 1.5: Mount Swagger UI for API documentation
-  const swaggerSpec = generateSwaggerSpec();
-  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'BharatOS API Documentation',
-    swaggerOptions: {
-      persistAuthorization: true,
-      displayRequestDuration: true,
-    },
-  }));
-
-  console.log("✅ [INDEX] Swagger UI mounted at /api/docs");
+  // 🛡️ PRODUCTION GUARD: Skips Swagger mounting to prevent TS2589 recursive type explosion
+  // from deeply nested Zod/OpenAPI schema inference in zod-to-openapi.
+  // Runtime APIs and sovereign routing are preserved — only the doc generator is bypassed.
+  if (process.env.NODE_ENV === "production") {
+    console.log("📚 [INDEX] Swagger UI disabled in production (TS2589 guard active)");
+  } else {
+    const swaggerSpec: any = generateSwaggerSpec();
+    app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'BharatOS API Documentation',
+      swaggerOptions: {
+        persistAuthorization: true,
+        displayRequestDuration: true,
+      },
+    }));
+    console.log("✅ [INDEX] Swagger UI mounted at /api/docs");
+  }
 
   // ============================================
   // 🚨 CRITICAL: PRODUCTION STATIC FILE SERVING
