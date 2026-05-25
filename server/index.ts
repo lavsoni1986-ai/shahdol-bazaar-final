@@ -614,18 +614,26 @@ if (!SESSION_SECRET && !process.env.VERCEL) {
 // Session middleware (optional, kept for backward compatibility)
 // JWT tokens are now primary auth method
 // Session middleware - SESSION_SECRET is now required (enforced above)
-app.use(session({
-  secret: SESSION_SECRET || (global as any).__DEV_SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    // 🚩 SECURE: SameSite 'none' requires HTTPS in production
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 1000 * 60 * 60 * 24, // 1 day
-  },
-}));
+// 🛡️ VERCEL GUARD: express-session is stateless in serverless — skip entirely.
+// JWT tokens are the primary auth mechanism; sessions are only for local dev.
+const sessionSecret = SESSION_SECRET || (global as any).__DEV_SESSION_SECRET;
+if (sessionSecret && !process.env.VERCEL) {
+  app.use(session({
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      // 🚩 SECURE: SameSite 'none' requires HTTPS in production
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
+    },
+  }));
+  console.log("✅ [SESSION] Express session middleware enabled (local dev)");
+} else {
+  console.log("🔵 [VERCEL] Skipping express-session middleware (serverless — JWT auth only)");
+}
 
 // Ensure uploads folder exists with open permissions
 // 🛡️ VERCEL GUARD: Serverless filesystem is read-only — skip mkdirSync

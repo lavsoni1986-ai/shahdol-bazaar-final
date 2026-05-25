@@ -9,12 +9,15 @@ type JwtNamespaceWithDefault = JwtModule & { default?: JwtModule };
 const jwtApi: JwtModule = (jwt as JwtNamespaceWithDefault).default ?? jwt;
 
 // Throw error in production if JWT_SECRET is not set
+// 🛡️ VERCEL GUARD: Env vars are injected at runtime, not build time.
+// Don't throw at module load — JWT operations will fail gracefully if missing.
 const isProduction = process.env.NODE_ENV === 'production';
+const isVercel = !!process.env.VERCEL;
 
-if (isProduction && !process.env.JWT_SECRET) {
+if (isProduction && !isVercel && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required in production');
 }
-if (isProduction && !process.env.REFRESH_TOKEN_SECRET) {
+if (isProduction && !isVercel && !process.env.REFRESH_TOKEN_SECRET) {
   throw new Error('REFRESH_TOKEN_SECRET environment variable is required in production');
 }
 
@@ -23,8 +26,8 @@ if (isProduction && !process.env.REFRESH_TOKEN_SECRET) {
 const envJwtSecret = process.env.JWT_SECRET;
 const envRefreshSecret = process.env.REFRESH_TOKEN_SECRET;
 
-// STRICT: In production, reject empty strings
-if (isProduction) {
+// STRICT: In production, reject empty strings (skip on Vercel — runtime injects after build)
+if (isProduction && !isVercel) {
   if (!envJwtSecret || envJwtSecret.trim() === '') {
     throw new Error('JWT_SECRET environment variable is required in production (empty string not allowed)');
   }
