@@ -749,7 +749,7 @@ async function startServer() {
   const __dirname = path.dirname(__filename);
 
   // ✅ Serve static files from built client
-  app.use(express.static(path.join(__dirname, "../dist/client")));
+  app.use(express.static(path.join(__dirname, "../dist")));
 
   // ✅ SPA fallback - serve index.html for all non-API routes
   app.get("*", (req, res) => {
@@ -757,7 +757,7 @@ async function startServer() {
       return res.status(404).json({ error: "API endpoint not found" });
     }
 
-    res.sendFile(path.join(__dirname, "../dist/client/index.html"));
+    res.sendFile(path.join(__dirname, "../dist/index.html"));
   });
 
   // Handle unhandled rejections for orchestration stability
