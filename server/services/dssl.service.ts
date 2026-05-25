@@ -17,8 +17,20 @@ export interface DSSLResult {
 // 🧠 DSSL (minimal, schema-safe)
 // ============================================
 export class DSSL {
-  static getDistrictWeights(_districtId: number) {
-    return {
+  private static weightsCache = new Map<number, {
+    trust: number;
+    performance: number;
+    safety: number;
+    activity: number;
+    conversion: number;
+  }>();
+
+  static setDistrictWeights(districtId: number, weights: any) {
+    this.weightsCache.set(districtId, weights);
+  }
+
+  static getDistrictWeights(districtId: number) {
+    return this.weightsCache.get(districtId) || {
       trust: 0.3,
       performance: 0.25,
       safety: 0.2,
@@ -93,7 +105,6 @@ async function computeVendorSignals(vendorId: number, districtId: number) {
       rating: true,
       isVerified: true,
       status: true,
-      trustScore: true,
       dsslScore: true
     }
   });
@@ -161,7 +172,6 @@ export async function getTrustScore(vendorId: number, districtId: number) {
   await prisma.vendor.update({
     where: { id: vendor.id },
     data: {
-      trustScore: score,
       dsslScore: score,
       rating: metrics.avgRating
     }

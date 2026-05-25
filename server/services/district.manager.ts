@@ -1,4 +1,4 @@
-import { findDistrictById, findDistricts, findEventLogs } from "../repositories";
+import { findDistrictById, findDistricts, findEventLogs, withTransaction } from "../repositories";
 
 export interface DistrictConfig {
   id: number;
@@ -216,7 +216,7 @@ export class DistrictManager {
       .sort(([,a], [,b]) => b - a)[0]?.[0];
 
     // Analyze popular search intents
-    const searchEvents = events.filter(e => e.type.includes('search'));
+    const searchEvents = events.filter(e => e.type && e.type.includes('search'));
     const popularIntents = searchEvents.reduce((acc, event) => {
       const intent = (typeof event.metadata === 'object' && event.metadata !== null && 'intent' in event.metadata) ? event.metadata.intent as string : 'general';
       acc[intent] = (acc[intent] || 0) + 1;
@@ -247,7 +247,7 @@ export class DistrictManager {
 
   static async addNewDistrict(districtData: { name: string; slug: string; state: string }): Promise<DistrictConfig> {
     // Create district in DB
-    const district = await withTransaction(async (tx) => {
+    const district = await withTransaction(async (tx: any) => {
       const newDistrict = await tx.district.create({
         data: {
           ...districtData,

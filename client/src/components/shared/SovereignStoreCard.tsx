@@ -12,7 +12,7 @@
 import { memo } from "react";
 import { MapPin, PhoneCall, Store, Navigation } from "lucide-react";
 import { Link } from "wouter";
-import { partnerRoutes, getCurrentDistrictSlug } from "@/shared/routing/sovereign-routes";
+import { getCurrentDistrictSlug, buildCanonicalRoute } from "@/shared/routing/sovereign-routes";
 import { SovereignTrustBadge, resolveTrustLevel, type TrustLevel } from "./SovereignTrustBadge";
 import {
     DistrictTrustLabel,
@@ -22,6 +22,7 @@ import {
 } from "./DistrictIntelligencePrimitives";
 import { resolveEntityExperience, resolveEntityCTAs } from "@/governance";
 import { trackEvent } from "@/lib/analytics";
+import { GovernedImage } from "@/design/media-governance";
 
 // ─── TYPES ────────────────────────────────────────────────
 
@@ -153,40 +154,7 @@ function StoreCardSkeleton({ variant }: { variant: StoreCardVariant }) {
 
 export { StoreCardSkeleton };
 
-// ─── IMAGE COMPONENT ─────────────────────────────────────
-
-const StoreImage = memo(function StoreImage({
-    src,
-    alt,
-}: {
-    src: string | null;
-    alt: string;
-}) {
-    if (!src) {
-        return (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-500/10 to-zinc-800/50">
-                <span className="text-orange-400 font-black text-xl">{alt[0]}</span>
-            </div>
-        );
-    }
-
-    return (
-        <img
-            src={src}
-            alt={alt}
-            loading="lazy"
-            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
-            onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-                (e.target as HTMLImageElement).parentElement!.classList.add("flex", "items-center", "justify-center");
-                const span = document.createElement("span");
-                span.className = "text-orange-400 font-black text-xl";
-                span.textContent = alt[0];
-                (e.target as HTMLImageElement).parentElement!.appendChild(span);
-            }}
-        />
-    );
-});
+// ─── STORE IMAGE RENDER CENTRALIZED IN MEDIA-GOVERNANCE ───
 
 // ─── MAIN CARD COMPONENT ──────────────────────────────────
 
@@ -204,14 +172,19 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
     const trustLevel: TrustLevel = resolveTrustLevel({ isVerified: data.isVerified, dsslScore: data.dsslScore });
     const district = data.district || getCurrentDistrictSlug();
 
-    const href = data.slug
-        ? partnerRoutes.profile(getCurrentDistrictSlug(), data.slug)
-        : null;
-
     // 🏛️ Governance — derive experience and CTAs for store/vendor surfaces
-    const experience = resolveEntityExperience({ entityKind: "marketplace" });
-    const ctas = resolveEntityCTAs({ kind: "marketplace" });
+    const category = typeof data.category === "string" ? data.category : data.category?.name;
+    const ctas = resolveEntityCTAs({ category });
+    const resolvedKind = ctas.kind;
+    const experience = resolveEntityExperience({ entityKind: resolvedKind, category });
     const ctaLabel = ctas.primaryCTA.label;
+
+    const href = buildCanonicalRoute({
+        entityKind: resolvedKind,
+        slug: data.slug,
+        id: data.id,
+        districtSlug: district,
+    });
 
     const handleClick = () => {
         trackEvent("VENDOR_VIEW", {
@@ -238,9 +211,14 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
         if (!href) {
             return (
                 <div className={`flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 opacity-50 cursor-not-allowed ${className}`}>
-                    <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-zinc-800">
-                        <StoreImage src={imageSrc} alt={name} />
-                    </div>
+                    <GovernedImage
+                        src={imageSrc}
+                        alt={name}
+                        categoryName={categoryName}
+                        name={name}
+                        aspectRatioHint="square"
+                        className="w-14 h-14 rounded-xl flex-shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
                         <p className="text-label font-black uppercase tracking-[0.2em] text-orange-400/70">{categoryName}</p>
                         <h3 className="text-sm font-bold text-white line-clamp-1">{name}</h3>
@@ -256,9 +234,14 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
                 className={`group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-orange-500/40 hover:bg-white/10 ${className}`}
                 onClick={handleClick}
             >
-                <div className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-zinc-800">
-                    <StoreImage src={imageSrc} alt={name} />
-                </div>
+                <GovernedImage
+                    src={imageSrc}
+                    alt={name}
+                    categoryName={categoryName}
+                    name={name}
+                    aspectRatioHint="square"
+                    className="w-14 h-14 rounded-xl flex-shrink-0"
+                />
                 <div className="min-w-0 flex-1">
                     <p className="text-label font-black uppercase tracking-[0.2em] text-orange-400/70">{categoryName}</p>
                     <h3 className="text-sm font-bold text-white line-clamp-1 group-hover:text-orange-400 transition-colors">{name}</h3>
@@ -273,7 +256,7 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
                         {distance && <span className="text-label text-zinc-500">{distance} away</span>}
                     </div>
                 </div>
-                <SovereignTrustBadge level={trustLevel} size="sm" />
+                <SovereignTrustBadge level={trustLevel} size="sm" entityKind={resolvedKind} />
             </Link>
         );
     }
@@ -284,9 +267,14 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
             return (
                 <div className={`group block rounded-2xl overflow-hidden border border-white/10 bg-white/5 p-4 opacity-50 cursor-not-allowed ${className}`}>
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-zinc-800 shrink-0">
-                            <StoreImage src={imageSrc} alt={name} />
-                        </div>
+                        <GovernedImage
+                            src={imageSrc}
+                            alt={name}
+                            categoryName={categoryName}
+                            name={name}
+                            aspectRatioHint="square"
+                            className="w-10 h-10 rounded-full shrink-0"
+                        />
                         <div className="min-w-0">
                             <h3 className="text-sm font-bold text-white truncate">{name}</h3>
                             <p className="text-label text-zinc-500">Coming Soon</p>
@@ -303,14 +291,19 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
                 onClick={handleClick}
             >
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-zinc-800 shrink-0">
-                        <StoreImage src={imageSrc} alt={name} />
-                    </div>
+                        <GovernedImage
+                            src={imageSrc}
+                            alt={name}
+                            categoryName={categoryName}
+                            name={name}
+                            aspectRatioHint="square"
+                            className="w-10 h-10 rounded-full shrink-0"
+                        />
                     <div className="min-w-0 flex-1">
                         <p className="text-caption font-black uppercase tracking-[0.15em] text-orange-400/70 truncate">{categoryName}</p>
                         <h3 className="text-sm font-bold text-white truncate group-hover:text-orange-400 transition-colors">{name}</h3>
                     </div>
-                    {trustLevel !== "none" && <SovereignTrustBadge level={trustLevel} size="sm" />}
+                    {trustLevel !== "none" && <SovereignTrustBadge level={trustLevel} size="sm" entityKind={resolvedKind} />}
                 </div>
             </Link>
         );
@@ -322,9 +315,14 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
             return (
                 <div className={`group relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-5 opacity-50 cursor-not-allowed ${className}`}>
                     <div className="flex items-center gap-4 mb-4">
-                        <div className="w-14 h-14 rounded-full overflow-hidden bg-zinc-800 shrink-0">
-                            <StoreImage src={imageSrc} alt={name} />
-                        </div>
+                        <GovernedImage
+                            src={imageSrc}
+                            alt={name}
+                            categoryName={categoryName}
+                            name={name}
+                            aspectRatioHint="square"
+                            className="w-14 h-14 rounded-full shrink-0"
+                        />
                         <div className="min-w-0">
                             <h3 className="text-base font-bold text-white">{name}</h3>
                             <p className="text-label text-orange-400/70 font-black uppercase tracking-[0.15em]">{categoryName}</p>
@@ -350,13 +348,18 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
 
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-4">
-                    <div className="w-14 h-14 rounded-full overflow-hidden bg-zinc-800 shrink-0">
-                        <StoreImage src={imageSrc} alt={name} />
-                    </div>
+                    <GovernedImage
+                        src={imageSrc}
+                        alt={name}
+                        categoryName={categoryName}
+                        name={name}
+                        aspectRatioHint="square"
+                        className="w-14 h-14 rounded-full shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                             <h3 className="text-base font-bold text-white leading-snug group-hover:text-orange-400 transition-colors">{name}</h3>
-                            {trustLevel !== "none" && <SovereignTrustBadge level={trustLevel} size="sm" />}
+                            {trustLevel !== "none" && <SovereignTrustBadge level={trustLevel} size="sm" entityKind={resolvedKind} />}
                         </div>
                         <p className="text-label font-black uppercase tracking-[0.15em] text-orange-400/70 mt-0.5">{categoryName}</p>
                     </div>
@@ -400,9 +403,14 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
         if (!href) {
             return (
                 <div className={`group flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 opacity-50 cursor-not-allowed ${className}`}>
-                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-zinc-800 shrink-0">
-                        <StoreImage src={imageSrc} alt={name} />
-                    </div>
+                    <GovernedImage
+                        src={imageSrc}
+                        alt={name}
+                        categoryName={categoryName}
+                        name={name}
+                        aspectRatioHint="square"
+                        className="w-12 h-12 rounded-xl shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
                         <h3 className="text-sm font-bold text-white">{name}</h3>
                         <p className="text-xs text-zinc-500 mt-1">Coming Soon</p>
@@ -417,9 +425,14 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
                 className={`group flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:border-orange-500/40 hover:bg-white/10 ${className}`}
                 onClick={handleClick}
             >
-                <div className="w-12 h-12 rounded-xl overflow-hidden bg-zinc-800 shrink-0">
-                    <StoreImage src={imageSrc} alt={name} />
-                </div>
+                <GovernedImage
+                    src={imageSrc}
+                    alt={name}
+                    categoryName={categoryName}
+                    name={name}
+                    aspectRatioHint="square"
+                    className="w-12 h-12 rounded-xl shrink-0"
+                />
                 <div className="min-w-0 flex-1 flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                         <span className="text-caption font-black uppercase tracking-[0.15em] text-orange-400/70">{categoryName}</span>
@@ -439,7 +452,7 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
                         {distance && <span className="text-label text-zinc-500">{distance} away</span>}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                        <SovereignTrustBadge level={trustLevel} size="sm" />
+                        <SovereignTrustBadge level={trustLevel} size="sm" entityKind={resolvedKind} />
                         <DistrictTrustLabel district={district} isVerified={data.isVerified} dsslScore={data.dsslScore} size="sm" />
                     </div>
                 </div>
@@ -452,9 +465,14 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
         return (
             <div className={`group relative overflow-hidden rounded-2xl backdrop-blur-xl p-5 border border-white/[0.06] bg-white/[0.02] opacity-50 cursor-not-allowed ${className}`}>
                 <div className="relative flex items-start gap-4 mb-4">
-                    <div className="shrink-0 w-12 h-12 rounded-full overflow-hidden bg-zinc-800">
-                        <StoreImage src={imageSrc} alt={name} />
-                    </div>
+                    <GovernedImage
+                        src={imageSrc}
+                        alt={name}
+                        categoryName={categoryName}
+                        name={name}
+                        aspectRatioHint="square"
+                        className="w-12 h-12 rounded-full shrink-0"
+                    />
                     <div className="flex-1 min-w-0">
                         <h3 className="text-white font-black text-lg leading-tight">{name}</h3>
                         <p className="text-white/40 text-caption font-black uppercase tracking-[0.15em] mt-1 truncate">{categoryName}</p>
@@ -486,15 +504,20 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
 
                 {/* 🏛️ Header */}
                 <div className="relative flex items-start gap-4 mb-4">
-                    <div className="shrink-0 w-12 h-12 rounded-full overflow-hidden bg-zinc-800">
-                        <StoreImage src={imageSrc} alt={name} />
-                    </div>
+                    <GovernedImage
+                        src={imageSrc}
+                        alt={name}
+                        categoryName={categoryName}
+                        name={name}
+                        aspectRatioHint="square"
+                        className="w-12 h-12 rounded-full shrink-0"
+                    />
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                             <h3 className="text-white font-black text-lg leading-tight group-hover:text-orange-400 transition-colors line-clamp-2">
                                 {name}
                             </h3>
-                            {trustLevel !== "none" && <SovereignTrustBadge level={trustLevel} size="sm" />}
+                            {trustLevel !== "none" && <SovereignTrustBadge level={trustLevel} size="sm" entityKind={resolvedKind} />}
                         </div>
                         <p className="text-white/40 text-caption font-black uppercase tracking-[0.15em] mt-1 truncate">
                             {categoryName}

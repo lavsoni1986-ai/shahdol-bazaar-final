@@ -5,6 +5,7 @@
  * Prevents inventory leakage and ensures stock availability.
  */
 
+import crypto from 'crypto';
 import { prisma } from '../storage.js';
 
 // ============================================
@@ -167,22 +168,37 @@ export class ReservationCleanupWorker {
     });
 
     for (const district of districts) {
+      const logPayload = {
+        action: 'RESERVATION_CLEANUP_COMPLETED',
+        entityType: 'RESERVATION',
+        entityId: district.id,
+        details: { message: `Reservation cleanup: ${totalProcessed} products processed, ${totalReleased} reservations released` },
+        metadata: {
+          totalProcessed,
+          totalReleased,
+          cleanupConfig: RESERVATION_CONFIG
+        },
+        ipAddress: 'system',
+        userAgent: 'ReservationCleanupWorker',
+        districtId: district.id
+      };
+
+      const hash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(logPayload))
+        .digest('hex');
+
       await prisma.auditLog.create({
         data: {
-          action: 'RESERVATION_CLEANUP_COMPLETED',
-          entityType: 'DISTRICT',
-          entityId: district.id,
-          targetType: 'DISTRICT',
-          targetId: district.id,
-          details: `Reservation cleanup: ${totalProcessed} products processed, ${totalReleased} reservations released`,
-          metadata: {
-            totalProcessed,
-            totalReleased,
-            cleanupConfig: RESERVATION_CONFIG
-          },
-          ipAddress: 'system',
-          userAgent: 'ReservationCleanupWorker',
-          districtId: district.id
+          action: logPayload.action,
+          entityType: logPayload.entityType,
+          entityId: logPayload.entityId,
+          details: logPayload.details,
+          metadata: logPayload.metadata,
+          ipAddress: logPayload.ipAddress,
+          userAgent: logPayload.userAgent,
+          districtId: logPayload.districtId,
+          hash
         }
       });
     }
@@ -230,20 +246,37 @@ export class ReservationCleanupWorker {
     console.log(`✅ Manually released ${releaseAmount} reservations for product: ${product.title}`);
 
     // Log manual cleanup
+    const logPayload = {
+      action: 'MANUAL_RESERVATION_CLEANUP',
+      entityType: 'RESERVATION',
+      entityId: productId,
+      details: { message: `Manual reservation cleanup: ${releaseAmount} reservations released` },
+      metadata: {
+        releaseAmount,
+        productId,
+        districtId
+      },
+      ipAddress: 'system',
+      userAgent: 'ReservationCleanupWorker',
+      districtId
+    };
+
+    const hash = crypto
+      .createHash('sha256')
+      .update(JSON.stringify(logPayload))
+      .digest('hex');
+
     await prisma.auditLog.create({
       data: {
-        action: 'MANUAL_RESERVATION_CLEANUP',
-        targetType: 'PRODUCT',
-        targetId: productId,
-        details: `Manual reservation cleanup: ${releaseAmount} reservations released`,
-        metadata: {
-          releaseAmount,
-          productId,
-          districtId
-        },
-        ipAddress: 'system',
-        userAgent: 'ReservationCleanupWorker',
-        districtId
+        action: logPayload.action,
+        entityType: logPayload.entityType,
+        entityId: logPayload.entityId,
+        details: logPayload.details,
+        metadata: logPayload.metadata,
+        ipAddress: logPayload.ipAddress,
+        userAgent: logPayload.userAgent,
+        districtId: logPayload.districtId,
+        hash
       }
     });
 
@@ -313,7 +346,7 @@ export function setupReservationCleanupEndpoints(app: any) {
       });
     } catch (error) {
       console.error('Failed to cleanup product reservations:', error);
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as any).message });
     }
   });
 }

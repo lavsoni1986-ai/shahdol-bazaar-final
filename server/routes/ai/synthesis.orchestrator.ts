@@ -44,7 +44,7 @@ export async function handleSynthesisFlow({
         timeoutMs: 6000
       },
       async () => {
-        executionState.response = await synthesizeResponse({
+        executionState.response = (await synthesizeResponse({
           query: rawQuery,
           districtName: district?.name,
           cognition: executionState.cognition,
@@ -57,7 +57,7 @@ export async function handleSynthesisFlow({
           transportResults,
           districtIntelligence: executionState.districtIntelligence,
           hasLiveAvailability: false
-        });
+        })) as any;
         return executionState.response;
       },
       executionState

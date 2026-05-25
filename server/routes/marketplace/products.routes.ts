@@ -216,7 +216,7 @@ router.get("/merchant/products", requireAuth, requireMerchant, async (req: Reque
     return success(res, productsWithImages);
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
+      return failure(res, "BAD_REQUEST", "Vendor profile not linked to this merchant account.", 400);
     }
 
     console.error("Failed to fetch merchant products", e?.message);
@@ -309,7 +309,7 @@ router.post("/merchant/products", requireAuth, requireMerchant, async (req: Requ
     }
 
     console.error("Create product failed", e?.message);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed to create product"));
+    return failure(res, "SERVER_ERROR", "Failed to create product", 500);
   }
 });
 
@@ -321,12 +321,12 @@ router.post("/merchant/products/:id/images", requireAuth, requireMerchant, uploa
     const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
 
     if (!Number.isInteger(productId)) {
-      return res.status(400).json(failure("BAD_REQUEST", "Invalid product id"));
+      return failure(res, "BAD_REQUEST", "Invalid product id", 400);
     }
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
+      return failure(res, "NOT_FOUND", "Product not found", 404);
     }
 
     const files = req.files as Express.Multer.File[];
@@ -338,11 +338,11 @@ router.post("/merchant/products/:id/images", requireAuth, requireMerchant, uploa
     return success(res, uploadedImages);
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
+      return failure(res, "BAD_REQUEST", "Vendor profile not linked to this merchant account.", 400);
     }
 
     console.error("Image upload failed", e?.message);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed to upload images"));
+    return failure(res, "SERVER_ERROR", "Failed to upload images", 500);
   }
 });
 
@@ -356,18 +356,18 @@ router.delete("/merchant/products/:productId/images/:imageId", requireAuth, requ
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
+      return failure(res, "NOT_FOUND", "Product not found", 404);
     }
 
     await deleteMerchantProductImage(imageId, productId);
     return success(res, { message: "Image deleted" });
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
+      return failure(res, "BAD_REQUEST", "Vendor profile not linked to this merchant account.", 400);
     }
 
     console.error("Image deletion failed", e?.message);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed to delete image"));
+    return failure(res, "SERVER_ERROR", "Failed to delete image", 500);
   }
 });
 
@@ -381,18 +381,18 @@ router.put("/merchant/products/:id", requireAuth, requireMerchant, async (req: R
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
+      return failure(res, "NOT_FOUND", "Product not found", 404);
     }
 
     const updated = await updateMerchantProduct(productId, vendor.id, updates);
     return success(res, updated);
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
+      return failure(res, "BAD_REQUEST", "Vendor profile not linked to this merchant account.", 400);
     }
 
     console.error("Product update failed", e?.message);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed to update product"));
+    return failure(res, "SERVER_ERROR", "Failed to update product", 500);
   }
 });
 
@@ -405,18 +405,18 @@ router.delete("/merchant/products/:id", requireAuth, requireMerchant, async (req
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
+      return failure(res, "NOT_FOUND", "Product not found", 404);
     }
 
     await deleteMerchantProduct(productId, vendor.id);
     return success(res, { message: "Product deleted" });
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
+      return failure(res, "BAD_REQUEST", "Vendor profile not linked to this merchant account.", 400);
     }
 
     console.error("Product deletion failed", e?.message);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed to delete product"));
+    return failure(res, "SERVER_ERROR", "Failed to delete product", 500);
   }
 });
 
@@ -429,18 +429,18 @@ router.get("/merchant/products/:id/images", requireAuth, requireMerchant, async 
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
-      return res.status(404).json(failure("NOT_FOUND", "Product not found"));
+      return failure(res, "NOT_FOUND", "Product not found", 404);
     }
 
     const images = await getMerchantProductImages(productId);
     return success(res, images);
   } catch (e: any) {
     if (e?.message === "MERCHANT_VENDOR_NOT_LINKED") {
-      return res.status(400).json(failure("BAD_REQUEST", "Vendor profile not linked to this merchant account."));
+      return failure(res, "BAD_REQUEST", "Vendor profile not linked to this merchant account.", 400);
     }
 
     console.error("Fetch images failed", e?.message);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed to fetch images"));
+    return failure(res, "SERVER_ERROR", "Failed to fetch images", 500);
   }
 });
 

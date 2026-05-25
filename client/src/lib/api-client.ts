@@ -20,7 +20,7 @@ function serializeBody(body?: any) {
   return JSON.stringify(body);
 }
 
-function resolveCanonicalDistrictSlug(): string {
+export function resolveCanonicalDistrictSlug(): string {
   if (typeof window === "undefined") return "shahdol";
 
   const urlSlug = extractDistrictSlug(window.location.pathname);
@@ -54,12 +54,62 @@ function isValidApiResponse(result: any): boolean {
   return false;
 }
 
-export async function apiRequest(method: string, endpoint: string, body?: any) {
-  const cleanEndpoint = endpoint.replace(/^\/*(api\/+)*/, "");
-  const url = `/api/${cleanEndpoint}`;
+export function normalizeApiUrl(baseUrl: string, endpoint: string): string {
+  // If endpoint is an absolute URL, return it directly but normalize slashes after the domain
+  const isAbsolute = /^[a-z][a-z0-9+.-]*:\/\//i.test(endpoint.trim());
+  if (isAbsolute) {
+    const protocolMatch = endpoint.match(/^https?:\/\//i);
+    if (protocolMatch) {
+      const protocol = protocolMatch[0];
+      const rest = endpoint.slice(protocol.length);
+      return protocol + rest.replace(/\/+/g, "/");
+    }
+    return endpoint;
+  }
+  
+  // Otherwise resolve relative to baseUrl
+  const cleanBase = (baseUrl || "").trim().replace(/\/+$/, "");
+  const cleanEndpoint = endpoint.trim().replace(/^\/*(api\/+)*/, "");
+  
+  let resolvedBase = cleanBase;
+  if (!resolvedBase) {
+    if (typeof window !== "undefined") {
+      resolvedBase = window.location.origin;
+    } else {
+      resolvedBase = "";
+    }
+  }
+  
+  let apiPath = resolvedBase;
+  if (apiPath && !apiPath.endsWith("/api") && !apiPath.includes("/api/")) {
+    apiPath = `${apiPath}/api`;
+  } else if (!apiPath) {
+    apiPath = "/api";
+  }
+  
+  const finalUrl = `${apiPath}/${cleanEndpoint}`;
+  const protocolMatch = finalUrl.match(/^https?:\/\//i);
+  if (protocolMatch) {
+    const protocol = protocolMatch[0];
+    const rest = finalUrl.slice(protocol.length);
+    return protocol + rest.replace(/\/+/g, "/");
+  }
+  
+  return finalUrl.replace(/\/+/g, "/");
+}
+
+export async function apiRequest(
+  method: string, 
+  endpoint: string, 
+  body?: any,
+  options?: { signal?: AbortSignal; headers?: Record<string, string> }
+) {
+  const apiBase = import.meta.env.VITE_API_URL || "";
+  const url = normalizeApiUrl(apiBase, endpoint);
 
   const headers: Record<string, string> = {
     "x-district-slug": resolveCanonicalDistrictSlug(),
+    ...options?.headers,
   };
 
   if (!(typeof FormData !== "undefined" && body instanceof FormData)) {
@@ -73,6 +123,7 @@ export async function apiRequest(method: string, endpoint: string, body?: any) {
       credentials: "include",
       headers,
       body: serializeBody(body),
+      signal: options?.signal,
     });
   } catch (fetchError: any) {
     console.error("❌ Network error in apiRequest:", fetchError);

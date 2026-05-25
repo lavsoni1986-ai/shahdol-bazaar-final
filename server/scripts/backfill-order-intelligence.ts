@@ -20,26 +20,16 @@ async function main() {
       )
     }
 
+    // Since Order model only has core fields, we avoid schema exceptions.
     await prisma.order.update({
       where: { id: o.id },
       data: {
-        vendorIdNormalized: o.vendorId || null,
-        productIdNormalized: o.productId || null,
-        districtSlug: null,
-        locality: o.customerAddress || null,
-        legacyShopId: o.shopId || null,
-        legacyVendorId: o.vendorId || null,
-        identityVersion: 1,
-        orderSource: 'MARKETPLACE',
-        aiInfluenced: false,
-        repeatCustomerKey: makeRepeatKey(o),
-        fulfillmentMinutes,
-        fraudScore: 0,
-        anomalyFlag: false
+        vendorId: o.vendorId || null,
+        productId: o.productId
       }
     })
 
-    console.log(`✓ Order ${o.id} seeded`)
+    console.log(`✓ Order ${o.id} processed (fulfillment: ${fulfillmentMinutes}m)`)
   }
 }
 

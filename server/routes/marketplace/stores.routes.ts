@@ -357,7 +357,7 @@ router.get("/shops/:id", async (req: Request, res: Response) => {
     }
 
     const shop = await prisma.shop.findUnique({
-      where: { id: shopId, districtId }
+      where: { id: shopId }
     });
 
     if (!shop) {

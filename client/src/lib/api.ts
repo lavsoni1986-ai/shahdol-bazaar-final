@@ -1,7 +1,6 @@
 import { createDomainError } from "./errors";
 import { getDistrictFromContext } from "../contexts/DistrictContext";
-
-const API_BASE = '/api';
+import { normalizeApiUrl } from "./api-client";
 
 // Canonical API Response Type
 export interface ApiResponse<T = any> {
@@ -39,11 +38,8 @@ export async function apiRequest<T = any>(
   const startTime = Date.now();
 
   // CANONICAL URL BUILDING - transport layer normalization
-  const normalizedUrl = url.startsWith("/")
-    ? url
-    : `/${url}`;
-
-  const fullUrl = `${API_BASE}${normalizedUrl}`;
+  const apiBase = import.meta.env.VITE_API_URL || "";
+  const fullUrl = normalizeApiUrl(apiBase, url);
 
   // Add district header for marketplace routes (exclude admin)
   const headers: Record<string, string> = {

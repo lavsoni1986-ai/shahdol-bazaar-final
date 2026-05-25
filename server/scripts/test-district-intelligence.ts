@@ -47,7 +47,7 @@ async function testDistrictIntelligence() {
     }
 
   } catch (error) {
-    console.error('❌ Test failed:', error.message);
+    console.error('❌ Test failed:', (error as any).message);
   }
 }
 

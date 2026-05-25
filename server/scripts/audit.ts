@@ -18,32 +18,33 @@ async function runSovereignAudit() {
   console.log(`⚠️ CRITICAL: ${inconsistentVendors.length} vulnerable vendors found!`);
 
   // 🔍 हाई-रिस्क यूज़र्स की जांच (UserIntelligence टेबल के जरिए)
-  const highRiskUsers = await prisma.user.findMany({
-    where: {
-      userIntelligence: {
-        is: {  // <--- यह जादुई कीवर्ड 'is' जोड़ना जरूरी है
-          OR: [
-            { riskScore: { gt: 80 } },
-            { trustScore: { lt: 20 } }
-          ]
-        }
-      }
-    },
+  const usersWithIntelligence = await prisma.user.findMany({
     include: {
       userIntelligence: true
     }
+  });
+
+  const highRiskUsers = usersWithIntelligence.filter(u => {
+    if (!u.userIntelligence || !u.userIntelligence.intelligenceData) return false;
+    const data = u.userIntelligence.intelligenceData as any;
+    const riskScore = data.riskScore ?? 0;
+    const trustScore = data.trustScore ?? 100;
+    return riskScore > 80 || trustScore < 20;
   });
 
   // 🔥 ध्यान दें: यहाँ highRiskUsers.length होना चाहिए
   console.log(`🚨 HIGH RISK: ${highRiskUsers.length} users with high risk score not blocked!`);
 
   if (highRiskUsers.length > 0) {
-    console.table(highRiskUsers.map(u => ({
-      ID: u.id,
-      Username: u.username,
-      Trust: u.userIntelligence?.trustScore,
-      Fraud: u.userIntelligence?.riskScore
-    })));
+    console.table(highRiskUsers.map(u => {
+      const data = (u.userIntelligence?.intelligenceData as any) || {};
+      return {
+        ID: u.id,
+        Username: u.username,
+        Trust: data.trustScore,
+        Fraud: data.riskScore
+      };
+    }));
   }
 
   console.log("✅ DEEP DIAGNOSTIC COMPLETED");

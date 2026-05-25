@@ -35,22 +35,6 @@ function jsonString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-declare global {
-  namespace Express {
-    interface Request {
-      ctx?: {
-        role?: string;
-        districtId?: number;
-        userId?: number;
-        requestId?: string;
-      };
-      districtId?: number;
-      districtSlug?: string;
-      user?: unknown;
-    }
-  }
-}
-
 // Define the exact shape BharatOS expects
 type SovereignVendor = Prisma.VendorGetPayload<{
   include: { vendorMLProfile: true }
@@ -70,7 +54,7 @@ router.get("/fraud-analysis/:vendorId", async (req: Request, res: Response) => {
     const vendorId = parseInt(req.params.vendorId, 10);
 
     if (isNaN(vendorId)) {
-      return res.status(400).json(failure("VALIDATION_ERROR", "Invalid vendor ID", undefined));
+      return failure(res, "VALIDATION_ERROR", "Invalid vendor ID", 400);
     }
 
     const [vendor, fraudHistory] = await Promise.all([
@@ -93,7 +77,7 @@ router.get("/fraud-analysis/:vendorId", async (req: Request, res: Response) => {
     // Get latest fraud analysis from history
     const latestAnalysis = fraudHistory[0];
     if (!latestAnalysis) {
-      return res.status(404).json(failure("NOT_FOUND", "No fraud analysis available for this vendor", undefined));
+      return failure(res, "NOT_FOUND", "No fraud analysis available for this vendor", 404);
     }
 
     const latestDetails = asJsonRecord(latestAnalysis.details);
@@ -126,7 +110,7 @@ router.get("/fraud-analysis/:vendorId", async (req: Request, res: Response) => {
     return success(res, response);
   } catch (error) {
     console.error("Fraud analysis API error:", error);
-    res.status(500).json(failure("SERVER_ERROR", "Failed to fetch fraud analysis", undefined));
+    return failure(res, "SERVER_ERROR", "Failed to fetch fraud analysis", 500);
   }
 });
 
@@ -220,7 +204,7 @@ router.get("/trends", async (req: Request, res: Response) => {
     return success(res, response);
   } catch (error) {
     console.error("Trends API error:", error);
-    res.status(500).json(failure("SERVER_ERROR", "Failed to fetch trend data", undefined));
+    return failure(res, "SERVER_ERROR", "Failed to fetch trend data", 500);
   }
 });
 
@@ -278,7 +262,7 @@ router.get("/rankings", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Rankings API error:", error);
-    res.status(500).json(failure("SERVER_ERROR", "Failed to fetch ranking data", undefined));
+    return failure(res, "SERVER_ERROR", "Failed to fetch ranking data", 500);
   }
 });
 
@@ -363,7 +347,7 @@ router.get("/health", async (req: Request, res: Response) => {
     return success(res, response);
   } catch (error) {
     console.error("Health API error:", error);
-    res.status(500).json(failure("SERVER_ERROR", "Failed to fetch system health data", undefined));
+    return failure(res, "SERVER_ERROR", "Failed to fetch system health data", 500);
   }
 });
 
@@ -372,7 +356,7 @@ router.get("/vendor-insights/:vendorId", async (req: Request, res: Response) => 
     const vendorId = parseInt(req.params.vendorId, 10);
 
     if (isNaN(vendorId)) {
-      return res.status(400).json(failure("VALIDATION_ERROR", "Invalid vendor ID", undefined));
+      return failure(res, "VALIDATION_ERROR", "Invalid vendor ID", 400);
     }
 
     const [vendor, fraudHistory, orders] = await Promise.all([
@@ -453,7 +437,7 @@ router.get("/vendor-insights/:vendorId", async (req: Request, res: Response) => 
     });
   } catch (error) {
     console.error("Vendor insights API error:", error);
-    res.status(500).json(failure("SERVER_ERROR", "Failed to fetch vendor insights", undefined));
+    return failure(res, "SERVER_ERROR", "Failed to fetch vendor insights", 500);
   }
 });
 
@@ -506,7 +490,7 @@ router.get("/metrics", async (req: Request, res: Response) => {
     return success(res, response);
   } catch (error) {
     console.error("Metrics API error:", error);
-    res.status(500).json(failure("SERVER_ERROR", "Failed to fetch metrics", undefined));
+    return failure(res, "SERVER_ERROR", "Failed to fetch metrics", 500);
   }
 });
 
@@ -555,7 +539,7 @@ router.get("/alerts", async (req: Request, res: Response) => {
     return success(res, formattedAlerts);
   } catch (error) {
     console.error("Alerts API error:", error);
-    res.status(500).json(failure("SERVER_ERROR", "Failed to fetch alerts", undefined));
+    return failure(res, "SERVER_ERROR", "Failed to fetch alerts", 500);
   }
 });
 
@@ -584,7 +568,9 @@ router.get("/fraud-network", async (req: Request, res: Response) => {
       : [];
     const riskScoreByVendor = new Map<number, number>();
     for (const row of latestFraudByVendor) {
-      if (!riskScoreByVendor.has(row.vendorId)) riskScoreByVendor.set(row.vendorId, row.riskScore);
+      if (row.vendorId !== null && !riskScoreByVendor.has(row.vendorId)) {
+        riskScoreByVendor.set(row.vendorId, row.riskScore);
+      }
     }
 
     // Create network data
@@ -664,7 +650,7 @@ router.get("/fraud-network", async (req: Request, res: Response) => {
 
     return success(res, response);
   } catch (error) {
-    res.status(500).json(failure("SERVER_ERROR", "Failed to fetch network data", undefined));
+    return failure(res, "SERVER_ERROR", "Failed to fetch network data", 500);
   }
 });
 
@@ -673,7 +659,7 @@ router.post("/policy-simulate", async (req: Request, res: Response) => {
     const { threshold } = req.body;
 
     if (typeof threshold !== "number" || threshold < 0 || threshold > 100) {
-      return res.status(400).json(failure("VALIDATION_ERROR", "Invalid threshold value", undefined));
+      return failure(res, "VALIDATION_ERROR", "Invalid threshold value", 400);
     }
 
     // Mock impact calculation based on threshold
@@ -694,7 +680,7 @@ router.post("/policy-simulate", async (req: Request, res: Response) => {
 
     return success(res, response);
   } catch (error) {
-    res.status(500).json(failure("SERVER_ERROR", "Failed to simulate policy", undefined));
+    return failure(res, "SERVER_ERROR", "Failed to simulate policy", 500);
   }
 });
 

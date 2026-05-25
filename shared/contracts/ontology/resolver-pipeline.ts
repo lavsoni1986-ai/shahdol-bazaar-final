@@ -116,8 +116,8 @@ function resolveSignals(rawQuery: RawQuery, intent: CanonicalIntentType, domain:
   operationalSignals: OperationalSignal[];
   userIntentSignals: UserContextSignal[];
 } {
-  const operationalSignals: ConstitutedSignal[] = [];
-  const userIntentSignals: ConstitutedSignal[] = [];
+  const operationalSignals: OperationalSignal[] = [];
+  const userIntentSignals: UserContextSignal[] = [];
   const text = rawQuery.text.toLowerCase();
 
   // Operational Signals (inferred expectations from query - NOT verified truth)

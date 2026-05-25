@@ -1,5 +1,4 @@
-import { prisma } from '../storage';
-
+import { prisma } from '../storage.js';
 
 export async function trackCallVendor(params: {
   userId?: number;
@@ -12,13 +11,13 @@ export async function trackCallVendor(params: {
   try {
     await prisma.userEvent.create({
       data: {
-        userId: params.userId,
+        userId: params.userId ?? 0,
         eventType: "CALL_VENDOR",
-        vendorId: params.vendorId,
-        metadata: {
+        districtId: params.districtId,
+        sessionId: params.sessionId || null,
+        eventData: {
+          vendorId: params.vendorId,
           query: params.query,
-          districtId: params.districtId,
-          sessionId: params.sessionId,
           actionType: params.actionType || "CALL_VENDOR",
         },
       },
@@ -32,7 +31,7 @@ export async function trackCallVendor(params: {
     console.error("TELEMETRY_ERROR", {
       eventType: "CALL_VENDOR",
       vendorId: params.vendorId,
-      error: error.message,
+      error: (error as any).message,
     });
   }
 }
@@ -48,13 +47,13 @@ export async function trackWhatsappVendor(params: {
   try {
     await prisma.userEvent.create({
       data: {
-        userId: params.userId,
+        userId: params.userId ?? 0,
         eventType: "WHATSAPP_VENDOR",
-        vendorId: params.vendorId,
-        metadata: {
+        districtId: params.districtId,
+        sessionId: params.sessionId || null,
+        eventData: {
+          vendorId: params.vendorId,
           query: params.query,
-          districtId: params.districtId,
-          sessionId: params.sessionId,
           actionType: params.actionType || "WHATSAPP_VENDOR",
         },
       },
@@ -68,7 +67,7 @@ export async function trackWhatsappVendor(params: {
     console.error("TELEMETRY_ERROR", {
       eventType: "WHATSAPP_VENDOR",
       vendorId: params.vendorId,
-      error: error.message,
+      error: (error as any).message,
     });
   }
 }
@@ -84,13 +83,13 @@ export async function trackOpenMaps(params: {
   try {
     await prisma.userEvent.create({
       data: {
-        userId: params.userId,
+        userId: params.userId ?? 0,
         eventType: "OPEN_MAPS",
-        vendorId: params.vendorId,
-        metadata: {
+        districtId: params.districtId,
+        sessionId: params.sessionId || null,
+        eventData: {
+          vendorId: params.vendorId,
           query: params.query,
-          districtId: params.districtId,
-          sessionId: params.sessionId,
           actionType: params.actionType || "OPEN_MAPS",
         },
       },
@@ -104,7 +103,7 @@ export async function trackOpenMaps(params: {
     console.error("TELEMETRY_ERROR", {
       eventType: "OPEN_MAPS",
       vendorId: params.vendorId,
-      error: error.message,
+      error: (error as any).message,
     });
   }
 }
@@ -120,13 +119,13 @@ export async function trackBookingIntent(params: {
   try {
     await prisma.userEvent.create({
       data: {
-        userId: params.userId,
+        userId: params.userId ?? 0,
         eventType: "BOOK_VENDOR",
-        vendorId: params.vendorId,
-        metadata: {
+        districtId: params.districtId,
+        sessionId: params.sessionId || null,
+        eventData: {
+          vendorId: params.vendorId,
           query: params.query,
-          districtId: params.districtId,
-          sessionId: params.sessionId,
           actionType: params.actionType || "BOOK_VENDOR",
         },
       },
@@ -140,7 +139,7 @@ export async function trackBookingIntent(params: {
     console.error("TELEMETRY_ERROR", {
       eventType: "BOOK_VENDOR",
       vendorId: params.vendorId,
-      error: error.message,
+      error: (error as any).message,
     });
   }
 }

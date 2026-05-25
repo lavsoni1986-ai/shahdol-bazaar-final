@@ -46,19 +46,17 @@ async function setupDistrict(config: DistrictConfig) {
   const hashedPassword = await hashPassword(config.adminPassword);
   
   const admin = await prisma.user.upsert({
-    where: { email: config.adminEmail },
+    where: { username: config.adminName.toLowerCase().replace(/\s+/g, "_") },
     update: {},
     create: {
-      email: config.adminEmail,
       username: config.adminName.toLowerCase().replace(/\s+/g, "_"),
       password: hashedPassword,
       role: "CITY_ADMIN",
       districtId: district.id,
       isAdmin: true,
-      tokenVersion: 1,
     }
   });
-  console.log(`✅ Admin created: ${admin.email} (ID: ${admin.id})`);
+  console.log(`✅ Admin created: ${admin.username} (ID: ${admin.id})`);
 
   console.log(`
 ╔════════════════════════════════════════════════════════════╗

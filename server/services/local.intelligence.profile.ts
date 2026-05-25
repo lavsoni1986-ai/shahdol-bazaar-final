@@ -343,7 +343,7 @@ export class LocalIntelligenceManager {
 
     // Analyze shopping patterns
     const categorySearches = events
-      .filter(e => e.type.includes('search') && isEventMetadata(e.metadata) && e.metadata.category)
+      .filter(e => e.type && e.type.includes('search') && isEventMetadata(e.metadata) && e.metadata.category)
       .reduce((acc, e) => {
         const cat = (e.metadata as any).category as string;
         acc[cat] = (acc[cat] || 0) + 1;

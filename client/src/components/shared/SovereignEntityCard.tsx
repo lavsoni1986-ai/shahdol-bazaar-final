@@ -24,9 +24,11 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SovereignProductCard, type ProductCardData } from "@/components/shared/SovereignProductCard";
+import { GovernedImage } from "@/design/media-governance";
 import type { CanonicalEntity } from "@/shared/api/response-normalizers";
 import { resolveEntityCTAs, hasCommerceDisplay, resolveEntityExperience } from "@/governance";
 import { trackEvent } from "@/lib/analytics";
+import { buildCanonicalRoute } from "@/shared/routing/sovereign-routes";
 
 // 🏛️ Canonical entity icon map — uses EntityKind (not old kind strings)
 const ENTITY_ICON_MAP: Partial<Record<string, React.ComponentType<any>>> = {
@@ -145,7 +147,11 @@ function mapToCanonicalKind(rawKind: string): string | undefined {
 export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: SovereignEntityCardProps) {
     const Icon = ENTITY_ICON_MAP[entity.kind] || Store;
     const label = ENTITY_LABEL_MAP[entity.kind] || 'Entity';
-    const route = entity.route || '#';
+    const route = buildCanonicalRoute({
+        entityKind: entity.kind,
+        slug: entity.slug,
+        id: entity.id,
+    });
 
     const handleClick = () => {
         onTrack?.('click', entity.id);
@@ -181,20 +187,14 @@ export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: Sover
             }
             onClick={handleClick}
         >
-            {entity.imageUrl ? (
-                <div className="flex-shrink-0 h-14 w-14 rounded-3xl overflow-hidden bg-zinc-800">
-                    <img
-                        src={entity.imageUrl}
-                        alt={entity.title}
-                        className="w-full h-full object-contain p-1"
-                        loading="lazy"
-                    />
-                </div>
-            ) : (
-                <div className="flex-shrink-0 flex h-14 w-14 items-center justify-center rounded-3xl bg-orange-500/10 text-orange-400">
-                    <Icon className="h-6 w-6" />
-                </div>
-            )}
+            <GovernedImage
+                src={entity.imageUrl}
+                alt={entity.title}
+                categoryName={entity.category}
+                name={entity.title}
+                aspectRatioHint="square"
+                className="h-14 w-14 rounded-3xl flex-shrink-0"
+            />
 
             <div className={variant === 'search' ? 'min-w-0 flex-1' : 'space-y-4'}>
                 <div className="flex items-start justify-between gap-3">

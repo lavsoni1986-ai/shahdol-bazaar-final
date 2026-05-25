@@ -10,7 +10,9 @@ export async function calculateFraudScore(vendorId: number): Promise<number> {
   // 1. Abnormal Rating Spike Detection
   const recentReviews = await prisma.review.findMany({
     where: {
-      vendorId,
+      product: {
+        vendorId
+      },
       createdAt: {
         gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
       }
@@ -18,7 +20,9 @@ export async function calculateFraudScore(vendorId: number): Promise<number> {
     include: { user: true }
   });
 
-  const avgRating = recentReviews.reduce((sum, r) => sum + r.rating, 0) / recentReviews.length;
+  const avgRating = recentReviews.length > 0
+    ? recentReviews.reduce((sum, r) => sum + r.rating, 0) / recentReviews.length
+    : 0;
   const ratingSpike = avgRating > 4.5 && recentReviews.length > 10;
   if (ratingSpike) fraudScore += 20;
 
@@ -34,34 +38,51 @@ export async function calculateFraudScore(vendorId: number): Promise<number> {
   });
 
   recentOrders.forEach(order => {
-    const count = userOrderCounts.get(order.userId) || 0;
-    userOrderCounts.set(order.userId, count + 1);
+    if (order.userId !== null) {
+      const count = userOrderCounts.get(order.userId) || 0;
+      userOrderCounts.set(order.userId, count + 1);
+    }
   });
 
   const suspiciousUsers = Array.from(userOrderCounts.values()).filter(count => count > 5);
   fraudScore += suspiciousUsers.length * 15;
 
   // 3. IP Clustering (Bot network detection)
-  const uniqueIPs = new Set(recentReviews.map(r => r.user?.lastLogin || 'unknown'));
+  const reviewerIds = recentReviews.map(r => r.userId).filter((id): id is number => id !== null);
+  const userEvents = reviewerIds.length > 0 ? await prisma.userEvent.findMany({
+    where: {
+      userId: { in: reviewerIds }
+    },
+    select: { userId: true, ipAddress: true }
+  }) : [];
+
+  const userIpMap = new Map<number, string>();
+  userEvents.forEach(ue => {
+    if (ue.ipAddress && ue.userId !== null) {
+      userIpMap.set(ue.userId, ue.ipAddress);
+    }
+  });
+
+  const uniqueIPs = new Set(recentReviews.map(r => (r.userId ? userIpMap.get(r.userId) : null) || 'unknown'));
   const ipClustering = uniqueIPs.size < recentReviews.length * 0.3; // Less than 30% unique IPs
-  if (ipClustering) fraudScore += 25;
+  if (ipClustering && recentReviews.length > 0) fraudScore += 25;
 
   // 4. Review Timing Patterns (Automated reviews)
   const reviewTimes = recentReviews.map(r => r.createdAt.getHours());
   const nightReviews = reviewTimes.filter(hour => hour >= 22 || hour <= 4).length;
-  const nightReviewRatio = nightReviews / reviewTimes.length;
-  if (nightReviewRatio > 0.6) fraudScore += 10; // Too many night reviews
+  const nightReviewRatio = reviewTimes.length > 0 ? nightReviews / reviewTimes.length : 0;
+  if (nightReviewRatio > 0.6 && reviewTimes.length > 0) fraudScore += 10; // Too many night reviews
 
   // 5. Content Similarity (Copy-paste reviews)
   const reviewTexts = recentReviews.map(r => r.comment || '').filter(text => text.length > 10);
   const duplicateReviews = reviewTexts.length - new Set(reviewTexts).size;
-  const duplicateRatio = duplicateReviews / reviewTexts.length;
-  if (duplicateRatio > 0.4) fraudScore += 30;
+  const duplicateRatio = reviewTexts.length > 0 ? duplicateReviews / reviewTexts.length : 0;
+  if (duplicateRatio > 0.4 && reviewTexts.length > 0) fraudScore += 30;
 
   // 6. User Trust Factor Integration
-  const userIds = new Set([
-    ...recentReviews.map(r => r.userId).filter(Boolean),
-    ...recentOrders.map(o => o.userId).filter(Boolean)
+  const userIds = new Set<number>([
+    ...recentReviews.map(r => r.userId).filter((id): id is number => id !== null),
+    ...recentOrders.map(o => o.userId).filter((id): id is number => id !== null)
   ]);
 
   for (const userId of userIds) {
@@ -80,9 +101,13 @@ export async function calculateFraudScore(vendorId: number): Promise<number> {
 export async function updateVendorFraudScore(vendorId: number): Promise<void> {
   const fraudScore = await calculateFraudScore(vendorId);
 
-  await prisma.vendor.update({
-    where: { id: vendorId },
-    data: { fraudScore }
+  await prisma.fraudHistory.create({
+    data: {
+      vendorId,
+      eventType: 'RATING_MANIPULATION',
+      riskScore: fraudScore,
+      details: { message: `Calculated fraud score from reviews and orders: ${fraudScore}` }
+    }
   });
 }
 

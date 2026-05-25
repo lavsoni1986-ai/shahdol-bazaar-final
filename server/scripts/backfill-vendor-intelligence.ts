@@ -21,7 +21,6 @@ function makeSearchText(v: any) {
 async function main() {
   const vendors = await prisma.vendor.findMany({
     include: {
-      orders: true,
       products: true
     }
   })
@@ -29,9 +28,12 @@ async function main() {
   console.log(`Found ${vendors.length} vendors`)
 
   for (const v of vendors) {
-    const totalOrders = v.orders.length
-    const completedOrders = v.orders.filter(o => o.status === 'delivered').length
-    const cancelledOrders = v.orders.filter(o => o.status === 'cancelled').length
+    const orders = await prisma.order.findMany({
+      where: { vendorId: v.id }
+    })
+    const totalOrders = orders.length
+    const completedOrders = orders.filter(o => o.status === 'delivered').length
+    const cancelledOrders = orders.filter(o => o.status === 'cancelled').length
 
     const completionRate = totalOrders > 0 ? completedOrders / totalOrders : 0
     const aiRankScore =
@@ -45,16 +47,11 @@ async function main() {
       where: { id: v.id },
       data: {
         searchText: makeSearchText(v),
-        totalOrders,
-        completedOrders,
-        cancelledOrders,
-        aiRankScore: Number(aiRankScore.toFixed(2)),
-        isAiIndexed: true,
-        identityVersion: 1
+        aiRankScore: Number(aiRankScore.toFixed(2))
       }
     })
 
-    console.log(`✓ Vendor ${v.id} seeded`)
+    console.log(`✓ Vendor ${v.id} processed (orders: ${totalOrders})`)
   }
 }
 

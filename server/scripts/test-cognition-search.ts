@@ -30,7 +30,7 @@ async function testCognitionSearch() {
       }
 
     } catch (error) {
-      console.error(`❌ Test failed for "${test.query}":`, error.message);
+      console.error(`❌ Test failed for "${test.query}":`, (error as any).message);
     }
   }
 }

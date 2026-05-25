@@ -11,6 +11,7 @@ interface TrustBadgePrimitiveProps {
     size?: "sm" | "md" | "lg";
     showLabel?: boolean;
     className?: string;
+    entityKind?: string;
 }
 
 const TRUST_CONFIG: Record<TrustLevel, { label: string; icon: typeof ShieldCheck; bg: string; text: string; border: string }> = {
@@ -51,9 +52,28 @@ const TRUST_CONFIG: Record<TrustLevel, { label: string; icon: typeof ShieldCheck
     },
 };
 
-export function SovereignTrustBadge({ level, dsslScore, size = "sm", showLabel = true, className = "" }: TrustBadgePrimitiveProps) {
+export function SovereignTrustBadge({ level, dsslScore, size = "sm", showLabel = true, className = "", entityKind }: TrustBadgePrimitiveProps) {
     const config = TRUST_CONFIG[level];
     const Icon = config.icon;
+
+    let label = config.label;
+    if (entityKind) {
+        const canonicalKind = entityKind.toLowerCase();
+        const isHealthcareOrDoc = ["healthcare", "hospital", "professional", "doctor"].includes(canonicalKind);
+        const isService = ["service"].includes(canonicalKind);
+        const isEducationOrSchool = ["education", "school"].includes(canonicalKind);
+
+        if (isHealthcareOrDoc) {
+            if (level === "verified") label = "Verified Healthcare Partner";
+            else if (level === "dssl_low" || level === "none") label = "Healthcare Partner";
+        } else if (isService) {
+            if (level === "verified") label = "Verified Service Provider";
+            else if (level === "dssl_low" || level === "none") label = "Service Provider";
+        } else if (isEducationOrSchool) {
+            if (level === "verified") label = "Verified Educational Partner";
+            else if (level === "dssl_low" || level === "none") label = "Educational Partner";
+        }
+    }
 
     const sizeClasses = size === "lg"
         ? "px-3 py-1.5 text-xs gap-1.5"
@@ -64,7 +84,7 @@ export function SovereignTrustBadge({ level, dsslScore, size = "sm", showLabel =
     return (
         <span className={`inline-flex items-center rounded-full border ${config.bg} ${config.border} ${config.text} ${sizeClasses} font-semibold ${className}`}>
             <Icon className={size === "lg" ? "w-3.5 h-3.5" : "w-3 h-3"} />
-            {showLabel && <span>{dsslScore ? `DSSL ${dsslScore}` : config.label}</span>}
+            {showLabel && <span>{dsslScore ? `DSSL ${dsslScore}` : label}</span>}
         </span>
     );
 }

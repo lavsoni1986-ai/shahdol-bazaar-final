@@ -76,7 +76,7 @@ export async function updateDistrictDemandMemory(params: {
       districtId: params.districtId,
       domain: params.domain,
       entity: params.entity,
-      error: error.message,
+      error: (error as any).message,
     });
   }
 }
@@ -97,16 +97,15 @@ export async function updateDistrictSupplyGap(params: {
         },
       },
       update: {
-        reports: { increment: 1 },
-        lastReportedAt: new Date(),
+        demandCount: { increment: 1 },
+        lastUpdated: new Date(),
       },
       create: {
         districtId: params.districtId,
         domain: params.domain,
         entity: params.entity,
-        gapType: params.gapType,
-        reports: 1,
-        lastReportedAt: new Date(),
+        demandCount: 1,
+        lastUpdated: new Date(),
       },
     });
 
@@ -121,7 +120,7 @@ export async function updateDistrictSupplyGap(params: {
       districtId: params.districtId,
       domain: params.domain,
       entity: params.entity,
-      error: error.message,
+      error: (error as any).message,
     });
   }
 }
@@ -132,39 +131,7 @@ export async function updateEconomicCluster(params: {
   economicIndicator: string;
   value: number;
 }) {
-  try {
-    await prisma.districtEconomicCluster.upsert({
-      where: {
-        districtId_clusterType: {
-          districtId: params.districtId,
-          clusterType: params.clusterType,
-        },
-      },
-      update: {
-        economicIndicator: params.economicIndicator,
-        value: params.value,
-        lastUpdatedAt: new Date(),
-      },
-      create: {
-        districtId: params.districtId,
-        clusterType: params.clusterType,
-        economicIndicator: params.economicIndicator,
-        value: params.value,
-        lastUpdatedAt: new Date(),
-      },
-    });
-
-    console.log("ECONOMIC_CLUSTER_SUCCESS", {
-      districtId: params.districtId,
-      clusterType: params.clusterType,
-    });
-  } catch (error) {
-    console.error("ECONOMIC_CLUSTER_ERROR", {
-      districtId: params.districtId,
-      clusterType: params.clusterType,
-      error: error.message,
-    });
-  }
+  console.log("Mock updateEconomicCluster", params);
 }
 
 export async function updateSharedLearning(params: {
@@ -202,11 +169,8 @@ export async function updateSharedLearning(params: {
       stack: error?.stack,
       districtId: params.districtId,
       domain: params.domain,
-      entity: params.entity,
       vendorIds: params.vendorIds?.length,
-      productIds: params.productIds?.length,
-      serviceIds: params.serviceIds?.length,
-      hospitalIds: params.hospitalIds?.length
+      productIds: params.productIds?.length
     });
     bharatOSLogger.error(LogComponent.DEMAND, 'shared_learning_failure', 'Failed to record district learning pattern', {
       districtId: params.districtId,

@@ -14,7 +14,7 @@ import { ShoppingCart, Star, Clock, Phone, MessageCircle, Calendar, Navigation }
 import { Link } from "wouter";
 import { productRoutes, getCurrentDistrictSlug } from "@/shared/routing/sovereign-routes";
 import { SovereignTrustBadge, resolveTrustLevel, type TrustLevel } from "./SovereignTrustBadge";
-import { MEDIA_DEBUG_BADGE_CLASS } from "@/design/media-governance";
+import { GovernedImage } from "@/design/media-governance";
 import { resolveEntityExperience, resolveEntityCTAs, type InteractionMode } from "@/governance";
 import { trackEvent } from "@/lib/analytics";
 
@@ -80,50 +80,7 @@ function getPrimaryImage(data: ProductCardData): string | null {
     return data.imageUrl || data.image || null;
 }
 
-// ─── IMAGE COMPONENT ─────────────────────────────────────
-
-const ProductImage = memo(function ProductImage({
-    src,
-    alt,
-    isLoading,
-    onLoad,
-    onError,
-}: {
-    src: string | null;
-    alt: string;
-    isLoading: boolean;
-    onLoad: () => void;
-    onError: () => void;
-}) {
-    if (!src) {
-        return (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-500/10 to-zinc-800/50">
-                <div className="flex flex-col items-center gap-2 opacity-40">
-                    <ShoppingCart className="w-10 h-10 text-white" />
-                    <span className="text-label text-white/60">No Image</span>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <>
-            {isLoading && (
-                <div className="absolute inset-0 bg-zinc-800/60 animate-pulse flex items-center justify-center">
-                    <div className="w-8 h-8 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
-                </div>
-            )}
-            <img
-                src={src}
-                alt={alt}
-                loading="lazy"
-                onLoad={onLoad}
-                onError={onError}
-                className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 p-1"
-            />
-        </>
-    );
-});
+// ─── IMAGE COMPONENT & FALLBACKS CENTRALIZED IN MEDIA-GOVERNANCE ───
 
 // ─── BADGE HELPERS ───────────────────────────────────────
 
@@ -184,15 +141,10 @@ export const SovereignProductCard = memo(function SovereignProductCard({
     onTrack,
     className = "",
 }: SovereignProductCardProps) {
-    const [imgLoaded, setImgLoaded] = useState(false);
-    const [imgError, setImgError] = useState(false);
-
-    const handleImgLoad = useCallback(() => setImgLoaded(true), []);
-    const handleImgError = useCallback(() => setImgError(true), []);
-
     const title = getTitle(data);
     const categoryName = getCategoryLabel(data.category);
-    const imageSrc = imgError ? null : getPrimaryImage(data);
+
+
     const price = typeof data.price === "string" ? parseFloat(data.price) : data.price;
     const mrp = data.mrp ? (typeof data.mrp === "string" ? parseFloat(data.mrp) : data.mrp) : null;
     const discount = data.discount ?? (mrp && mrp > price ? computeDiscount(price, mrp) : 0);
@@ -217,20 +169,14 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                 className={`group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-orange-500/40 hover:bg-white/10 ${className}`}
                 onClick={handleClick}
             >
-                <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-zinc-800">
-                    {imageSrc ? (
-                        <img
-                            src={imageSrc}
-                            alt={title}
-                            className="w-full h-full object-contain"
-                            loading="lazy"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center opacity-30">
-                            <ShoppingCart className="w-6 h-6 text-white" />
-                        </div>
-                    )}
-                </div>
+                <GovernedImage
+                    src={getPrimaryImage(data)}
+                    alt={title}
+                    categoryName={categoryName}
+                    aspectRatioHint="square"
+                    className="w-16 h-16 rounded-xl flex-shrink-0"
+                    imgClassName="p-0.5"
+                />
 
                 <div className="min-w-0 flex-1">
                     <p className="text-label font-black uppercase tracking-[0.2em] text-orange-400/70">
@@ -260,19 +206,14 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                 className={`group block relative rounded-2xl overflow-hidden border border-white/10 bg-white/5 transition hover:border-orange-500/40 hover:bg-white/10 ${className}`}
                 onClick={handleClick}
             >
-                <div className="aspect-[4/3] relative overflow-hidden">
-                    {imageSrc ? (
-                        <img
-                            src={imageSrc}
-                            alt={title}
-                            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 p-1"
-                            loading="lazy"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-zinc-800/50 opacity-30">
-                            <ShoppingCart className="w-8 h-8 text-white" />
-                        </div>
-                    )}
+                <div className="relative">
+                    <GovernedImage
+                        src={getPrimaryImage(data)}
+                        alt={title}
+                        categoryName={categoryName}
+                        aspectRatioHint="4/3"
+                        className="w-full"
+                    />
                     {discount > 0 && <DiscountBadge percent={discount} />}
                 </div>
 
@@ -303,23 +244,23 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                 onClick={handleClick}
             >
                 {/* Image section — dominant */}
-                <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900/80">
-                    <ProductImage
-                        src={imageSrc}
+                <div className="relative">
+                    <GovernedImage
+                        src={getPrimaryImage(data)}
                         alt={title}
-                        isLoading={!imgLoaded && !imgError}
-                        onLoad={handleImgLoad}
-                        onError={handleImgError}
+                        categoryName={categoryName}
+                        aspectRatioHint="4/3"
+                        className="w-full rounded-t-3xl border-0"
                     />
 
                     {/* Overlay badges */}
-                    <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
+                    <div className="absolute top-3 left-3 right-3 flex items-start justify-between z-10">
                         {discount > 0 && <DiscountBadge percent={discount} />}
                         {data.isTrending && <TrendingBadge />}
                     </div>
 
                     {/* Gradient fade to content */}
-                    <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-10" />
                 </div>
 
                 {/* Content */}
@@ -394,20 +335,13 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                 className={`group flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:border-orange-500/40 hover:bg-white/10 ${className}`}
                 onClick={handleClick}
             >
-                <div className="flex-shrink-0 w-24 h-24 rounded-2xl overflow-hidden bg-zinc-800">
-                    {imageSrc ? (
-                        <img
-                            src={imageSrc}
-                            alt={title}
-                            className="w-full h-full object-contain"
-                            loading="lazy"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center opacity-30">
-                            <ShoppingCart className="w-8 h-8 text-white" />
-                        </div>
-                    )}
-                </div>
+                <GovernedImage
+                    src={getPrimaryImage(data)}
+                    alt={title}
+                    categoryName={categoryName}
+                    aspectRatioHint="square"
+                    className="w-24 h-24 rounded-2xl flex-shrink-0"
+                />
 
                 <div className="min-w-0 flex-1 flex flex-col gap-1">
                     <div className="flex items-center gap-2">
@@ -446,23 +380,23 @@ export const SovereignProductCard = memo(function SovereignProductCard({
             onClick={handleClick}
         >
             {/* 🖼️ IMAGE — primary commerce anchor */}
-            <div className="relative aspect-square max-h-[260px] sm:max-h-none overflow-hidden bg-zinc-900/70">
-                <ProductImage
-                    src={imageSrc}
+            <div className="relative">
+                <GovernedImage
+                    src={getPrimaryImage(data)}
                     alt={title}
-                    isLoading={!imgLoaded && !imgError}
-                    onLoad={handleImgLoad}
-                    onError={handleImgError}
+                    categoryName={categoryName}
+                    aspectRatioHint="square"
+                    className="w-full max-h-[260px] sm:max-h-none rounded-t-3xl border-0"
                 />
 
                 {/* Badge layer */}
-                <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between pointer-events-none">
+                <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between pointer-events-none z-10">
                     {discount > 0 && <DiscountBadge percent={discount} />}
                     {data.isTrending && <TrendingBadge />}
                 </div>
 
                 {/* Bottom gradient for readability */}
-                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/60 to-transparent pointer-events-none z-10" />
             </div>
 
             {/* 📝 CONTENT */}

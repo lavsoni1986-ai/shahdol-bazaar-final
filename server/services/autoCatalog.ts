@@ -3,6 +3,9 @@ import { getGroq } from "../middleware/groq";
 export const analyzeProductImage = async (imageUrl: string) => {
   try {
     const groq = getGroq();
+    if (!groq) {
+      throw new Error("Groq client is not initialized");
+    }
 
     const prompt = `Analyze this product image and provide product data for e-commerce listing:
 Return JSON with: title, description, categoryName, price (number), mrp (number), stock (number)

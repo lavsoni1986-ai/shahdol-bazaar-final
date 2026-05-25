@@ -9,60 +9,43 @@ export async function computeVendorSignals(vendorId: number): Promise<void> {
   const signalWindow = 7 * 24 * 60 * 60 * 1000; // 7 days
   const signalStart = new Date(Date.now() - signalWindow);
 
-  // 1. Click-to-Order Conversion Rate
-  const clicks = await prisma.userEvent.count({
+  // 1. Fetch all user events in the signal window that might have vendor information
+  const events = await prisma.userEvent.findMany({
     where: {
-      vendorId,
-      action: "CLICK",
-      createdAt: { gte: signalStart }
+      createdAt: { gte: signalStart },
+      action: { in: ["CLICK", "ORDER", "VIEW", "REPEAT_ORDER", "ADD_TO_CART"] }
     }
   });
 
-  const orders = await prisma.userEvent.count({
-    where: {
-      vendorId,
-      action: "ORDER",
-      createdAt: { gte: signalStart }
-    }
+  // Filter in-memory by vendorId inside eventData JSON structure
+  const vendorEvents = events.filter(event => {
+    const data = event.eventData as any;
+    if (!data) return false;
+    return data.vendorId === vendorId || Number(data.vendorId) === vendorId;
   });
+
+  const clicks = vendorEvents.filter(e => e.action === "CLICK").length;
+  const orders = vendorEvents.filter(e => e.action === "ORDER").length;
 
   // 🚨 SIGNAL QUALITY CONTROL: Minimum threshold for reliability
   const MIN_CLICKS_FOR_SIGNAL = 10;
   const conversionRate = (clicks >= MIN_CLICKS_FOR_SIGNAL && clicks > 0) ? orders / clicks : 0;
 
   // 2. View-to-Click Rate (CTR) - only if enough views
-  const views = await prisma.userEvent.count({
-    where: {
-      vendorId,
-      action: "VIEW",
-      createdAt: { gte: signalStart }
-    }
-  });
+  const views = vendorEvents.filter(e => e.action === "VIEW").length;
 
   const MIN_VIEWS_FOR_CTR = 20;
   const ctr = (views >= MIN_VIEWS_FOR_CTR && views > 0) ? clicks / views : 0;
 
   // 3. Repeat Purchase Rate - only if enough orders
-  const repeatOrders = await prisma.userEvent.count({
-    where: {
-      vendorId,
-      action: "REPEAT_ORDER",
-      createdAt: { gte: signalStart }
-    }
-  });
+  const repeatOrders = vendorEvents.filter(e => e.action === "REPEAT_ORDER").length;
 
   const totalOrders = orders + repeatOrders;
   const MIN_ORDERS_FOR_REPEAT = 5;
   const repeatRate = (totalOrders >= MIN_ORDERS_FOR_REPEAT && totalOrders > 0) ? repeatOrders / totalOrders : 0;
 
   // 4. Cart Abandonment Rate - only if enough cart actions
-  const addToCarts = await prisma.userEvent.count({
-    where: {
-      vendorId,
-      action: "ADD_TO_CART",
-      createdAt: { gte: signalStart }
-    }
-  });
+  const addToCarts = vendorEvents.filter(e => e.action === "ADD_TO_CART").length;
 
   const MIN_CART_ACTIONS = 5;
   const cartConversionRate = (addToCarts >= MIN_CART_ACTIONS && addToCarts > 0) ? orders / addToCarts : 0;
@@ -73,8 +56,7 @@ export async function computeVendorSignals(vendorId: number): Promise<void> {
     await prisma.vendor.update({
       where: { id: vendorId },
       data: {
-        conversionRate: Math.round(conversionRate * 100) / 100, // Round to 2 decimals
-        // Store additional signals in meta or extend model later
+        updatedAt: new Date()
       }
     });
 
@@ -91,7 +73,7 @@ export async function computeVendorSignals(vendorId: number): Promise<void> {
       where: { id: vendorId },
       select: { districtId: true }
     });
-    if (vendor) {
+    if (vendor && vendor.districtId !== null) {
       emitSignalsUpdate(vendor.districtId, vendorId, {
         conversionRate: Math.round(conversionRate * 100) / 100,
         ctr: Math.round(ctr * 100) / 100,

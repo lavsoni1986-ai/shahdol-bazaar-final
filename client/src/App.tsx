@@ -280,6 +280,13 @@ const Router = () => {
         <Route path="/terms" component={Terms} />
         <Route path="/pricing" component={PricingPlans} />
 
+        <Route path="/admin/moderation">
+          <ProtectedRouteGuard
+            component={Admin}
+            requiredRole={["admin", "superadmin", "SUPER_ADMIN", "cityadmin", "CITY_ADMIN"]}
+          />
+        </Route>
+
         <Route path="/admin">
           <ProtectedRouteGuard
             component={Admin}

@@ -4,7 +4,36 @@ import { tenantContext } from "../storage";
 
 export const tenantResolver = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const slug = req.headers["x-district-slug"];
+    let slug = req.headers["x-district-slug"];
+
+    // =========================================
+    // 0. TELEMETRY GOVERNANCE BODY FALLBACK
+    // =========================================
+    if (!slug && req.originalUrl && req.originalUrl.startsWith("/api/analytics/track")) {
+      let body = req.body;
+      if (body) {
+        if (typeof body === "string") {
+          try {
+            body = JSON.parse(body);
+          } catch {}
+        }
+        let rawSlug: any;
+        if (Array.isArray(body)) {
+          rawSlug = body[0]?.districtSlug;
+        } else if (typeof body === "object" && body !== null) {
+          rawSlug = (body as any).districtSlug;
+        }
+
+        // STRICT PAYLOAD SLUG VALIDATION:
+        if (rawSlug !== undefined && rawSlug !== null) {
+          if (typeof rawSlug === "string" && rawSlug.length >= 2 && rawSlug.length <= 50 && /^[a-z-]{2,50}$/.test(rawSlug)) {
+            slug = rawSlug;
+          } else {
+            console.warn("🏢 [TENANT] Rejected invalid body-supplied districtSlug format:", rawSlug);
+          }
+        }
+      }
+    }
 
     console.log(`🏢 [TENANT] ${req.method} ${req.originalUrl} | Slug: ${slug || "MISSING"}`);
 

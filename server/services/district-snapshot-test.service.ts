@@ -5,36 +5,38 @@
  * Test service to generate district intelligence summaries
  */
 
-import { DistrictHealthSnapshot } from '../../shared/district-intelligence/types';
-
 export interface DistrictSnapshotTestService {
   // Generate test snapshots
   generateTestSnapshot(districtId: number, type: 'summary' | 'trends' | 'alerts'): Promise<any>;
 
   // Test summary generation
   generateDistrictSummary(districtId: number): Promise<{
-    topUnmetDemand: Array<{
-      category: string;
-      demandCount: number;
-      lastQueried: number;
-    }>;
-    topTrustedVendors: Array<{
-      vendorId: number;
-      name: string;
-      trustScore: number;
-      category: string;
-    }>;
-    localityActivity: Array<{
-      locality: string;
-      queryCount: number;
-      executionCount: number;
-      trustDensity: number;
-    }>;
-    emergencyTrends: Array<{
-      type: string;
-      count: number;
-      trend: 'increasing' | 'stable' | 'decreasing';
-    }>;
+    districtId: number;
+    generated: number;
+    summary: {
+      topUnmetDemand: Array<{
+        category: string;
+        demandCount: number;
+        lastQueried: number;
+      }>;
+      topTrustedVendors: Array<{
+        vendorId: number;
+        name: string;
+        trustScore: number;
+        category: string;
+      }>;
+      localityActivity: Array<{
+        locality: string;
+        queryCount: number;
+        executionCount: number;
+        trustDensity: number;
+      }>;
+      emergencyTrends: Array<{
+        type: string;
+        count: number;
+        trend: 'increasing' | 'stable' | 'decreasing';
+      }>;
+    };
   }>;
 
   // Test data validation

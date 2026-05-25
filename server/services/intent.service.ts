@@ -14,11 +14,11 @@ export interface IntentQuery {
 }
 
 export interface IntentMatch {
-  id: number;
-  name: string;
-  type: string;
-  category: string;
-  score: number;
+  id?: number;
+  name?: string;
+  type?: string;
+  category?: string;
+  score?: number;
   vendorId: number;
   relevanceScore: number;
   matchReasons: string[];

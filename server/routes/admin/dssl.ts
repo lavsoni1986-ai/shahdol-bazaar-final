@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { prisma } from "../../storage";
 import { requireSuperAdmin } from "../../auth/middleware";
-import { getBatchTrustScores } from "../../services/dssl.service";
+import { DSSL, getBatchTrustScores } from "../../services/dssl.service";
 
 const router = Router();
 
@@ -9,22 +9,22 @@ const router = Router();
 router.patch("/weights/:districtId", requireSuperAdmin, async (req: Request, res: Response) => {
   const { districtId } = req.params;
   const { weights } = req.body; // e.g., { rating: 0.3, orders: 0.4, ... }
+  const districtIdNum = parseInt(districtId, 10);
 
-  const existing = await prisma.district.findUnique({
-    where: { id: parseInt(districtId) }
+  if (isNaN(districtIdNum)) {
+    return res.status(400).json({ success: false, error: "Invalid districtId" });
+  }
+
+  const district = await prisma.district.findUnique({
+    where: { id: districtIdNum }
   });
 
-  const updatedConfig = {
-    ...(existing?.config as Record<string, any> || {}),
-    dsslWeights: weights
-  };
+  if (!district) {
+    return res.status(404).json({ success: false, error: "District not found" });
+  }
 
-  const district = await prisma.district.update({
-    where: { id: parseInt(districtId) },
-    data: {
-      config: updatedConfig
-    }
-  });
+  // Set the weights in-memory in the DSSL service cache
+  DSSL.setDistrictWeights(districtIdNum, weights);
 
   res.json({ success: true, data: { message: "Sovereign Weights Updated", district } });
 });

@@ -121,12 +121,8 @@ export async function updateVendor(id: number, data: any) {
         name: true,
         category: true,
         businessType: true,
-        type: true,
         description: true,
-        address: true,
-        locality: true,
-        landmark: true,
-        districtSlug: true
+        address: true
       }
     });
 

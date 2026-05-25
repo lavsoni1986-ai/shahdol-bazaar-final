@@ -291,12 +291,17 @@ export class DynamicDiscoveryRanking {
     }
 
     // General engagement metrics
-    const userEvents = await prisma.userEvent.findMany({
+    const allUserEvents = await prisma.userEvent.findMany({
       where: {
         districtId,
-        vendorId: entity.id,
         createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Last 30 days
       }
+    });
+
+    const userEvents = allUserEvents.filter(event => {
+      const data = event.eventData as any;
+      if (!data) return false;
+      return data.vendorId === entity.id || Number(data.vendorId) === entity.id;
     });
 
     const clicks = userEvents.filter(e => e.action === 'click').length;
@@ -441,35 +446,34 @@ export class DynamicDiscoveryRanking {
   private async recordRankingIntelligence(rankings: RankingResult[], context: RankingContext): Promise<void> {
     // Record ranking outcomes for future learning
     for (const ranking of rankings.slice(0, 5)) { // Top 5 for learning
-    // Find existing record first, then update or create
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+      // Find existing record first, then update or create
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    const existing = await prisma.vendorMetricsDaily.findFirst({
-      where: {
-        vendorId: ranking.vendorId,
-        date: today
+      const existing = await prisma.vendorMetricsDaily.findFirst({
+        where: {
+          vendorId: ranking.entityId,
+          date: today
+        }
+      });
+
+      if (existing) {
+        await prisma.vendorMetricsDaily.update({
+          where: { id: existing.id },
+          data: {
+            aiMentions: { increment: 1 }
+          }
+        });
+      } else {
+        await prisma.vendorMetricsDaily.create({
+          data: {
+            vendorId: ranking.entityId,
+            districtId: context.districtId,
+            date: today,
+            aiMentions: 1
+          }
+        });
       }
-    });
-
-    if (existing) {
-      await prisma.vendorMetricsDaily.update({
-        where: { id: existing.id },
-        data: {
-          aiMentions: { increment: 1 },
-          trustDelta: ranking.componentScores.trust
-        }
-      });
-    } else {
-      await prisma.vendorMetricsDaily.create({
-        data: {
-          vendorId: ranking.vendorId,
-          date: today,
-          aiMentions: 1,
-          trustDelta: ranking.componentScores?.trust || 0
-        }
-      });
-    }
 
       // Update district intelligence with ranking patterns
       await districtMemory.recordPartnerInteraction({

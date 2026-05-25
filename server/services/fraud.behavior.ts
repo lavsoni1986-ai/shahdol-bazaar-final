@@ -14,32 +14,58 @@ export async function computeBehaviorProfile(vendorId: number) {
     where: { vendorId, createdAt: { gte: last7Days } }
   });
 
-  const clicks = await prisma.userEvent.count({
-    where: { vendorId, action: "CLICK", createdAt: { gte: last7Days } }
+  const clickEvents = await prisma.userEvent.findMany({
+    where: {
+      action: "CLICK",
+      createdAt: { gte: last7Days }
+    }
   });
 
-  const repeatOrders = await prisma.order.count({
-    where: { vendorId, isRepeat: true }
+  const vendorClicks = clickEvents.filter(event => {
+    const data = event.eventData as any;
+    return data && (data.vendorId === vendorId || Number(data.vendorId) === vendorId);
   });
+
+  const clicks = vendorClicks.length;
+
+  // Calculate repeat orders (customers with more than one order with this vendor)
+  const vendorOrders = await prisma.order.findMany({
+    where: { vendorId },
+    select: { userId: true, customerPhone: true }
+  });
+
+  const orderIdentifiers = new Set<string>();
+  let repeatOrdersCount = 0;
+
+  for (const o of vendorOrders) {
+    const ident = o.userId ? `u:${o.userId}` : o.customerPhone ? `p:${o.customerPhone}` : null;
+    if (ident) {
+      if (orderIdentifiers.has(ident)) {
+        repeatOrdersCount++;
+      } else {
+        orderIdentifiers.add(ident);
+      }
+    }
+  }
+  const repeatOrders = repeatOrdersCount;
 
   const complaints = await prisma.order.count({
     where: { vendorId, status: "FAILED" }
   });
 
-  // Bot detection: Same IP clicking rapidly
+  // Bot detection: Same IP clicking rapidly in the last 1 hour
   const last1Hour = new Date(Date.now() - 60 * 60 * 1000);
-  const ipGroups = await prisma.userEvent.groupBy({
-    by: ['ipAddress'],
-    where: {
-      vendorId,
-      action: "CLICK",
-      createdAt: { gte: last1Hour },
-      ipAddress: { not: null }
-    },
-    _count: { id: true }
-  });
+  const last1HourClicks = vendorClicks.filter(
+    event => event.createdAt >= last1Hour && event.ipAddress !== null
+  );
 
-  const maxSameIPClicks = Math.max(...ipGroups.map(g => g._count.id), 0);
+  const ipCounts: Record<string, number> = {};
+  for (const event of last1HourClicks) {
+    const ip = event.ipAddress!;
+    ipCounts[ip] = (ipCounts[ip] || 0) + 1;
+  }
+
+  const maxSameIPClicks = Math.max(...Object.values(ipCounts), 0);
 
   const avgRating =
     reviews.length > 0

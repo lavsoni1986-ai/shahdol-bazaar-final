@@ -3,7 +3,6 @@ import { parseNaturalLanguage, IntentMatch } from "./intent.service";
 import { LocalIntelligenceManager } from "./local.intelligence.profile";
 import { DistrictManager } from "./district.manager";
 import { calculateSovereignScore } from "./sovereign-brain";
-import { aiProviderManager } from "../ai/provider-manager";
 
 export interface GlobalSearchResult {
   localResults: IntentMatch[];
@@ -33,7 +32,7 @@ export class SovereignGlobalSearch {
     voiceTranscript?: string,
     maxDistance: number = 100
   ): Promise<GlobalSearchResult> {
-    // Parse the intent from natural language (uses AI provider routing)
+    // Parse the intent from natural language
     const intentQuery = await parseNaturalLanguage(query, voiceTranscript, userDistrictId);
 
     // Search locally first
@@ -62,9 +61,11 @@ export class SovereignGlobalSearch {
       .filter(r => r.results.length > 0)
       .sort((a, b) => {
         // Prioritize closer districts and higher match counts
-        const distanceScore = (maxDistance - a.distance) / maxDistance;
-        const matchScore = Math.min(a.results.length / 5, 1); // Cap at 5 matches
-        return (b.distanceScore + b.matchScore) - (a.distanceScore + a.matchScore);
+        const aDistanceScore = (maxDistance - a.distance) / maxDistance;
+        const aMatchScore = Math.min(a.results.length / 5, 1); // Cap at 5 matches
+        const bDistanceScore = (maxDistance - b.distance) / maxDistance;
+        const bMatchScore = Math.min(b.results.length / 5, 1); // Cap at 5 matches
+        return (bDistanceScore + bMatchScore) - (aDistanceScore + aMatchScore);
       });
 
     // Generate recommendations
@@ -85,7 +86,6 @@ export class SovereignGlobalSearch {
         status: 'APPROVED'
       },
       include: {
-        vendorMLProfile: true,
         products: {
           take: 10,
           include: {
@@ -98,9 +98,6 @@ export class SovereignGlobalSearch {
     const matches: IntentMatch[] = [];
 
     for (const vendor of vendors) {
-      // Calculate sovereign score for vendor
-      const sovereignScore = await calculateSovereignScore(vendor.id, districtId);
-
       // Check if vendor matches intent
       const relevanceScore = await this.calculateVendorRelevance(vendor, intentQuery, districtId);
 
@@ -110,7 +107,7 @@ export class SovereignGlobalSearch {
           relevanceScore,
           matchReasons: this.generateMatchReasons(vendor, intentQuery, relevanceScore),
           distance: 0, // Local search
-          estimatedTime: intentQuery.urgency === 'high' ? '30 mins' : '1 hour'
+          estimatedTime: intentQuery.urgency === 'high' ? 30 : 60
         });
       }
     }
@@ -130,7 +127,7 @@ export class SovereignGlobalSearch {
     }
 
     // Keyword matching in vendor data
-    const vendorText = `${vendor.name} ${vendor.description} ${vendor.products.map((p: any) => p.title).join(' ')}`.toLowerCase();
+    const vendorText = `${vendor.name} ${vendor.description || ''} ${vendor.products.map((p: any) => p.title).join(' ')}`.toLowerCase();
     const keywordMatches = intentQuery.keywords.filter((k: string) =>
       vendorText.includes(k.toLowerCase())
     ).length;
@@ -167,17 +164,10 @@ export class SovereignGlobalSearch {
       reasons.push("Prioritized for urgent delivery");
     }
 
-    if (vendor.vendorMLProfile?.reliabilityScore > 0.8) {
-      reasons.push("Highly reliable vendor");
-    }
-
     return reasons;
   }
 
   private static async findNearbyDistricts(userDistrictId: number, maxDistance: number) {
-    // In a real implementation, this would use geographical distance
-    // For now, we'll use a simplified approach based on district relationships
-
     const allDistricts = await DistrictManager.getAllDistrictConfigs();
     const userDistrict = allDistricts.find(d => d.id === userDistrictId);
 
@@ -198,7 +188,7 @@ export class SovereignGlobalSearch {
         const district = allDistricts.find(d => d.name === name);
         return district ? { ...district, distance } : null;
       })
-      .filter(Boolean);
+      .filter((d): d is NonNullable<typeof d> => d !== null);
   }
 
   private static calculateTransportCost(distance: number, urgency: string): number {
@@ -223,8 +213,7 @@ export class SovereignGlobalSearch {
     const lip = await LocalIntelligenceManager.getLIP(userDistrictId);
 
     // Alternative items based on preferences
-    const alternativeItems = intentQuery.keywords.flatMap(keyword => {
-      // Simple keyword expansion - in reality, use ML/NLP
+    const alternativeItems = intentQuery.keywords.flatMap((keyword: string) => {
       const alternatives: Record<string, string[]> = {
         'पनीर': ['टोफू', 'छाछ', 'दही'],
         'दूध': ['दही', 'छाछ', 'बटर'],
@@ -244,7 +233,7 @@ export class SovereignGlobalSearch {
           name: district.name,
           similarity,
           topCategories: Object.entries(districtLIP.preferenceProfile.shoppingPatterns.categoryPreferences)
-            .sort(([,a], [,b]) => b - a)
+            .sort(([,a]: any, [,b]: any) => b - a)
             .slice(0, 3)
             .map(([cat]) => cat)
         };

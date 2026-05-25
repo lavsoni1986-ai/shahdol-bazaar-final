@@ -22,26 +22,10 @@
  * - Confidence undefined in any path
  * - Operation errors not communicated
  */
-
-
-
 import express, { type Request, type Response } from "express";
 import { requireAuth } from "../../auth/middleware";
-
-// Augment Request type for JWT payload
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: number;
-        email?: string;
-      };
-    }
-  }
-}
 import { storage, prisma } from "../../storage";
 import { getGroq } from "../../middleware/groq";
-
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -421,7 +405,7 @@ router.post("/action-learn", async (req: Request, res: Response) => {
 
     if (actionType === "CALL_VENDOR") {
       void trackCallVendor({
-        userId: req.user?.id,
+        userId: req.ctx?.userId,
         vendorId,
         query,
         districtId,
@@ -429,7 +413,7 @@ router.post("/action-learn", async (req: Request, res: Response) => {
       });
     } else if (actionType === "WHATSAPP_VENDOR") {
       void trackWhatsappVendor({
-        userId: req.user?.id,
+        userId: req.ctx?.userId,
         vendorId,
         query,
         districtId,
@@ -437,7 +421,7 @@ router.post("/action-learn", async (req: Request, res: Response) => {
       });
     } else if (actionType === "OPEN_MAPS") {
       void trackOpenMaps({
-        userId: req.user?.id,
+        userId: req.ctx?.userId,
         vendorId,
         query,
         districtId,
@@ -445,7 +429,7 @@ router.post("/action-learn", async (req: Request, res: Response) => {
       });
     } else if (actionType === "BOOK_VENDOR") {
       void trackBookingIntent({
-        userId: req.user?.id,
+        userId: req.ctx?.userId,
         vendorId,
         query,
         districtId,

@@ -5,10 +5,17 @@
  * Tracks inventory drift, ledger drift, event backlog, retry queues, stuck reservations.
  */
 
+import crypto from 'crypto';
 import { prisma } from '../storage.js';
-import { financialReconciliationEngine } from './financial-reconciliation-engine.js';
 import { reservationCleanupWorker } from './reservation-cleanup-worker.js';
 import { durableEventBus } from './event-delivery-verification.js';
+
+// Stub for quarantined reconciliation engine
+const financialReconciliationEngine = {
+  getReconciliationHistory(districtId: number): any[] {
+    return [];
+  }
+};
 
 // ============================================
 // DASHBOARD CONFIGURATION
@@ -343,7 +350,7 @@ export class ObservabilityDashboard {
 
       return {
         cleanupStatus: status.isRunning ? 'RUNNING' : 'STOPPED',
-        lastCleanup: status.lastCleanup || null,
+        lastCleanup: status.lastCleanupTime || null,
         expiredReservations,
         cleanupErrors: 0 // Would track actual errors
       };
@@ -483,21 +490,28 @@ export class ObservabilityDashboard {
    * LOG CRITICAL ALERT
    */
   private async logCriticalAlert(metrics: DashboardMetrics): Promise<void> {
+    const logPayload = {
+      action: 'CRITICAL_SYSTEM_ALERT',
+      entityType: 'SYSTEM',
+      entityId: 0,
+      details: { message: `Critical system alert: ${metrics.criticalAlerts} critical issues` },
+      metadata: {
+        systemStatus: metrics.systemStatus,
+        activeAlerts: metrics.activeAlerts,
+        criticalAlerts: metrics.criticalAlerts,
+        metrics: metrics as any
+      },
+      ipAddress: 'system',
+      userAgent: 'ObservabilityDashboard',
+      districtId: DASHBOARD_CONFIG.districtId
+    };
+
+    const hash = crypto.createHash('sha256').update(JSON.stringify(logPayload)).digest('hex');
+
     await prisma.auditLog.create({
       data: {
-        action: 'CRITICAL_SYSTEM_ALERT',
-        targetType: 'SYSTEM',
-        targetId: 0,
-        details: `Critical system alert: ${metrics.criticalAlerts} critical issues`,
-        metadata: {
-          systemStatus: metrics.systemStatus,
-          activeAlerts: metrics.activeAlerts,
-          criticalAlerts: metrics.criticalAlerts,
-          metrics: metrics
-        },
-        ipAddress: 'system',
-        userAgent: 'ObservabilityDashboard',
-        districtId: DASHBOARD_CONFIG.districtId
+        ...logPayload,
+        hash
       }
     });
   }

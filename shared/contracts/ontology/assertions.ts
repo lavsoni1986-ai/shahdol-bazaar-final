@@ -4,7 +4,7 @@
 import { CanonicalDomain, CANONICAL_DOMAINS } from './domains';
 import { CanonicalEntityType, CANONICAL_ENTITY_TYPES } from './entity-types';
 import { CanonicalCategory, CANONICAL_CATEGORIES } from './categories';
-import { CanonicalSignal, UserIntentSignal, OperationalSignalType, SignalProvenance } from './signals';
+import { CanonicalSignal, UserIntentSignal, OperationalSignalType, SignalProvenance, CANONICAL_SIGNALS } from './signals';
 import { CanonicalIntentType, CANONICAL_INTENT_TYPES } from './intent-types';
 
 export function assertCanonicalDomain(domain: string): asserts domain is CanonicalDomain {

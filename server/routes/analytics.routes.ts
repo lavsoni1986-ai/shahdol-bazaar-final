@@ -74,24 +74,68 @@ function validateAnalyticsPayload(body: Record<string, unknown>): ValidatedPaylo
 
 router.post("/track", async (req, res) => {
     try {
-        const validated = validateAnalyticsPayload(req.body);
+        const body = req.body;
+        const districtId = req.ctx?.districtId || req.districtId;
 
-        if (typeof validated === "string") {
-            safeLogger.warn(LogComponent.TELEMETRY, 'analytics_validation_failed', validated, { body: req.body });
-            return failure(res, "VALIDATION_ERROR", validated, 400);
+        // Strict telemetry district isolation check
+        if (!districtId) {
+            safeLogger.warn(LogComponent.TELEMETRY, 'analytics_rejected', 'Sovereign Violation: districtId context required');
+            return failure(res, "SOVEREIGN_VIOLATION", "Sovereign Violation: x-district-slug header or body fallback required", 400);
         }
 
-        const districtId = req.ctx?.districtId;
+        if (Array.isArray(body)) {
+            if (body.length === 0) {
+                return success(res, { message: "Empty batch received" });
+            }
 
-        safeLogger.info(LogComponent.TELEMETRY, 'analytics_event_received', 'Analytics event received', {
-            vendorId: validated.vendorId,
-            eventType: validated.eventType,
-            source: validated.source,
-            action: validated.action,
-            districtId,
-        });
+            // Cap batch bursts at 100 events to prevent memory pressure
+            if (body.length > 100) {
+                safeLogger.warn(LogComponent.TELEMETRY, 'analytics_batch_overflow', `Batch size of ${body.length} exceeded limit of 100, slicing.`);
+                body.splice(100);
+            }
 
-        return success(res, { message: "Event tracked successfully" });
+            // STRICT VALIDATION: Mixed district telemetry batch rejected
+            const firstSlug = body[0]?.districtSlug;
+            const isConsistent = body.every(item => item && item.districtSlug === firstSlug);
+            if (!isConsistent) {
+                safeLogger.warn(LogComponent.TELEMETRY, 'analytics_mixed_districts_rejected', 'Mixed district telemetry batch rejected', { body });
+                return failure(res, "MIXED_DISTRICTS", "Sovereign Violation: Mixed district telemetry batch rejected", 400);
+            }
+
+            const validatedEvents = [];
+            for (const item of body) {
+                const validated = validateAnalyticsPayload(item);
+                if (typeof validated === "string") {
+                    safeLogger.warn(LogComponent.TELEMETRY, 'analytics_validation_failed', validated, { item });
+                    continue;
+                }
+                validatedEvents.push(validated);
+            }
+
+            safeLogger.info(LogComponent.TELEMETRY, 'analytics_batch_received', `Received batch of ${validatedEvents.length} events`, {
+                count: validatedEvents.length,
+                districtId,
+            });
+
+            return success(res, { message: `Batch of ${validatedEvents.length} events tracked successfully` });
+        } else {
+            const validated = validateAnalyticsPayload(body);
+
+            if (typeof validated === "string") {
+                safeLogger.warn(LogComponent.TELEMETRY, 'analytics_validation_failed', validated, { body });
+                return failure(res, "VALIDATION_ERROR", validated, 400);
+            }
+
+            safeLogger.info(LogComponent.TELEMETRY, 'analytics_event_received', 'Analytics event received', {
+                vendorId: validated.vendorId,
+                eventType: validated.eventType,
+                source: validated.source,
+                action: validated.action,
+                districtId,
+            });
+
+            return success(res, { message: "Event tracked successfully" });
+        }
     } catch (err) {
         console.error("Analytics error:", err);
         safeLogger.error(LogComponent.TELEMETRY, 'analytics_processing_failed', 'Failed to process analytics event', {}, err);

@@ -5,7 +5,7 @@ let LOCKDOWN_MODE = false;
 export const SystemLockdown = {
   async load() {
     const record = await prisma.systemLock.findFirst({
-      where: { key: "GLOBAL_LOCKDOWN" }
+      where: { lockKey: "GLOBAL_LOCKDOWN" }
     });
     LOCKDOWN_MODE = record?.isActive || false;
   },
@@ -18,17 +18,21 @@ export const SystemLockdown = {
     LOCKDOWN_MODE = true;
 
     await prisma.systemLock.upsert({
-      where: { key: "GLOBAL_LOCKDOWN" },
+      where: { lockKey: "GLOBAL_LOCKDOWN" },
       update: {
         isActive: true,
-        lockedAt: new Date(),
-        lockedBy: adminId,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // expires in 24h
+        owner: String(adminId),
+        metadata: { reason }
       },
       create: {
+        lockKey: "GLOBAL_LOCKDOWN",
+        lockType: "GLOBAL_LOCKDOWN",
         key: "GLOBAL_LOCKDOWN",
         isActive: true,
-        lockedAt: new Date(),
-        lockedBy: adminId,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        owner: String(adminId),
+        metadata: { reason }
       },
     });
   },
@@ -37,17 +41,19 @@ export const SystemLockdown = {
     LOCKDOWN_MODE = false;
 
     await prisma.systemLock.upsert({
-      where: { key: "GLOBAL_LOCKDOWN" },
+      where: { lockKey: "GLOBAL_LOCKDOWN" },
       update: {
         isActive: false,
-        lockedAt: new Date(),
-        lockedBy: adminId,
+        expiresAt: new Date(),
+        owner: String(adminId)
       },
       create: {
+        lockKey: "GLOBAL_LOCKDOWN",
+        lockType: "GLOBAL_LOCKDOWN",
         key: "GLOBAL_LOCKDOWN",
         isActive: false,
-        lockedAt: new Date(),
-        lockedBy: adminId,
+        expiresAt: new Date(),
+        owner: String(adminId)
       },
     });
   },
@@ -59,7 +65,7 @@ export async function checkSystemLockdown(): Promise<boolean> {
   const recentFraudIncidents = await prisma.fraudHistory.count({
     where: {
       createdAt: { gte: oneHourAgo },
-      score: { gte: 50 }
+      riskScore: { gte: 50 }
     }
   });
 
@@ -105,30 +111,34 @@ export async function getFalsePositiveMetrics(): Promise<any> {
 }
 
 export async function getPriorityAlerts(limit: number = 10): Promise<any[]> {
-  const alerts = await prisma.userIntelligence.findMany({
-    where: {
-      riskScore: { gte: 40 }
-    },
+  const allIntel = await prisma.userIntelligence.findMany({
     include: {
       user: {
-        select: { username: true, email: true, districtId: true }
+        select: { username: true, districtId: true }
       }
-    },
-    orderBy: { riskScore: 'desc' },
-    take: limit
+    }
   });
 
-  return alerts.map(alert => ({
-    userId: alert.userId,
-    username: alert.user.username,
-    riskScore: alert.riskScore,
-    trustScore: alert.trustScore,
-    districtId: alert.user.districtId,
-    priority: alert.riskScore >= 80 ? 'CRITICAL' :
-              alert.riskScore >= 60 ? 'HIGH' :
-              alert.riskScore >= 40 ? 'MEDIUM' : 'LOW',
-    meta: alert.meta
-  }));
+  const alerts = allIntel
+    .map(intel => {
+      const data = (intel.intelligenceData as any) || {};
+      return {
+        userId: intel.userId,
+        username: intel.user.username,
+        riskScore: data.riskScore || 0,
+        trustScore: data.trustScore || 0,
+        districtId: intel.user.districtId,
+        priority: (data.riskScore || 0) >= 80 ? 'CRITICAL' :
+                  (data.riskScore || 0) >= 60 ? 'HIGH' :
+                  (data.riskScore || 0) >= 40 ? 'MEDIUM' : 'LOW',
+        meta: data.meta || {}
+      };
+    })
+    .filter(alert => alert.riskScore >= 40)
+    .sort((a, b) => b.riskScore - a.riskScore)
+    .slice(0, limit);
+
+  return alerts;
 }
 
 // Auto policy tuner
@@ -168,9 +178,12 @@ export async function processAdminFeedback(adminId: number, userId: number, acti
     data: {
       adminId,
       action: 'USER_OVERRIDE',
-      targetId: userId,
-      details: `Override: ${action} - ${reason || 'No reason'}`,
-      meta: { reason, action }
+      details: {
+        targetId: userId,
+        message: `Override: ${action} - ${reason || 'No reason'}`,
+        reason,
+        action
+      }
     }
   });
 
@@ -180,6 +193,7 @@ export async function processAdminFeedback(adminId: number, userId: number, acti
   });
 
   if (intel) {
+    const data = (intel.intelligenceData as any) || {};
     let adjustment = 0;
     if (action === 'UNBLOCK' || action === 'REDUCE_RESTRICTION') {
       adjustment = -10; // Reduce risk score
@@ -187,22 +201,26 @@ export async function processAdminFeedback(adminId: number, userId: number, acti
       adjustment = 10; // Increase risk score
     }
 
-    const newRiskScore = Math.max(0, Math.min(100, (intel.riskScore || 0) + adjustment));
+    const newRiskScore = Math.max(0, Math.min(100, (data.riskScore || 0) + adjustment));
+    const newIntelligenceData = {
+      ...data,
+      riskScore: newRiskScore,
+      meta: {
+        ...(data.meta || {}),
+        lastAdminFeedback: {
+          adminId,
+          action,
+          reason,
+          adjustment,
+          timestamp: new Date().toISOString()
+        }
+      }
+    };
 
     await prisma.userIntelligence.update({
       where: { userId },
       data: {
-        riskScore: newRiskScore,
-        meta: {
-          ...(intel.meta as object || {}),
-          lastAdminFeedback: {
-            adminId,
-            action,
-            reason,
-            adjustment,
-            timestamp: new Date()
-          }
-        }
+        intelligenceData: newIntelligenceData
       }
     });
   }

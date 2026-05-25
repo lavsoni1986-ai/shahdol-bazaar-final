@@ -10,11 +10,11 @@
 // ⚠️ RULES:
 //   - NEVER fullscreen commerce media
 //   - NEVER viewport-dominating posters
-//   - NEVER one-size-fits-all image rendering
 //   - NEVER layout collapse on broken uploads
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Wrench, Cpu, Shirt, Apple, HeartPulse, Sparkles, ShoppingBag, type LucideIcon } from "lucide-react";
 
 // ─── MEDIA TYPE ───────────────────────────────────────────
-
 export type MediaType =
     | "product"         // phones, electronics, groceries, food items
     | "poster"          // doctor posters, vertical pamphlets, announcements
@@ -271,6 +271,320 @@ export const MEDIA_GOVERNANCE: Record<MediaType, MediaGovernance> = {
     },
 };
 
+// ─── IMAGE FALLBACK GOVERNANCE ──────────────────────────
+
+export interface ImageFallbackConfig {
+    gradient: string;
+    icon: LucideIcon;
+}
+
+export const CATEGORY_FALLBACK_MAP: Record<string, ImageFallbackConfig> = {
+    auto: { gradient: "from-amber-600/20 via-zinc-800/80 to-zinc-950", icon: Wrench },
+    bike: { gradient: "from-amber-600/20 via-zinc-800/80 to-zinc-950", icon: Wrench },
+    repair: { gradient: "from-amber-600/20 via-zinc-800/80 to-zinc-950", icon: Wrench },
+    automotive: { gradient: "from-amber-600/20 via-zinc-800/80 to-zinc-950", icon: Wrench },
+    vehicle: { gradient: "from-amber-600/20 via-zinc-800/80 to-zinc-950", icon: Wrench },
+    motorcycle: { gradient: "from-amber-600/20 via-zinc-800/80 to-zinc-950", icon: Wrench },
+    
+    electronic: { gradient: "from-blue-600/20 via-zinc-800/80 to-zinc-950", icon: Cpu },
+    mobile: { gradient: "from-blue-600/20 via-zinc-800/80 to-zinc-950", icon: Cpu },
+    phone: { gradient: "from-blue-600/20 via-zinc-800/80 to-zinc-950", icon: Cpu },
+    tv: { gradient: "from-blue-600/20 via-zinc-800/80 to-zinc-950", icon: Cpu },
+    computer: { gradient: "from-blue-600/20 via-zinc-800/80 to-zinc-950", icon: Cpu },
+    appliance: { gradient: "from-blue-600/20 via-zinc-800/80 to-zinc-950", icon: Cpu },
+    tech: { gradient: "from-blue-600/20 via-zinc-800/80 to-zinc-950", icon: Cpu },
+    
+    fashion: { gradient: "from-rose-600/20 via-zinc-800/80 to-zinc-950", icon: Shirt },
+    clothing: { gradient: "from-rose-600/20 via-zinc-800/80 to-zinc-950", icon: Shirt },
+    shirt: { gradient: "from-rose-600/20 via-zinc-800/80 to-zinc-950", icon: Shirt },
+    wear: { gradient: "from-rose-600/20 via-zinc-800/80 to-zinc-950", icon: Shirt },
+    shoe: { gradient: "from-rose-600/20 via-zinc-800/80 to-zinc-950", icon: Shirt },
+    apparel: { gradient: "from-rose-600/20 via-zinc-800/80 to-zinc-950", icon: Shirt },
+    jewel: { gradient: "from-rose-600/20 via-zinc-800/80 to-zinc-950", icon: Shirt },
+    
+    grocery: { gradient: "from-emerald-600/20 via-zinc-800/80 to-zinc-950", icon: Apple },
+    food: { gradient: "from-emerald-600/20 via-zinc-800/80 to-zinc-950", icon: Apple },
+    vegetable: { gradient: "from-emerald-600/20 via-zinc-800/80 to-zinc-950", icon: Apple },
+    fruit: { gradient: "from-emerald-600/20 via-zinc-800/80 to-zinc-950", icon: Apple },
+    kirana: { gradient: "from-emerald-600/20 via-zinc-800/80 to-zinc-950", icon: Apple },
+    eat: { gradient: "from-emerald-600/20 via-zinc-800/80 to-zinc-950", icon: Apple },
+    drink: { gradient: "from-emerald-600/20 via-zinc-800/80 to-zinc-950", icon: Apple },
+    
+    health: { gradient: "from-red-600/20 via-zinc-800/80 to-zinc-950", icon: HeartPulse },
+    medicine: { gradient: "from-red-600/20 via-zinc-800/80 to-zinc-950", icon: HeartPulse },
+    doctor: { gradient: "from-red-600/20 via-zinc-800/80 to-zinc-950", icon: HeartPulse },
+    pharmacy: { gradient: "from-red-600/20 via-zinc-800/80 to-zinc-950", icon: HeartPulse },
+    hospital: { gradient: "from-red-600/20 via-zinc-800/80 to-zinc-950", icon: HeartPulse },
+    medical: { gradient: "from-red-600/20 via-zinc-800/80 to-zinc-950", icon: HeartPulse },
+    
+    service: { gradient: "from-cyan-600/20 via-zinc-800/80 to-zinc-950", icon: Sparkles },
+    consult: { gradient: "from-cyan-600/20 via-zinc-800/80 to-zinc-950", icon: Sparkles },
+    clean: { gradient: "from-cyan-600/20 via-zinc-800/80 to-zinc-950", icon: Sparkles },
+    pest: { gradient: "from-cyan-600/20 via-zinc-800/80 to-zinc-950", icon: Sparkles },
+};
+
+export const DEFAULT_FALLBACK: ImageFallbackConfig = {
+    gradient: "from-zinc-800/80 to-zinc-950/90",
+    icon: ShoppingBag,
+};
+
+export function isLowEndAndroidDevice(): boolean {
+    if (typeof navigator === "undefined") return false;
+    const ua = navigator.userAgent.toLowerCase();
+    const isAndroid = ua.includes("android");
+    if (!isAndroid) return false;
+    
+    const lowMemory = (navigator as any).deviceMemory !== undefined && (navigator as any).deviceMemory <= 3;
+    const lowCPU = navigator.hardwareConcurrency !== undefined && navigator.hardwareConcurrency <= 4;
+    
+    return lowMemory || lowCPU || ua.includes("mobile");
+}
+
+export function resolveCategoryFallback(categoryName?: string | null): ImageFallbackConfig {
+    const isLowEnd = isLowEndAndroidDevice();
+
+    if (!categoryName) {
+        return {
+            gradient: isLowEnd ? "bg-zinc-900" : DEFAULT_FALLBACK.gradient,
+            icon: DEFAULT_FALLBACK.icon
+        };
+    }
+    
+    const normalized = categoryName.toLowerCase();
+    const matchedKey = Object.keys(CATEGORY_FALLBACK_MAP).find(key => normalized.includes(key));
+    
+    if (matchedKey) {
+        const config = CATEGORY_FALLBACK_MAP[matchedKey];
+        if (isLowEnd) {
+            let solidBg = "bg-zinc-900";
+            if (matchedKey === "auto" || matchedKey === "bike" || matchedKey === "repair" || matchedKey === "automotive" || matchedKey === "vehicle" || matchedKey === "motorcycle") {
+                solidBg = "bg-amber-950/40";
+            } else if (matchedKey === "electronic" || matchedKey === "mobile" || matchedKey === "phone" || matchedKey === "tv" || matchedKey === "computer" || matchedKey === "appliance" || matchedKey === "tech") {
+                solidBg = "bg-blue-950/40";
+            } else if (matchedKey === "fashion" || matchedKey === "clothing" || matchedKey === "shirt" || matchedKey === "wear" || matchedKey === "shoe" || matchedKey === "apparel" || matchedKey === "jewel") {
+                solidBg = "bg-rose-950/40";
+            } else if (matchedKey === "grocery" || matchedKey === "food" || matchedKey === "vegetable" || matchedKey === "fruit" || matchedKey === "kirana" || matchedKey === "eat" || matchedKey === "drink") {
+                solidBg = "bg-emerald-950/40";
+            } else if (matchedKey === "health" || matchedKey === "medicine" || matchedKey === "doctor" || matchedKey === "pharmacy" || matchedKey === "hospital" || matchedKey === "medical") {
+                solidBg = "bg-red-950/40";
+            } else if (matchedKey === "service" || matchedKey === "consult" || matchedKey === "clean" || matchedKey === "pest") {
+                solidBg = "bg-cyan-950/40";
+            }
+            return {
+                gradient: solidBg,
+                icon: config.icon
+            };
+        }
+        return config;
+    }
+    
+    return {
+        gradient: isLowEnd ? "bg-zinc-900" : DEFAULT_FALLBACK.gradient,
+        icon: DEFAULT_FALLBACK.icon
+    };
+}
+
+export interface GovernedImageState {
+    src: string | null;
+    isFallback: boolean;
+    fallbackConfig: ImageFallbackConfig;
+    imgLoaded: boolean;
+    imageError: boolean;
+    shouldLoad: boolean;
+    containerRef: (node: HTMLElement | null) => void;
+    handleLoad: () => void;
+    handleError: () => void;
+}
+
+export function useGovernedImage(
+    initialSrc: string | null | undefined,
+    categoryName?: string | null,
+    options?: { lazy?: boolean; rootMargin?: string }
+): GovernedImageState {
+    const [imgLoaded, setImgLoaded] = useState(false);
+    const [hasError, setHasError] = useState(false);
+    const [isVisible, setIsVisible] = useState(!options?.lazy);
+    
+    const observerRef = useRef<IntersectionObserver | null>(null);
+    const elementRef = useRef<HTMLElement | null>(null);
+    
+    const containerRef = useCallback((node: HTMLElement | null) => {
+        if (!options?.lazy) return;
+        
+        if (elementRef.current && observerRef.current) {
+            observerRef.current.unobserve(elementRef.current);
+        }
+        
+        elementRef.current = node;
+        
+        if (node) {
+            const observer = new IntersectionObserver(
+                ([entry]) => {
+                    if (entry.isIntersecting) {
+                        setIsVisible(true);
+                        if (observerRef.current) {
+                            observerRef.current.disconnect();
+                        }
+                    }
+                },
+                { rootMargin: options?.rootMargin || "200px" }
+            );
+            observer.observe(node);
+            observerRef.current = observer;
+        }
+    }, [options?.lazy, options?.rootMargin]);
+    
+    useEffect(() => {
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+        };
+    }, []);
+    
+    const handleLoad = useCallback(() => {
+        setImgLoaded(true);
+    }, []);
+    
+    const handleError = useCallback(() => {
+        setHasError(true);
+    }, []);
+    
+    const isFallback = !initialSrc || hasError;
+    const fallbackConfig = useMemo(() => resolveCategoryFallback(categoryName), [categoryName]);
+    const src = isFallback ? null : (initialSrc ?? null);
+    
+    return useMemo(() => ({
+        src: isVisible ? src : null,
+        isFallback,
+        fallbackConfig,
+        imgLoaded,
+        imageError: hasError,
+        shouldLoad: isVisible,
+        containerRef,
+        handleLoad,
+        handleError,
+    }), [src, isFallback, fallbackConfig, imgLoaded, hasError, isVisible, containerRef, handleLoad, handleError]);
+}
+
+// ─── CANONICAL REACT COMPONENTS FOR CENTRALIZED RENDER ───
+
+export interface GovernedFallbackProps {
+    config: ImageFallbackConfig;
+    name?: string | null;
+    className?: string;
+    iconClassName?: string;
+}
+
+export const GovernedFallback = React.memo(function GovernedFallback({
+    config,
+    name,
+    className = "",
+    iconClassName = "w-10 h-10 text-white",
+}: GovernedFallbackProps) {
+    const Icon = config.icon;
+    const isLowEnd = isLowEndAndroidDevice();
+    const bgClass = isLowEnd ? config.gradient : `bg-gradient-to-br ${config.gradient}`;
+    const firstLetter = name ? name.trim().charAt(0).toUpperCase() : null;
+
+    return React.createElement(
+        "div",
+        { className: `w-full h-full flex flex-col items-center justify-center ${bgClass} ${className}` },
+        React.createElement(
+            "div",
+            { className: "flex flex-col items-center gap-1.5 opacity-60" },
+            firstLetter 
+                ? React.createElement("span", { className: "text-white font-black text-xl leading-none select-none" }, firstLetter)
+                : React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement(Icon, { className: iconClassName }),
+                    React.createElement("span", { className: "text-[10px] font-black uppercase tracking-widest text-white/50 leading-none" }, "No Image")
+                )
+        )
+    );
+});
+
+export interface GovernedImageProps {
+    src: string | null | undefined;
+    alt: string;
+    categoryName?: string | null;
+    aspectRatioHint?: "square" | "4/3" | "16/9";
+    contextHint?: string;
+    className?: string;
+    imgClassName?: string;
+    lazy?: boolean;
+    name?: string | null;
+}
+
+export const GovernedImage = React.memo(function GovernedImage({
+    src,
+    alt,
+    categoryName,
+    aspectRatioHint = "square",
+    contextHint,
+    className = "",
+    imgClassName = "",
+    lazy = true,
+    name,
+}: GovernedImageProps) {
+    const { src: imgUrl, isFallback, fallbackConfig, imgLoaded, imageError, containerRef, handleLoad, handleError } = useGovernedImage(src, categoryName, { lazy });
+    const { governance } = useMediaDetection(isFallback ? null : imgUrl, aspectRatioHint, contextHint);
+
+    const isLowEnd = isLowEndAndroidDevice();
+
+    const containerClasses = [
+        "relative w-full overflow-hidden flex items-center justify-center",
+        governance.aspectClass,
+        governance.minHeightClass,
+        governance.maxHeightClass,
+        governance.borderRadiusClass,
+        governance.borderClass,
+        governance.backgroundClass,
+        className
+    ].filter(Boolean).join(" ");
+
+    const imageClasses = [
+        "w-full h-full",
+        governance.containStrategy === "contain" ? "object-contain" : "object-cover",
+        governance.paddingClass,
+        governance.objectPositionClass,
+        !isLowEnd && "transition-all duration-300",
+        imgLoaded ? "opacity-100 scale-100" : (isLowEnd ? "opacity-100" : "opacity-0 scale-95"),
+        imgClassName
+    ].filter(Boolean).join(" ");
+
+    return React.createElement(
+        "div",
+        { ref: containerRef as any, className: containerClasses },
+        isFallback 
+            ? React.createElement(GovernedFallback, { config: fallbackConfig, name, iconClassName: "w-8 h-8 text-white" })
+            : React.createElement(
+                React.Fragment,
+                null,
+                !imgLoaded && !isLowEnd && React.createElement(
+                    "div",
+                    { className: "absolute inset-0 bg-zinc-800/60 animate-pulse flex items-center justify-center" },
+                    React.createElement("div", { className: "w-8 h-8 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" })
+                ),
+                React.createElement("img", {
+                    src: imgUrl || "",
+                    alt: alt,
+                    loading: lazy ? "lazy" : "eager",
+                    decoding: "async",
+                    onLoad: handleLoad,
+                    onError: handleError,
+                    className: imageClasses
+                })
+            ),
+        import.meta.env.DEV && React.createElement(
+            "span",
+            { className: MEDIA_DEBUG_BADGE_CLASS },
+            `${governance.label} ${isFallback ? "(fallback)" : ""}`
+        )
+    );
+});
+
 // ─── DEFAULT GOVERNANCE (before detection completes) ─────
 
 /**
@@ -362,8 +676,6 @@ export function detectMediaType(aspectRatio: number, contextHint?: string): Medi
 }
 
 // ─── HOOK: MEDIA DETECTION ──────────────────────────────
-
-import { useState, useEffect, useRef } from "react";
 
 interface MediaDetectionResult {
     /** The detected media type */
@@ -479,12 +791,14 @@ export function resolveMediaClasses(governance: MediaGovernance): string {
 export function resolveImageClasses(governance: MediaGovernance, loaded: boolean): string {
     const { containStrategy, paddingClass, objectPositionClass } = governance;
     const objectClass = containStrategy === "contain" ? "object-contain" : "object-cover";
+    const isLowEnd = isLowEndAndroidDevice();
     return [
-        "w-full h-full transition-all duration-500",
+        "w-full h-full",
+        !isLowEnd && "transition-all duration-500",
         objectClass,
         paddingClass,
         objectPositionClass,
-        loaded ? "opacity-100 scale-100" : "opacity-0 scale-95",
+        loaded ? "opacity-100 scale-100" : (isLowEnd ? "opacity-100" : "opacity-0 scale-95"),
     ].filter(Boolean).join(" ");
 }
 
