@@ -3,15 +3,9 @@
 
 export const ENGINE_VERSION = "1.0.0";
 
-// Re-export for confidence.engine
-export interface CognitionResult {
-  query: string;
-  domain: string;
-  intent: string;
-  confidence: number;
-  entities: any[];
-  [key: string]: any;
-}
+// Import canonical CognitionResult from single source of truth
+import type { CognitionResult } from './types';
+export type { CognitionResult };
 
 import { findFuzzyMatches, getUnifiedGroundingIndex } from '../../services/district-memory.service';
 

@@ -51,18 +51,17 @@ export default function DistrictsPanel() {
           {districts.map((district: AdminDistrict) => (
             <div
               key={district.id}
-              className={`glass-card-sovereign p-6 rounded-xl border transition-all ${
-                district.isActive 
-                  ? "border-emerald-500/30 bg-emerald-500/5" 
+              className={`glass-card-sovereign p-6 rounded-xl border transition-all ${district.isActive
+                  ? "border-emerald-500/30 bg-emerald-500/5"
                   : "border-red-500/30 bg-red-500/5"
-              }`}
+                }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
                   <div className={`p-3 rounded-xl ${district.isActive ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
                     <Globe className={`w-6 h-6 ${district.isActive ? 'text-emerald-400' : 'text-red-400'}`} />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <h3 className="text-xl font-bold text-white">{district.name}</h3>
@@ -77,7 +76,7 @@ export default function DistrictsPanel() {
                         <XCircle className="w-4 h-4 text-red-400" />
                       )}
                     </div>
-                    
+
                     <div className="flex items-center gap-4 text-sm text-gray-400">
                       <div className="flex items-center gap-1">
                         <MapPin size={14} />
@@ -102,7 +101,7 @@ export default function DistrictsPanel() {
                 <div className="text-right">
                   <p className="text-xs text-gray-500">ID: {district.id}</p>
                   <p className="text-sm text-gray-300 mt-1">
-                    Created: {new Date(district.createdAt).toLocaleDateString()}
+                    Created: {district.createdAt ? new Date(district.createdAt).toLocaleDateString() : "N/A"}
                   </p>
                 </div>
               </div>

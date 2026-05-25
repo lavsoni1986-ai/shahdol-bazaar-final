@@ -158,7 +158,7 @@ export async function synthesizeResponse(context: ResponseSynthesisContext): Pro
         }
 
         if (relevantTrends.length > 0) {
-          memoryContext += `\nCommon searches here include: ${relevantTrends.map(t => `"${t.query}"`).join(', ')}.`;
+          memoryContext += `\nCommon searches here include: ${relevantTrends.map((t: any) => `"${t.query}"`).join(', ')}.`;
         }
 
         if (districtIntelligence.economicHealth < 70) {
