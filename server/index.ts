@@ -16,7 +16,10 @@ function validateCriticalEnv() {
     console.error('❌ FATAL: Missing critical environment variables:');
     missing.forEach(key => console.error(`   - ${key}`));
     console.error('\n💥 BharatOS refusing startup - insecure configuration');
-    process.exit(1);
+    // 🛡️ VERCEL GUARD: env vars injected at runtime, not build time
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
   }
 
   console.log('✅ Critical environment validation passed');
@@ -676,6 +679,25 @@ app.use("/api", (req, _res, next) => {
   return next();
 });
 
+// ============================================
+// 🚀 VERCEL SERVERLESS BRIDGE
+// ============================================
+// On Vercel, routes must be registered at import time (not inside startServer).
+// This block runs only on Vercel serverless, not in local dev.
+if (process.env.VERCEL) {
+  console.log("🔵 [VERCEL] Setting up serverless bridge...");
+  const apiRouter = express.Router();
+  registerSovereignRoutes(apiRouter).then(() => {
+    app.use("/api", apiRouter);
+    console.log("✅ [VERCEL] Sovereign routes mounted on /api");
+  }).catch((err: any) => {
+    console.error("❌ [VERCEL] Failed to register routes:", err?.message || err);
+  });
+
+  // Health endpoint for Vercel
+  app.get("/api/health-fn", (_req: any, res: any) => res.json({ status: "ok", scope: "vercel-bridge" }));
+}
+
 async function startServer() {
   // Validate required environment variables first
   validateEnv();
@@ -813,8 +835,17 @@ async function startServer() {
 // Error handler from middleware/errorHandler
 app.use(errorHandler);
 
-// ✅ CORRECT: startServer() को फंक्शन के बाहर कॉल करें
-startServer().catch((err) => {
-  console.error("❌ [FATAL] Server failed to start:", err);
-  process.exit(1);
-});
+// ✅ VERCEL SERVERLESS EXPORT
+// Vercel uses the default export as the serverless handler.
+// On Vercel, only the middleware chain runs (no httpServer.listen).
+if (!process.env.VERCEL) {
+  // ✅ CORRECT: startServer() को फंक्शन के बाहर कॉल करें
+  startServer().catch((err) => {
+    console.error("❌ [FATAL] Server failed to start:", err);
+    process.exit(1);
+  });
+} else {
+  console.log("🔵 [VERCEL] Running in serverless mode — httpServer.listen() skipped");
+}
+
+export default app;

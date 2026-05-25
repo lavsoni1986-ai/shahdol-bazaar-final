@@ -1,52 +1,40 @@
-import "dotenv/config";
-import express from "express";
-import cors from "cors";
+// ============================================
+// 🚀 VERCEL SERVERLESS BRIDGE — BharatOS API
+// ============================================
+// This file is the Vercel serverless entry point.
+// It imports the fully-configured Express app from
+// server/index.ts (full middleware: CORS, helmet,
+// rate-limit, session, tenantResolver, auth, etc.)
+// and re-exports it as the default handler.
+//
+// Routes are mounted at /api/* via registerSovereignRoutes()
+// inside server/index.ts when process.env.VERCEL is set.
+//
+// DO NOT duplicate middleware here — let server/index.ts
+// be the single source of backend truth.
+// ============================================
 
-console.log("🔵 [FN BOOT] Vercel function starting...");
-console.log("🔵 [FN BOOT] DATABASE_URL present:", !!process.env.DATABASE_URL);
-console.log("🔵 [FN BOOT] NODE_ENV:", process.env.NODE_ENV);
+import "dotenv/config";
+
+console.log("🔵 [VERCEL BRIDGE] Loading BharatOS serverless handler...");
+console.log("🔵 [VERCEL BRIDGE] DATABASE_URL present:", !!process.env.DATABASE_URL);
+console.log("🔵 [VERCEL BRIDGE] NODE_ENV:", process.env.NODE_ENV);
+
+let dbHost = "unknown";
 try {
   const dbUrl = process.env.DATABASE_URL || "";
-  const dbHost = dbUrl ? new URL(dbUrl).hostname : "";
-  console.log("🔵 [FN BOOT] DATABASE_URL host:", dbHost || "missing");
-} catch (err: any) {
-  console.error("❌ [FN BOOT] Failed to parse DATABASE_URL:", err?.message || err);
+  dbHost = dbUrl ? new URL(dbUrl).hostname : "missing";
+} catch {
+  dbHost = "parse-error";
 }
+console.log("🔵 [VERCEL BRIDGE] DATABASE_URL host:", dbHost);
 
-// Lightweight Express handler for Vercel Serverless Functions.
-const app = express();
+// Import the full sovereign Express app from the backend runtime.
+// server/index.ts detects process.env.VERCEL and:
+//   1. Registers all sovereign routes at import time (not inside startServer)
+//   2. Skips httpServer.listen() and Socket.IO init
+//   3. Exports the fully-configured app as default
+import app from "../server/index";
 
-app.use(cors({
-  origin: "*", // tighten to your prod domains if needed
-  credentials: true,
-}));
-
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: false, limit: "10mb" }));
-
-
-
-// Function-level health (no DB)
-app.get("/api/health-fn", (_req, res) => res.json({ status: "ok", scope: "function" }));
-
-// Lazy-load the heavier routes; failure won't crash health endpoints
-const loadRoutes = async () => {
-  try {
-    console.log("🔵 [FN BOOT] Attempting to load routes module...");
-    const { registerSovereignRoutes } = await import("../server/routes/index.js");
-    await registerSovereignRoutes(app);
-    console.log("✅ [FN BOOT] Routes registered");
-  } catch (err: any) {
-    console.error("❌ Failed to register routes in serverless handler:", err?.message || err);
-    console.error(err?.stack || err);
-  }
-};
-
-// Ensure routes are registered before handling requests
-await loadRoutes();
-
-// Vercel Node functions expect a default export compatible with (req, res)
+// Vercel expects a default export compatible with (req, res)
 export default app;
-
-// Trigger redeploy: 2026-01-04T00:00:00Z
-
