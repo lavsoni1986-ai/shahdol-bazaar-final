@@ -3,6 +3,16 @@
 
 export const ENGINE_VERSION = "1.0.0";
 
+// Re-export for confidence.engine
+export interface CognitionResult {
+  query: string;
+  domain: string;
+  intent: string;
+  confidence: number;
+  entities: any[];
+  [key: string]: any;
+}
+
 import { findFuzzyMatches, getUnifiedGroundingIndex } from '../../services/district-memory.service';
 
 // Ranking interfaces
@@ -105,8 +115,8 @@ export function calculateRelevanceScore(
   // 2. Domain Match (0-25 points)
   let domainMatch = 0;
   if (cognition.domain === entity.entityType ||
-      (cognition.domain === 'HEALTHCARE' && ['HOSPITAL', 'DOCTOR'].includes(entity.entityType)) ||
-      (cognition.domain === 'TRANSPORT' && entity.entityType === 'BUS')) {
+    (cognition.domain === 'HEALTHCARE' && ['HOSPITAL', 'DOCTOR'].includes(entity.entityType)) ||
+    (cognition.domain === 'TRANSPORT' && entity.entityType === 'BUS')) {
     domainMatch = 25;
     matchReasons.push(`domain:${cognition.domain}`);
   }

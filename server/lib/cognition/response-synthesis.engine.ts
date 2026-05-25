@@ -138,7 +138,7 @@ export async function synthesizeResponse(context: ResponseSynthesisContext): Pro
         .map(d => `${d.title} (${d.subtitle || "Doctor"}) - ${d.phone || "Contact available"}`)
         .join("\n") || "None";
 
-      const transportContext = transportResults?.results?.map(t =>
+      const transportContext = transportResults?.results?.map((t: any) =>
         `${t.fromCity} → ${t.toCity} at ${t.time}, ₹${t.price} (${t.type})`
       ).join("\n") || "None";
 
@@ -146,11 +146,11 @@ export async function synthesizeResponse(context: ResponseSynthesisContext): Pro
       let memoryContext = "";
       if (districtIntelligence) {
         const relevantSupplyGaps = districtIntelligence.supplyGaps
-          .filter(g => g.domain === cognition.domain)
+          .filter((g: any) => g.domain === cognition.domain)
           .slice(0, 2);
 
         const relevantTrends = districtIntelligence.trendingQueries
-          .filter(t => t.category === cognition.domain)
+          .filter((t: any) => t.category === cognition.domain)
           .slice(0, 2);
 
         if (relevantSupplyGaps.length > 0) {
@@ -170,7 +170,7 @@ export async function synthesizeResponse(context: ResponseSynthesisContext): Pro
         .map(p => `${p.title} at ${p.subtitle || "Vendor"}`)
         .join("\n");
 
-      const transportContextSanitized = transportResults?.results?.map(t =>
+      const transportContextSanitized = transportResults?.results?.map((t: any) =>
         `${t.fromCity} -> ${t.toCity} (${t.type})`
       ).join("\n") || "None";
 
@@ -215,18 +215,18 @@ Rules:
 5) Max ${strategy.maxWords || 80} words.
 `;
 
-       const groqCall = groq.chat.completions.create({
-         model: "llama-3.3-70b-versatile",
-         messages: [{ role: "user", content: prompt }],
-         temperature: 0.4,
-         max_tokens: 120
-       });
+      const groqCall = groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.4,
+        max_tokens: 120
+      });
 
-       const timeoutPromise = new Promise<never>((_, reject) => {
-         setTimeout(() => reject(new Error('AI response timeout')), 5000);
-       });
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('AI response timeout')), 5000);
+      });
 
-       const response = await Promise.race([groqCall, timeoutPromise]);
+      const response = await Promise.race([groqCall, timeoutPromise]);
 
       const aiAnswer = response.choices[0]?.message?.content;
       if (aiAnswer) {

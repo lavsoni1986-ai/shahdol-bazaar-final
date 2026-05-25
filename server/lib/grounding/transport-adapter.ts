@@ -59,16 +59,16 @@ export async function groundTransportUtility(query: string, districtId: number):
     }
 
     // Map bus data to transport results
-    const transportResults: TransportResult[] = busData.map(bus => ({
+    const transportResults: TransportResult[] = busData.map((bus: any) => ({
       id: `bus_${bus.id}`,
       fromCity: bus.fromCity,
       toCity: bus.toCity,
       time: bus.firstBusTime,
       price: bus.fare.replace('₹', ''),
-      type: bus.busType,
+      type: bus.busType ?? 'unknown',
       routeDescription: bus.travelTime || bus.publicNote || 'Main Highway',
       grounded: true,
-      source: 'bus_timetable'
+      source: 'bus_timetable' as const
     }));
 
     // Filter results based on query content if specific destination mentioned

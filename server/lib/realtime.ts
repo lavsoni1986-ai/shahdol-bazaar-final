@@ -2,10 +2,9 @@
 // Clean API for emitting real-time events with performance optimizations
 
 // io is available globally from the main server
-import { prisma } from "../storage";
 
 // Performance optimizations
-const emitQueue = new Map<string, Array<{event: string, payload: any, timestamp: number}>>();
+const emitQueue = new Map<string, Array<{ event: string, payload: any, timestamp: number }>>();
 const BATCH_DELAY = 1000; // 1 second batching
 const MAX_BATCH_SIZE = 10;
 
@@ -40,18 +39,14 @@ export const emitDistrict = async (districtId: number, event: string, payload: a
       timestamp: new Date().toISOString()
     };
 
-    // 🔥 EVENT PERSISTENCE: Store in DB for reliability
-    // await prisma.sovereignEvent.create({
-    //   data: {
-    //     districtId,
-    //     type: event,
-    //     payload: eventData
-    //   }
-    // });
-    console.log("[SOVEREIGN_EVENT_DISABLED]", payload);
+    // 🔥 EVENT PERSISTENCE: Disabled - sovereignEvent model not in Prisma schema
+    console.log("[SOVEREIGN_EVENT_DISABLED]", event, districtId, JSON.stringify(eventData).slice(0, 200));
 
     // Emit to live connections
-    (global as any).io?.to(`district:${districtId}`).emit(event, eventData);
+    const io = (global as any).io;
+    if (io) {
+      io.to(`district:${districtId}`).emit(event, eventData);
+    }
   } catch (error) {
     console.error(`Failed to emit/persist ${event} to district ${districtId}:`, error);
   }
@@ -65,17 +60,14 @@ export const emitSystem = async (event: string, payload: any) => {
       timestamp: new Date().toISOString()
     };
 
-    // 🔥 EVENT PERSISTENCE: Store system events
-    await prisma.sovereignEvent.create({
-      data: {
-        districtId: 0, // System-wide
-        type: `system:${event}`,
-        payload: eventData
-      }
-    });
+    // 🔥 EVENT PERSISTENCE: Disabled - sovereignEvent model not in Prisma schema
+    console.log("[SYSTEM_EVENT_DISABLED]", event, JSON.stringify(eventData).slice(0, 200));
 
     // Emit to super admin connections
-    (global as any).io?.to("system:alerts").emit(event, eventData);
+    const io = (global as any).io;
+    if (io) {
+      io.to("system:alerts").emit(event, eventData);
+    }
   } catch (error) {
     console.error(`Failed to emit/persist system ${event}:`, error);
   }
@@ -96,8 +88,9 @@ export const emitVendorUpdate = (vendor: any) => {
 };
 
 // Policy execution events
-export const emitPolicySummary = (districtId: number, summary: any) => {
-  emitDistrict(districtId, "policy:summary", summary);
+export const emitPolicySummary = (districtId: number | string, summary: any) => {
+  const did = typeof districtId === 'string' ? parseInt(districtId, 10) : districtId;
+  emitDistrict(did, "policy:summary", summary);
 };
 
 // ML signals update events
@@ -118,7 +111,7 @@ export const emitSystemAlert = (districtId: number | null, alert: any) => {
 };
 
 // Batch emit helper (performance optimization)
-export const emitBatch = (districtId: number, events: Array<{event: string, payload: any}>) => {
+export const emitBatch = (districtId: number, events: Array<{ event: string, payload: any }>) => {
   const batchKey = `batch:${districtId}`;
   const now = Date.now();
 
@@ -128,7 +121,7 @@ export const emitBatch = (districtId: number, events: Array<{event: string, payl
   }
 
   const batch = emitQueue.get(batchKey)!;
-  batch.push(...events.map(event => ({ ...event, timestamp: now })));
+  batch.push(...events.map(ev => ({ ...ev, timestamp: now })));
 
   // If batch is full, emit immediately
   if (batch.length >= MAX_BATCH_SIZE) {
@@ -155,7 +148,7 @@ function processBatch(districtId: number) {
   // Group events by type for efficiency
   const eventGroups = new Map<string, any[]>();
 
-  batch.forEach(({event, payload}) => {
+  batch.forEach(({ event, payload }) => {
     if (!eventGroups.has(event)) {
       eventGroups.set(event, []);
     }

@@ -1,6 +1,9 @@
 // 📁 client/src/pages/admin/Dashboard.tsx
 
-import { GlassCard } from "@/components/ui/glass-card"; // हमारा Sovereign Component
+// GlassCard component removed - using div with glass styling instead
+const GlassCard = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div className={`backdrop-blur-xl bg-black/30 border border-white/10 shadow-xl ${className}`}>{children}</div>
+);
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Shield, Map, Zap, DollarSign, Lock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
