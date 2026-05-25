@@ -10,7 +10,11 @@
       "destination": "/api/index"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api|assets|manifest.json|sw.js|favicon.ico).*)",
       "destination": "/index.html"
     }
   ],
