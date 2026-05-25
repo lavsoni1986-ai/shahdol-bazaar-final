@@ -134,3 +134,43 @@ export const legacyRoutes = {
   seller: (districtSlug: string, entitySlug: string) => `/marketplace/stores/${entitySlug}`,
   merchant: (districtSlug: string, entitySlug: string) => `/marketplace/stores/${entitySlug}`,
 };
+
+/**
+ * Builds canonical route dynamically for any entity, avoiding circular dependencies.
+ */
+export function buildCanonicalRoute(input: {
+  entityKind: string;
+  slug?: string | null;
+  id?: string | number | null;
+  districtSlug?: string;
+}): string {
+  const identifier = input.slug || (input.id != null ? String(input.id) : '');
+  if (!identifier) return '/marketplace';
+
+  const kind = input.entityKind.toLowerCase();
+  switch (kind) {
+    case 'product':
+      return `/marketplace/products/${identifier}`;
+    case 'service':
+      return `/services/${identifier}`;
+    case 'professional':
+      return `/professionals/${identifier}`;
+    case 'healthcare':
+    case 'hospital':
+      return `/healthcare/${identifier}`;
+    case 'booking':
+      return `/bookings/${identifier}`;
+    case 'education':
+    case 'school':
+      return `/schools/${identifier}`;
+    case 'restaurant':
+      return `/restaurants/${identifier}`;
+    case 'emergency':
+      return `/emergency/${identifier}`;
+    case 'marketplace':
+    case 'partner':
+    default:
+      return `/marketplace/stores/${identifier}`;
+  }
+}
+

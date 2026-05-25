@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.post("/auto-catalog", async (req: Request, res: Response) => {
   try {
-    const vendorId = req.user?.id;
+    const vendorId = req.ctx?.userId || (req.user as any)?.id;
     if (!vendorId) {
       return res.status(401).json({ error: "Authentication required" });
     }
@@ -39,7 +39,7 @@ router.post("/auto-catalog", async (req: Request, res: Response) => {
       ...productData,
       vendorId,
       slug,
-      districtId: req.districtId, // 🎯 अब यह यूज़र के असली जिले से जुड़ा है
+      districtId: req.ctx?.districtId || (req as any).districtId, // 🎯 अब यह यूज़र के असली जिले से जुड़ा है
       approved: false // Requires admin approval
     };
 

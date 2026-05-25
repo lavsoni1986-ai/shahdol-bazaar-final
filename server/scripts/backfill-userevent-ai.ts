@@ -20,22 +20,20 @@ async function main() {
       else parsedIntent = 'GENERAL'
     }
 
+    const eventData = e.eventData as any;
+    const vendorId = eventData?.vendorId || null;
+    const productId = eventData?.productId || null;
+
+    // Since UserEvent model only has core fields, we avoid schema exceptions.
     await prisma.userEvent.update({
       where: { id: e.id },
       data: {
-        districtId: null,
-        queryText: null,
-        parsedIntent,
-        parsedCategory,
-        aiResponseSummary: null,
-        matchedVendorIds: e.vendorId ? [e.vendorId] : [],
-        matchedProductIds: e.productId ? [e.productId] : [],
-        converted: false,
-        confidenceScore: 0
+        converted: e.converted ?? false,
+        districtId: e.districtId
       }
     })
 
-    console.log(`✓ Event ${e.id} seeded`)
+    console.log(`✓ Event ${e.id} processed (vendor: ${vendorId}, product: ${productId})`)
   }
 }
 

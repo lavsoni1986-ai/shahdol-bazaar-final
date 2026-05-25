@@ -59,6 +59,8 @@ export interface TelemetryMetadata {
   performanceMetrics: any;
   errors: any[];
   userId?: number;
+  resolvedCategory?: string | null;
+  resolvedSemanticType?: string | null;
 }
 
 export class TelemetryService {
@@ -148,41 +150,21 @@ export class TelemetryService {
 
   private async storeTruth(truth: TelemetryTruth): Promise<void> {
     try {
-      // Store in telemetry truth table (assuming it exists)
       await prisma.telemetryTruth.create({
         data: {
           truthId: truth.truthId,
           timestamp: truth.timestamp,
           districtId: truth.intelligence.districtId,
-          userId: truth.metadata.userId,
+          query: truth.query.original,
           queryOriginal: truth.query.original,
-          queryParsed: truth.query.parsed,
-          queryIntent: truth.query.intent,
-          queryConfidence: truth.query.confidence,
-          searchTerms: truth.query.searchTerms,
-          economicHealth: truth.intelligence.economicHealth,
-          supplyGaps: truth.intelligence.supplyGaps,
-          trendingQueries: truth.intelligence.trendingQueries,
-          activeSignals: truth.intelligence.activeSignals,
-          economicClusters: truth.intelligence.clusters,
-          resultsEntities: truth.results.entities,
-          resultsTotalFound: truth.results.totalFound,
-          resultsRankingApplied: truth.results.rankingApplied,
-          resultsValidationPassed: truth.results.validationPassed,
-          resultsConfidence: truth.results.confidence,
-          resultsEconomicContext: truth.results.economicContext,
-          responseAnswer: truth.response.answer,
-          responseConfidence: truth.response.confidence,
-          responseFollowUp: truth.response.followUp,
-          responseRecommendations: truth.response.recommendations,
-          responseGenerationTime: truth.response.generationTime,
-          pipelineVersion: truth.metadata.pipelineVersion,
-          processingSteps: truth.metadata.processingSteps,
-          performanceMetrics: truth.metadata.performanceMetrics,
-          errors: truth.metadata.errors,
-          // New additive fields for resolved semantic telemetry (Phase 1C-A)
-          resolvedCategory: truth.query.resolvedCategory || null,
-          resolvedSemanticType: truth.query.resolvedSemanticType || null
+          domain: truth.query.resolvedCategory || null,
+          entity: 'search',
+          intent: truth.query.intent?.primary || 'discovery',
+          normalizedIntent: truth.query.resolvedSemanticType || null,
+          confidence: truth.query.confidence,
+          matchedEntities: truth.results.totalFound,
+          hallucinationPrevented: !truth.results.validationPassed,
+          executionTime: truth.response.generationTime || 0,
         }
       });
     } catch (error) {
@@ -201,8 +183,8 @@ export class TelemetryService {
         entity: 'search',
         intent: truth.query.intent?.primary || 'discovery',
         confidence: truth.query.confidence,
-        resultsCount: truth.results.totalFound,
-        userId: truth.metadata.userId
+        matchedEntities: truth.results.totalFound,
+        resolvedCategory: truth.query.resolvedCategory
       });
 
       // Record partner interactions for top results
@@ -219,8 +201,7 @@ export class TelemetryService {
               position: truth.results.entities.indexOf(entity) + 1,
               relevanceScore: entity.relevanceScore,
               trustScore: entity.rankingFactors?.trustScore
-            },
-            userId: truth.metadata.userId
+            }
           });
         }
       }
@@ -241,8 +222,10 @@ export class TelemetryService {
         data: {
           userId: truth.metadata.userId,
           districtId: truth.intelligence.districtId,
-          action: 'ai_concierge_search',
-          meta: {
+          eventType: 'ai_concierge_search',
+          action: 'search',
+          converted: false,
+          eventData: {
             truthId: truth.truthId,
             query: truth.query.original,
             resultsFound: truth.results.totalFound,
@@ -253,15 +236,14 @@ export class TelemetryService {
               type: e.type,
               name: e.name,
               relevanceScore: e.relevanceScore
-            }))
-          },
-          queryText: truth.query.original,
-          parsedIntent: truth.query.intent?.primary || 'discovery',
-          matchedVendorIds: truth.results.entities
-            .filter(e => e.type === 'vendor')
-            .map(e => e.id)
-            .slice(0, 5),
-          converted: false // Will be updated later if user takes action
+            })),
+            queryText: truth.query.original,
+            parsedIntent: truth.query.intent?.primary || 'discovery',
+            matchedVendorIds: truth.results.entities
+              .filter(e => e.type === 'vendor')
+              .map(e => e.id)
+              .slice(0, 5)
+          }
         }
       });
     } catch (error) {
@@ -367,58 +349,56 @@ export class TelemetryService {
     if (!truth.truthId || !truth.timestamp || !truth.districtId) return false;
 
     // Check confidence ranges
-    if (truth.queryConfidence < 0 || truth.queryConfidence > 1) return false;
-    if (truth.resultsConfidence < 0 || truth.resultsConfidence > 1) return false;
-    if (truth.responseConfidence < 0 || truth.responseConfidence > 1) return false;
+    if (truth.confidence < 0 || truth.confidence > 1) return false;
 
     // Check result counts
-    if (truth.resultsTotalFound < 0) return false;
+    if (truth.matchedEntities < 0) return false;
 
     return true;
   }
 
   private reconstructTruth(dbTruth: any): TelemetryTruth {
     return {
-      truthId: dbTruth.truthId,
-      timestamp: dbTruth.timestamp,
+      truthId: dbTruth.truthId || '',
+      timestamp: dbTruth.timestamp || new Date(),
       query: {
-        original: dbTruth.queryOriginal,
-        parsed: dbTruth.queryParsed,
-        intent: dbTruth.queryIntent,
-        confidence: dbTruth.queryConfidence,
-        searchTerms: dbTruth.searchTerms
+        original: dbTruth.queryOriginal || dbTruth.query || '',
+        parsed: {},
+        intent: { primary: dbTruth.intent },
+        confidence: dbTruth.confidence || 1.0,
+        searchTerms: []
       },
       intelligence: {
         districtId: dbTruth.districtId,
-        economicHealth: dbTruth.economicHealth,
-        supplyGaps: dbTruth.supplyGaps,
-        trendingQueries: dbTruth.trendingQueries,
-        activeSignals: dbTruth.activeSignals,
-        clusters: dbTruth.economicClusters
+        economicHealth: 100,
+        supplyGaps: [],
+        trendingQueries: [],
+        activeSignals: [],
+        clusters: []
       },
       results: {
-        entities: dbTruth.resultsEntities,
-        totalFound: dbTruth.resultsTotalFound,
-        rankingApplied: dbTruth.resultsRankingApplied,
-        validationPassed: dbTruth.resultsValidationPassed,
-        confidence: dbTruth.resultsConfidence,
-        economicContext: dbTruth.resultsEconomicContext
+        entities: [],
+        totalFound: dbTruth.matchedEntities || 0,
+        rankingApplied: false,
+        validationPassed: !dbTruth.hallucinationPrevented,
+        confidence: dbTruth.confidence || 1.0,
+        economicContext: null
       },
       response: {
-        answer: dbTruth.responseAnswer,
-        confidence: dbTruth.responseConfidence,
-        followUp: dbTruth.responseFollowUp,
-        recommendations: dbTruth.responseRecommendations,
-        generationTime: dbTruth.responseGenerationTime
+        answer: '',
+        confidence: dbTruth.confidence || 1.0,
+        followUp: [],
+        recommendations: [],
+        generationTime: dbTruth.executionTime || 0
       },
       metadata: {
-        pipelineVersion: dbTruth.pipelineVersion,
-        processingSteps: dbTruth.processingSteps,
-        performanceMetrics: dbTruth.performanceMetrics,
-        errors: dbTruth.errors,
-        userId: dbTruth.userId,
-        resolvedCategory: dbTruth.resolvedCategory || null,
-        resolvedSemanticType: dbTruth.resolvedSemanticType || null
+        pipelineVersion: '1.0.0',
+        processingSteps: [],
+        performanceMetrics: {},
+        errors: [],
+        userId: undefined,
+        resolvedCategory: dbTruth.domain || null,
+        resolvedSemanticType: dbTruth.normalizedIntent || null
       }
     };
   }

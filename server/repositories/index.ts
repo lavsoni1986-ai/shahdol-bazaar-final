@@ -7,7 +7,7 @@ export { findAuditLog, createAuditLog, findAuditLogs } from "./auditLog.repo";
 export { findAdminLog, createAdminLog, countAdminLogs } from "./adminLog.repo";
 export { findEventLog, createEventLog, findEventLogs } from "./eventLog.repo";
 export { findUserEventById, createUserEvent, findUserEvents } from "./userEvent.repo";
-// export { withTransaction, updateUserInTx, updateVendorInTx, findUserByIdInTx, findVendorByIdInTx, findProductByIdInTx, updateProductInTx, createAuditLogInTx } from "./transaction.repo";
+export { withTransaction, updateUserInTx, updateVendorInTx, findUserByIdInTx, findVendorByIdInTx, findProductByIdInTx, updateProductInTx, createAuditLogInTx } from "./transaction.repo";
 export { findDistrictById, findDistrictBySlug, findDistricts } from "./district.repo";
 export { getAdminMetrics } from "./admin.repo";
 export { findReview, countReviews, aggregateReview, findReviews, createReview } from "./review.repo";

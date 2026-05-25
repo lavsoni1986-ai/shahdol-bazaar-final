@@ -91,19 +91,8 @@ export const DISTRICT_SEARCH_TAXONOMY: Record<string, CategoryAlias> = {
 
   school: {
     canonical: CanonicalCategory.SCHOOL,
-    aliases: ['school', 'schools', 'education', 'coaching', 'tuition', 'teacher', 'student'],
-    related: ['admission', 'fees', 'classes', 'exams'],
-    priority: 3
-  },
-
-  // Quarantined duplicate electronics block consolidated above (CanonicalDomain.COMMERCE)
-
-
-  // EDUCATION
-  school: {
-    canonical: 'school',
-    aliases: ['school', 'education', 'college', 'tuition', 'coaching', 'study', 'learning'],
-    related: ['primary', 'secondary', 'higher', 'vocational', 'competitive'],
+    aliases: ['school', 'schools', 'education', 'college', 'tuition', 'coaching', 'study', 'learning', 'teacher', 'student'],
+    related: ['primary', 'secondary', 'higher', 'vocational', 'competitive', 'admission', 'fees', 'classes', 'exams'],
     priority: 9
   },
 
@@ -138,16 +127,16 @@ export const DISTRICT_SEARCH_TAXONOMY: Record<string, CategoryAlias> = {
 
   bank: {
     canonical: CanonicalDomain.GOVERNANCE,
-    aliases: ['bank', 'banking', 'atm', 'finance', 'loan', 'account'],
-    related: ['deposit', 'withdrawal', 'transfer'],
-    priority: 3
+    aliases: ['bank', 'banking', 'atm', 'finance', 'loan', 'insurance', 'investment', 'account'],
+    related: ['savings', 'account', 'credit', 'debit', 'transaction', 'deposit', 'withdrawal', 'transfer'],
+    priority: 8
   },
 
   taxi: {
     canonical: CanonicalDomain.TRANSPORT,
-    aliases: ['taxi', 'cab', 'auto', 'rickshaw', 'ride', 'transport'],
-    related: ['booking', 'pickup', 'drop'],
-    priority: 2
+    aliases: ['taxi', 'cab', 'auto', 'rickshaw', 'ride', 'transport', 'travel'],
+    related: ['booking', 'pickup', 'drop', 'local', 'outstation'],
+    priority: 8
   },
 
   laundry: {
@@ -155,33 +144,6 @@ export const DISTRICT_SEARCH_TAXONOMY: Record<string, CategoryAlias> = {
     aliases: ['laundry', 'dry cleaning', 'washing', 'iron', 'clothes', 'dry clean', 'cleaning'],
     related: ['wash', 'clean', 'press'],
     priority: 6
-  },
-
-  // HOME SERVICES
-  // Quarantined duplicate plumber block consolidated above (CanonicalDomain.SERVICES)
-
-
-  // Quarantined duplicate carpenter block consolidated above (CanonicalDomain.SERVICES)
-
-
-  // BEAUTY & PERSONAL CARE
-  // Quarantined duplicate salon block consolidated above (CanonicalDomain.SERVICES)
-
-
-  // FINANCIAL SERVICES
-  bank: {
-    canonical: 'bank',
-    aliases: ['bank', 'banking', 'atm', 'finance', 'loan', 'insurance', 'investment'],
-    related: ['savings', 'account', 'credit', 'debit', 'transaction'],
-    priority: 8
-  },
-
-  // TRANSPORT
-  taxi: {
-    canonical: 'taxi',
-    aliases: ['taxi', 'cab', 'auto', 'rickshaw', 'transport', 'ride', 'travel'],
-    related: ['local', 'outstation', 'booking', 'pickup'],
-    priority: 8
   },
 
   // GENERAL SERVICES (quarantined duplicate)

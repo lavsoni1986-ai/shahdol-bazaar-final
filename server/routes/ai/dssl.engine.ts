@@ -5,7 +5,7 @@ import { prisma } from "../../storage";
 import { getTrustScore } from "../../services/dssl.service";
 
 // Stub functions since brain.service deleted
-const calculateDSSLScore = (vendor: any) => {
+export const calculateDSSLScore = (vendor: any) => {
   // For now, return a default score since async is problematic in map
   return 50; // Neutral score
 };

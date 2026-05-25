@@ -33,7 +33,7 @@ server.on("listening", () => {
 
 server.on("error", (err) => {
   console.error(`❌ SERVER ERROR:`, err.message);
-  console.error(`❌ Error code:`, err.code);
+  console.error(`❌ Error code:`, (err as any).code);
 });
 
 server.on("connection", (socket) => {

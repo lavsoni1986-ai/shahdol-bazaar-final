@@ -34,7 +34,6 @@
   opacity: 0.3 !important;
 }
 
-.reduce-effects .hover\:scale-*:hover,
 .reduce-effects [class*="hover:scale-"]:hover {
   transform: none !important;
 }

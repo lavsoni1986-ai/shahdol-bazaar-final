@@ -44,7 +44,7 @@ router.get("/weights", async (req, res) => {
 
     return res.json(success({
       weights,
-      total: Object.values(weights).reduce((sum, w) => sum + w, 0),
+      total: Object.values(weights as unknown as Record<string, number>).reduce((sum: number, w: number) => sum + w, 0),
       components: {
         trust: "Vendor reliability, ratings, verification",
         demand: "District demand patterns, supply gaps",
@@ -84,7 +84,7 @@ router.put("/weights", async (req, res) => {
     }
 
     // Check sum
-    const total = Object.values(weights).reduce((sum: number, w: number) => sum + w, 0);
+    const total = Object.values(weights as Record<string, number>).reduce((sum: number, w: number) => sum + w, 0);
     if (Math.abs(total - 1.0) > 0.01) {
       return res.status(400).json(error(`Weights must sum to 1.0, got ${total}`));
     }

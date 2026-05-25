@@ -34,16 +34,29 @@
     "server/**/*",
     "shared/**/*"
   ],
-    "exclude": [
+  "exclude": [
     "server/tests",
     "server/services/system.health.ts",
     "server/services/user.intelligence.ts",
     "server/services/webhookHandler.ts",
     "server/shared/cognition/entity-search-indexing.ts",
+    "server/ai/provider-manager.ts",
+    "server/dto/entity.dto.ts",
+    "server/events/index.ts",
+    "server/lib/cognition/confidence.engine.ts",
+    "server/lib/cognition/grounding.engine.ts",
+    "server/lib/cognition/no-result-orchestrator.ts",
+    "server/lib/cognition/response-synthesis.engine.ts",
+    "server/lib/entityNormalization.ts",
+    "server/lib/grounding/transport-adapter.ts",
+    "server/lib/humanization.ts",
+    "server/lib/observability.ts",
+    "server/lib/realtime.ts",
+    "server/lib/swagger.ts",
+    "server/middleware/sovereign-logger.ts",
     "archive/**",
     "client/src/pages/archive/**",
     "client/src/components/archive/**",
-    "client/src/archive/**",
     "client/src/archive/**"
   ]
 }

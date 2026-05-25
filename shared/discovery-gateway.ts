@@ -134,7 +134,7 @@ export function getHumanTitleForVendor(vendor: any): string {
             title: title
           }
         }
-      }).catch(err => {
+      }).catch((err: any) => {
         console.warn('HYDRATION_AUDIT_FAILURE', err instanceof Error ? err.message : String(err));
       });
     }
@@ -157,7 +157,7 @@ export function getHumanTitleForVendor(vendor: any): string {
 export function hydrateDoctorMetadata(input: {
   doctor: any;
   vendor?: any;
-}): DoctorMetadata & { metadataCompletenessScore: number } {
+}): DoctorMetadata & { doctorId: number | null; vendorId: number | null } {
   const { doctor, vendor } = input;
   const isVerified = vendor?.status === "APPROVED" || vendor?.isVerified === true;
 
@@ -197,8 +197,11 @@ export function hydrateDoctorMetadata(input: {
     doctorId: doctor?.id ?? null,
     vendorId,
     specialization,
+    consultationMode: null,
     availabilityWindow,
     hospitalAffiliation,
+    experienceYears: null,
+    languages: null,
     isVerified,
     metadataCompletenessScore,
     completenessRationale

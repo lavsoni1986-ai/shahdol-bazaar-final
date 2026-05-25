@@ -68,6 +68,8 @@ interface VendorResult {
   isVerified?: boolean;
   description?: string | null;
   logo?: string | null;
+  rank?: number;
+  insights?: string[];
 }
 
 interface ProductResult {
@@ -106,7 +108,14 @@ export async function searchUnified(query: string, districtId: number): Promise<
 }> {
   let intent: any = null;
   let searchExpansion: any = null;
-  let canonicalSemantics: ResolverResult;
+  let canonicalSemantics: ResolverResult = {
+    intent: 'DISCOVERY' as any,
+    domain: 'SERVICES' as any,
+    entity: 'PROVIDER' as any,
+    category: 'GROCERY' as any,
+    operationalSignals: [],
+    userIntentSignals: []
+  };
   try {
     // 1. Detect intent with taxonomy expansion
     intent = detectIntent(query);
@@ -206,7 +215,14 @@ export async function searchUnified(query: string, districtId: number): Promise<
           if (i >= 5) return v;
           try {
             // Use cognitive routing for AI-powered reasoning
-            const reason = await generateReason(query, v);
+            const reason = await generateReason(query, {
+              name: v.name,
+              rating: v.rating ?? v.avgRating ?? 0,
+              category: v.category,
+              entityType: 'vendor' as any,
+              dsslScore: v.dsslScore ?? v.trustScore ?? 0,
+              trustScore: v.trustScore
+            });
             return { ...v, reason };
           } catch {
             return v;
@@ -588,7 +604,7 @@ async function rankVendors(vendors: any[], districtId: number, query: string): P
   const rankings = await dynamicDiscoveryRanking.rankEntities(vendors, rankingContext);
 
   // Convert back to VendorResult format for compatibility
-  return rankings.map(ranking => {
+  const results: (VendorResult | null)[] = rankings.map(ranking => {
     const vendor = vendors.find(v => v.id === ranking.entityId);
     if (!vendor) return null;
 
@@ -596,7 +612,7 @@ async function rankVendors(vendors: any[], districtId: number, query: string): P
       id: vendor.id,
       name: vendor.name,
       slug: vendor.slug,
-      category: vendor.category,
+      category: vendor.category || 'general',
       districtId: vendor.districtId,
       trustScore: vendor.trustScore ?? vendor.dsslScore ?? 0,
       dsslScore: vendor.dsslScore,
@@ -610,5 +626,7 @@ async function rankVendors(vendors: any[], districtId: number, query: string): P
       rank: ranking.rank,
       insights: ranking.insights
     };
-  }).filter(Boolean).sort((a, b) => b.finalScore - a.finalScore);
+  });
+
+  return results.filter((v): v is VendorResult => v !== null).sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0));
 }

@@ -51,7 +51,7 @@ export enum SignalProvenance {
 
 // Signal Constitution - Sovereign signals with epistemic separation
 export interface OperationalSignal {
-  type: CanonicalSignal;     // Entity capability signals
+  type: CanonicalSignal | OperationalSignalType;     // Entity capability signals
   state: CanonicalSignalState;
 
   // Epistemic timestamps (constitutional semantics)

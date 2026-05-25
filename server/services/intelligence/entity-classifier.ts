@@ -215,7 +215,7 @@ export async function classifyVendor(vendorId: number): Promise<ServerClassifica
     const topScore = sorted[0][1];
     const totalScore = sorted.reduce((sum, [, s]) => sum + s, 0) || 1;
 
-    safeLogger.info(COMPONENT, `${TAG} Vendor ${vendorId} classified as ${topKind} (confidence=${(topScore / totalScore).toFixed(2)})`);
+    safeLogger.info(COMPONENT, "vendor_classified", `${TAG} Vendor ${vendorId} classified as ${topKind} (confidence=${(topScore / totalScore).toFixed(2)})`);
 
     return {
         kind: topKind,
@@ -272,7 +272,7 @@ export async function classifyProduct(productId: number): Promise<ServerClassifi
         source: "product",
         vendorBusinessType: product.vendor?.businessType || undefined,
         metadata: {
-            category: product.categoryName || product.category?.toString() || undefined,
+            category: product.categoryName || product.categoryId?.toString() || undefined,
         },
     };
 }

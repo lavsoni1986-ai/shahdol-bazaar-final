@@ -6,9 +6,14 @@
 import { getGroq } from "../middleware/groq";
 import { CanonicalEntity } from "../dto/entity.dto";
 
-type ReasonTarget = Pick<CanonicalEntity, 'name' | 'rating' | 'category' | 'entityType' | 'dsslScore'> & {
+interface ReasonTarget {
+  name: string;
+  rating?: number | null;
+  category?: string | null;
+  entityType: string;
+  dsslScore?: number;
   trustScore?: number;
-};
+}
 
 export async function generateReason(query: string, vendor: ReasonTarget): Promise<string> {
   try {

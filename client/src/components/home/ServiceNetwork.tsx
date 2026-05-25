@@ -43,8 +43,8 @@ export default function ServiceNetwork({ workers = [], isLoading = false }: Serv
     <section>
       <h2 className="text-xl font-black text-white mb-6 tracking-tighter">Service Network</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {canonicalServices.map((service) => (
-          <SovereignEntityCard key={'service-' + service.id} entity={service} variant="grid" />
+        {canonicalServices.map((service, index) => (
+          <SovereignEntityCard key={`service-${service.slug || service.id}-${index}`} entity={service} variant="grid" />
         ))}
       </div>
     </section>

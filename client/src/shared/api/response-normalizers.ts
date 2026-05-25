@@ -13,8 +13,7 @@
 // ============================================
 
 import { normalizePartnerEntity, type CanonicalPartner } from "../canonical/partner.adapter";
-import { getCurrentDistrictSlug } from "../routing/sovereign-routes";
-import { resolveEntityRoute } from "../../governance/entity-route-resolver";
+import { getCurrentDistrictSlug, buildCanonicalRoute } from "../routing/sovereign-routes";
 
 export type CanonicalEntityKind = 'partner' | 'hospital' | 'school' | 'service' | 'product';
 
@@ -91,13 +90,11 @@ function buildEntityRoute(kind: CanonicalEntityKind, districtSlug: string, slug:
     partner: 'marketplace',
   };
 
-  const result = resolveEntityRoute({
-    entityKind: (kindMap[kind] || 'marketplace') as any,
+  return buildCanonicalRoute({
+    entityKind: kindMap[kind] || 'marketplace',
     slug,
     districtSlug,
   });
-
-  return result.href;
 }
 
 export function normalizeCanonicalEntity(entity: any, districtSlug?: string, kindHint?: CanonicalEntityKind): CanonicalEntity {

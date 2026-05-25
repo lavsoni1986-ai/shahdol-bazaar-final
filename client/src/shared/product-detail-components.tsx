@@ -4,7 +4,7 @@
 
 import { memo, useState, useCallback, type ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ShoppingCart, ShieldCheck, MapPin, Star, Store, MessageCircle, Phone, Clock, Zap, Package, Calendar, CalendarCheck, GraduationCap, UtensilsCrossed, PhoneCall } from "lucide-react";
+import { ShoppingCart, ShieldCheck, MapPin, Star, Store, MessageCircle, Phone, Clock, Zap, Package, Calendar, CalendarCheck, GraduationCap, UtensilsCrossed, PhoneCall, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,20 @@ import {
     type MediaType,
 } from "@/design/media-governance";
 import { resolveEntityCTAs, hasCommerceDisplay, CTA_METADATA } from "@/governance";
+
+const CTA_ICONS: Record<string, React.ComponentType<any>> = {
+    ShoppingCart,
+    Zap,
+    CalendarCheck,
+    Calendar,
+    MessageSquare,
+    Phone,
+    MessageCircle,
+    MapPin,
+    GraduationCap,
+    UtensilsCrossed,
+    PhoneCall,
+};
 
 // ─── 1. PRODUCT IMAGE WITH GOVERNANCE ─────────────────────
 
@@ -233,7 +247,7 @@ export function TrustBadgeRow({
     return (
         <div className="flex flex-wrap items-center gap-2.5 py-2">
             {/* DSSL Sovereign Trust Badge */}
-            <SovereignTrustBadge level={trustLevel} dsslScore={dsslScore ?? undefined} size="md" />
+            <SovereignTrustBadge level={trustLevel} dsslScore={dsslScore ?? undefined} size="md" entityKind={entityKind} />
 
             {/* Cash on Delivery — ONLY for commerce entities */}
             {isCommerce && deliveryGuarantee && (
@@ -288,6 +302,7 @@ export function PrimaryCTAGroup({
     const primaryCTA = ctas.policy.primaryCTA === "add_to_cart" ? CTA_METADATA.add_to_cart.label : ctas.primaryCTA.label;
     const whatsappLabel = CTA_METADATA.whatsapp.label;
     const callLabel = CTA_METADATA.call_now.label;
+    const PrimaryIcon = CTA_ICONS[ctas.primaryCTA.icon] || ShoppingCart;
 
     const handleWhatsApp = () => {
         if (onWhatsApp) {
@@ -329,7 +344,7 @@ export function PrimaryCTAGroup({
                         disabled={disabled}
                         className="col-span-1 bg-orange-600 hover:bg-orange-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-orange-600/20 transition-all active:scale-[0.98]"
                     >
-                        <ShoppingCart className="w-4 h-4 mr-1.5" />
+                        <PrimaryIcon className="w-4 h-4 mr-1.5" />
                         {primaryCTA}
                     </Button>
                 )}
@@ -370,6 +385,7 @@ interface SellerInfoCardProps {
     trustLevel?: TrustLevel;
     dsslScore?: number | null;
     onViewMap?: () => void;
+    entityKind?: string;
 }
 
 export function SellerInfoCard({
@@ -380,6 +396,7 @@ export function SellerInfoCard({
     trustLevel = "none",
     dsslScore,
     onViewMap,
+    entityKind,
 }: SellerInfoCardProps) {
     const handleMap = () => {
         if (onViewMap) {
@@ -398,7 +415,7 @@ export function SellerInfoCard({
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-bold text-white truncate">{name}</h3>
-                    <SovereignTrustBadge level={trustLevel} dsslScore={dsslScore ?? undefined} size="sm" />
+                    <SovereignTrustBadge level={trustLevel} dsslScore={dsslScore ?? undefined} size="sm" entityKind={entityKind} />
                 </div>
             </div>
 
@@ -572,6 +589,7 @@ export function StickyMobileCTA({
     const ctas = resolveEntityCTAs({ kind: entityKind as any });
     const ctaLabel = ctas.primaryCTA.label;
     const ctaIcon = ctas.primaryCTA.icon;
+    const PrimaryIcon = CTA_ICONS[ctaIcon] || ShoppingCart;
 
     return (
         <div
@@ -608,7 +626,7 @@ export function StickyMobileCTA({
                             disabled={disabled}
                             className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-orange-600/20 transition-all active:scale-[0.98]"
                         >
-                            <ShoppingCart className="w-4 h-4 mr-1.5" />
+                            <PrimaryIcon className="w-4 h-4 mr-1.5" />
                             {ctaLabel}
                         </Button>
                     )}

@@ -36,7 +36,7 @@ export async function handleTelemetryFlow({
         hallucinationPrevented,
         query: rawQuery,
         unmetDemand
-      });
+      } as any) as any;
     }
 
     // Telemetry creation engine
@@ -52,7 +52,7 @@ export async function handleTelemetryFlow({
           hallucinationPrevented,
           query: rawQuery,
           unmetDemand
-        });
+        } as any) as any;
         return executionState.telemetry;
       },
       executionState
@@ -60,7 +60,7 @@ export async function handleTelemetryFlow({
 
     // Emit telemetry (non-blocking)
     const emitFn = async () => {
-      await emitTelemetry(executionState.telemetry!, {
+      await emitTelemetry(executionState.telemetry as any, {
         query: rawQuery,
         operationErrors: executionState.operationErrors
       });

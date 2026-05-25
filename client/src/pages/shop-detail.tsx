@@ -46,7 +46,7 @@ import {
 } from "@/governance";
 import { trackEvent } from "@/lib/analytics";
 import { SovereignTrustBadge, resolveTrustLevel } from "@/components/shared/SovereignTrustBadge";
-import { MEDIA_GOVERNANCE } from "@/design/media-governance";
+import { MEDIA_GOVERNANCE, GovernedImage } from "@/design/media-governance";
 import type { MediaType } from "@/design/media-governance";
 
 // ─── TYPES ──────────────────────────────────────────────
@@ -480,6 +480,7 @@ export default function ShopDetail() {
                       dsslScore: displayVendor.dsslScore || 0,
                     })}
                     size="md"
+                    entityKind={entityKind}
                   />
                 </div>
               </div>
@@ -597,6 +598,7 @@ export default function ShopDetail() {
                     dsslScore: displayVendor.dsslScore || 0,
                   })}
                   size="lg"
+                  entityKind={entityKind}
                 />
               </div>
             </div>
@@ -618,11 +620,14 @@ export default function ShopDetail() {
                     {products.map((product: Product) => (
                       <Link key={product.id} href={`/product/${product.id}`}>
                         <div className="group bg-zinc-900/80 rounded-2xl border border-zinc-800 hover:border-orange-800/50 hover:shadow-xl hover:shadow-orange-500/5 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col h-full">
-                          <div className="h-36 overflow-hidden bg-zinc-800/50 relative">
-                            <img
-                              src={toAbsolute(product.images?.[0] || product.imageUrls?.[0] || product.imageUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?auto=format&fit=crop&q=80&w=400")}
+                          <div className="relative">
+                            <GovernedImage
+                              src={toAbsolute(product.images?.[0] || product.imageUrls?.[0] || product.imageUrl)}
                               alt={product.name}
-                              className="w-full h-full object-contain p-1 bg-zinc-900/70 group-hover:scale-105 transition-transform duration-500"
+                              categoryName={product.category}
+                              aspectRatioHint="square"
+                              className="w-full h-36 border-0"
+                              imgClassName="p-1 bg-zinc-900/70 group-hover:scale-105"
                             />
                           </div>
                           <div className="p-3 flex flex-col flex-1 gap-1">

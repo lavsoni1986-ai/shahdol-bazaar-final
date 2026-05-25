@@ -26,7 +26,7 @@ router.get("/status", async (req, res) => {
     const cognitiveRouting = aiProviderManager.getCognitiveRoutingStatus();
     const failoverStatus = aiProviderManager.getFailoverStatus();
 
-    return success(res, {
+    return res.json(success({
       healthStatus,
       capabilityMatrix,
       availableProviders,
@@ -39,7 +39,7 @@ router.get("/status", async (req, res) => {
         totalTasks: cognitiveRouting.length,
         failoverReadyTasks: failoverStatus.filter(f => f.allHealthy).length
       }
-    });
+    }));
   } catch (err: any) {
     console.error("AI provider status error:", err.message);
     return res.status(500).json(error("Failed to fetch AI provider status"));
@@ -71,7 +71,7 @@ router.get("/capabilities", async (req, res) => {
       }
     };
 
-    return success(res, readableMatrix);
+    return res.json(success(readableMatrix));
   } catch (err: any) {
     console.error("AI capabilities error:", err.message);
     return res.status(500).json(error("Failed to fetch AI capabilities"));
@@ -97,7 +97,7 @@ router.get("/config", async (req, res) => {
       };
     });
 
-    return success(res, configs);
+    return res.json(success(configs));
   } catch (err: any) {
     console.error("AI provider config error:", err.message);
     return res.status(500).json(error("Failed to fetch AI provider config"));
@@ -117,12 +117,12 @@ router.post("/validate", async (req, res) => {
       const health = await aiProviderManager['validateProvider'](provider);
       aiProviderManager['healthStatus'].set(provider, health);
 
-return success(res, {
+return res.json(success({
          provider,
          healthy: health.healthy,
          latency: health.latency,
          error: health.error
-       });
+       }));
     } else {
       // Validate all providers
       const results = await aiProviderManager['validateAllProviders']();
@@ -143,7 +143,7 @@ router.get("/routing", async (req, res) => {
     const routing = aiProviderManager.getCognitiveRoutingStatus();
     const failoverStatus = aiProviderManager.getFailoverStatus();
 
-    return success(res, {
+    return res.json(success({
       routing,
       failoverStatus,
       summary: {
@@ -151,7 +151,7 @@ router.get("/routing", async (req, res) => {
         totalTasks: routing.length,
         failoverReadyTasks: failoverStatus.filter(f => f.allHealthy).length
       }
-    });
+    }));
   } catch (err: any) {
     console.error("AI routing config error:", err.message);
     return res.status(500).json(error("Failed to fetch AI routing config"));

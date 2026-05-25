@@ -1,7 +1,7 @@
 // shared/contracts/ontology/signal-observability.ts
 // Signal Sovereignty Observability - Epistemic Governance with Separated Truth Domains
 
-import { ConstitutedSignal, OperationalSignal, UserContextSignal, CanonicalSignal, UserIntentSignal, SignalProvenance, CanonicalSignalState } from './signals';
+import { ConstitutedSignal, OperationalSignal, UserContextSignal, CanonicalSignal, UserIntentSignal, SignalProvenance, CanonicalSignalState, OperationalSignalType } from './signals';
 import { SignalSovereigntyEngine } from './signal-engine';
 
 export interface OperationalTruthMetrics {
@@ -11,7 +11,7 @@ export interface OperationalTruthMetrics {
   operationalWeightedTruthDensity: number;
   operationalAverageConfidence: number;
   operationalProvenanceBreakdown: Record<SignalProvenance, number>;
-  operationalSignalBreakdown: Record<CanonicalSignal, number>;
+  operationalSignalBreakdown: Record<CanonicalSignal | OperationalSignalType, number>;
 }
 
 export interface UserContextMetrics {
@@ -76,7 +76,7 @@ export class SignalObservabilityEngine {
     const sovereignSignals = SignalSovereigntyEngine.filterSovereignSignals(signals);
 
     // Separate operational and user context signals
-    const operationalSignals = signals.filter(s => 'type' in s && Object.values(CanonicalSignal).includes((s as OperationalSignal).type));
+    const operationalSignals = signals.filter(s => 'type' in s && (Object.values(CanonicalSignal).includes((s as OperationalSignal).type as any) || Object.values(OperationalSignalType).includes((s as OperationalSignal).type as any)));
     const userSignals = signals.filter(s => 'type' in s && Object.values(UserIntentSignal).includes((s as UserContextSignal).type));
 
     const operationalSovereign = sovereignSignals.filter(s => operationalSignals.includes(s));
@@ -95,7 +95,7 @@ export class SignalObservabilityEngine {
         const opSignal = signal as OperationalSignal;
         acc[opSignal.type] = (acc[opSignal.type] || 0) + 1;
         return acc;
-      }, {} as Record<CanonicalSignal, number>)
+      }, {} as Record<CanonicalSignal | OperationalSignalType, number>)
     };
 
     // User context metrics

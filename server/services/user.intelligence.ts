@@ -4,24 +4,28 @@ import { prisma } from '../storage';
 export async function getGlobalUserRisk(userId: number): Promise<number> {
   // For now, just return local risk. In production, aggregate across districts
   const intel = await prisma.userIntelligence.findUnique({
-    where: { userId },
-    select: { riskScore: true }
+    where: { userId }
   });
-  return intel?.riskScore || 0;
+  const data = (intel?.intelligenceData as any) || {};
+  return data.riskScore || 0;
 }
 
 // Fairness normalization - district baseline
 export async function getDistrictFairnessBaseline(districtId: number): Promise<number> {
-  const result = await prisma.userIntelligence.aggregate({
+  const intels = await prisma.userIntelligence.findMany({
     where: {
       user: {
         districtId,
         orders: { some: {} } // Has at least one order
       }
-    },
-    _avg: { trustScore: true }
+    }
   });
-  return result._avg.trustScore || 50;
+  if (intels.length === 0) return 50;
+  const sum = intels.reduce((acc, curr) => {
+    const data = (curr.intelligenceData as any) || {};
+    return acc + (data.trustScore || 50);
+  }, 0);
+  return sum / intels.length;
 }
 
 export async function computeUserIntelligence(userId: number) {
@@ -84,8 +88,8 @@ export async function computeUserIntelligence(userId: number) {
   });
 
   if (recentRiskHistory.length >= 7) { // At least a week's data
-    const earlyRisk = recentRiskHistory.slice(0, 3).reduce((sum, h) => sum + h.score, 0) / 3;
-    const lateRisk = recentRiskHistory.slice(-3).reduce((sum, h) => sum + h.score, 0) / 3;
+    const earlyRisk = recentRiskHistory.slice(0, 3).reduce((sum, h) => sum + h.riskScore, 0) / 3;
+    const lateRisk = recentRiskHistory.slice(-3).reduce((sum, h) => sum + h.riskScore, 0) / 3;
     const drift = lateRisk - earlyRisk;
     if (drift > 10) { // Consistently rising risk
       riskScore += 20; // Slow coordinated attack penalty
@@ -114,16 +118,17 @@ export async function computeUserIntelligence(userId: number) {
 
   let behaviorShiftPenalty = 0;
   if (existingIntel && existingIntel.updatedAt) {
+    const data = (existingIntel.intelligenceData as any) || {};
     const daysSinceUpdate = (Date.now() - existingIntel.updatedAt.getTime()) / (1000 * 60 * 60 * 24);
     if (daysSinceUpdate >= 7) {
-      const trustVelocity = trustScore - (existingIntel.trustScore || 50);
+      const trustVelocity = trustScore - (data.trustScore || 50);
       if (trustVelocity > 30) {
         riskScore += 20; // Trust velocity guard
       }
 
       // Check for sudden device changes
       const recentDevices = events.filter(e => e.createdAt > existingIntel.updatedAt).map(e => e.deviceHash);
-      const oldDeviceCount = existingIntel.deviceCount || 1;
+      const oldDeviceCount = data.deviceCount || 1;
       if (recentDevices.length > 0 && deviceCount > oldDeviceCount + 2) {
         behaviorShiftPenalty = 25; // Identity shift detected
         riskScore += behaviorShiftPenalty;
@@ -215,7 +220,7 @@ export async function applyUserActions(userId: number) {
   // Get recent flags and linked vendors for explainability
   const recentFlags = await prisma.fraudHistory.findMany({
     where: { userId },
-    select: { score: true, flags: true, createdAt: true },
+    select: { riskScore: true, details: true, createdAt: true },
     orderBy: { createdAt: 'desc' },
     take: 5
   });
@@ -252,31 +257,27 @@ export async function applyUserActions(userId: number) {
     fairnessApplied: (intel.orderCount || 0) < 3 && intel.trustScore < 50
   };
 
+  const intelligenceData = {
+    trustScore: intel.trustScore,
+    riskScore: intel.riskScore,
+    reviewCount: intel.reviewCount,
+    orderCount: intel.orderCount,
+    flaggedCount: intel.flaggedCount,
+    deviceCount: intel.deviceCount,
+    ipDiversity: intel.ipDiversity,
+    meta,
+    lastActive: new Date().toISOString()
+  };
+
   // Update or create UserIntelligence record
   await prisma.userIntelligence.upsert({
     where: { userId },
     update: {
-      trustScore: intel.trustScore,
-      riskScore: intel.riskScore,
-      reviewCount: intel.reviewCount,
-      orderCount: intel.orderCount,
-      flaggedCount: intel.flaggedCount,
-      deviceCount: intel.deviceCount,
-      ipDiversity: intel.ipDiversity,
-      meta,
-      lastActive: new Date()
+      intelligenceData
     },
     create: {
       userId,
-      trustScore: intel.trustScore,
-      riskScore: intel.riskScore,
-      reviewCount: intel.reviewCount,
-      orderCount: intel.orderCount,
-      flaggedCount: intel.flaggedCount,
-      deviceCount: intel.deviceCount,
-      ipDiversity: intel.ipDiversity,
-      meta,
-      lastActive: new Date()
+      intelligenceData
     }
   });
 

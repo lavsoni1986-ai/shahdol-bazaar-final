@@ -8,6 +8,7 @@ import { createOrder, findOrders } from "../repositories/order.repo";
 import { prisma } from "../storage";
 import { MIGRATION_FLAGS, logMigrationEvent, logMigrationWarning, logMigrationError } from "../config/migration";
 import { SovereignOrderEngine } from "../services/order.engine";
+import { reliableEventPublisher } from "../services/event-delivery-verification";
 
 // Order validation schemas
 const orderItemSchema = z.object({
@@ -62,7 +63,7 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
       });
 
       try {
-        const sovereignEngine = new SovereignOrderEngine(null); // TODO: Add event publisher
+        const sovereignEngine = new SovereignOrderEngine(reliableEventPublisher);
         const result = await sovereignEngine.createOrder({
           userId,
           districtId,
@@ -194,41 +195,7 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
         await prisma.vendor.update({
           where: { id: resolvedVendorId },
           data: {
-            totalOrders: { increment: 1 },
             aiRankScore: { increment: 1.2 }
-          }
-        });
-
-        await prisma.product.update({
-          where: { id: item.productId },
-          data: {
-            orderCount: { increment: 1 },
-            aiRankScore: { increment: 1.0 },
-            conversionScore: { increment: 0.1 }
-          }
-        });
-
-        const previousOrders = await prisma.order.count({
-          where: {
-            userId,
-            vendorId: resolvedVendorId,
-            createdAt: { lt: new Date() }
-          }
-        });
-
-        if (previousOrders > 0) {
-          await prisma.vendor.update({
-            where: { id: resolvedVendorId },
-            data: { repeatCustomers: { increment: 1 } }
-          });
-        }
-
-        await prisma.order.update({
-          where: { id: order.id },
-          data: {
-            orderSource: 'USER_PURCHASE',
-            aiInfluenced: false,
-            identityVersion: 1
           }
         });
       }

@@ -22,7 +22,7 @@ router.get("/", requireAuth, requireSuperAdmin, async (req: Request, res: Respon
     const supplyGaps = await districtMemory.calculateSupplyGaps(districtId);
 
     // Get top trending queries (recent high-demand searches)
-    const trendingQueries = await districtMemory.getQueryTrends(districtId, 24); // Last 24 hours
+    const trendingQueries = await districtMemory.getDemandQueryTrends(districtId, 24); // Last 24 hours
 
     // Get critical gaps (severity critical + high)
     const criticalGaps = supplyGaps.filter(gap => gap.severity === 'critical' || gap.severity === 'high');

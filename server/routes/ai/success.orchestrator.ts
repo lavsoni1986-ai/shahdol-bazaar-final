@@ -115,7 +115,7 @@ export async function handleSuccessFlow({
     // Enhance search terms with district memory
     if (executionState.districtIntelligence?.trendingQueries?.length) {
       const relevantTrends = executionState.districtIntelligence.trendingQueries
-        .filter(t => t.category === cognition.domain || t.intent === cognition.intent)
+        .filter((t: any) => t.category === cognition.domain || t.intent === cognition.intent)
         .slice(0, 3);
 
       for (const trend of relevantTrends) {
@@ -179,7 +179,7 @@ export async function handleSuccessFlow({
             entity.relevanceScore
           )
         };
-      } catch (error) {
+      } catch (error: any) {
         executionState.operationErrors.push(`trust_integrity: ${error.message}`);
         return entity;
       }
@@ -229,15 +229,15 @@ export async function handleSuccessFlow({
     await safeExecute('shared_learning', async () => {
       const signal = {
         districtId,
-        areaKey: district?.slug || "unknown",
+        areaKey: (district?.slug as string) || "unknown",
         domain: cognition.domain || "GENERAL",
         searchTerms,
-        vendorIds: vendors.map(v => v.sourceId),
-        productIds: products.map(v => v.sourceId),
-        serviceIds: services.map(s => s.id),
-        hospitalIds: hospitals.map(h => h.sourceId),
+        vendorIds: vendors.map(v => Number(v.sourceId)),
+        productIds: products.map(v => Number(v.sourceId)),
+        serviceIds: services.map(s => Number(s.id)),
+        hospitalIds: hospitals.map(h => Number(h.sourceId)),
         successScore: executionState.confidenceResult?.score ?? cognition?.confidence ?? 0,
-        responseMode: cognition.responseMode
+        responseMode: (cognition.responseMode as string) || "chat"
       };
 
       await updateSharedLearning(signal);
@@ -304,7 +304,7 @@ export async function handleSuccessFlow({
           hallucinationPrevented: false,
           query: rawQuery,
           unmetDemand: executionState.allResults.length === 0
-        });
+        } as any) as any;
         return executionState.telemetry;
       },
       executionState
@@ -318,7 +318,7 @@ export async function handleSuccessFlow({
         timeoutMs: 6000
       },
       async () => {
-        executionState.response = await synthesizeResponse({
+        executionState.response = (await synthesizeResponse({
           query: rawQuery,
           districtName: district?.name,
           cognition: cognition,
@@ -331,7 +331,7 @@ export async function handleSuccessFlow({
           transportResults,
           districtIntelligence: executionState.districtIntelligence,
           hasLiveAvailability: false
-        });
+        })) as any;
         return executionState.response;
       },
       executionState

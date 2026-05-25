@@ -220,7 +220,7 @@ export async function governedRequest<T = any>(
         // ── EXECUTION ──
         const result = await executeWithRetry(
             async () => {
-                return apiRequest(method, endpoint);
+                return apiRequest(method, endpoint, (config as any).body, { signal: combinedSignal, headers: (config as any).headers });
             },
             config,
             requestId

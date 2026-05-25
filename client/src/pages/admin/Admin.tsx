@@ -17,6 +17,7 @@ import PolicyPanel from "./PolicyPanel";
 import AuditPanel from "./AuditPanel";
 import EmergencyPanel from "./EmergencyPanel";
 import AIDashboard from "./ai-dashboard";
+import ModerationCockpit from "./ModerationCockpit";
 
 export default function Admin() {
   const [location] = useLocation();
@@ -31,6 +32,8 @@ export default function Admin() {
       return <ProductsPanel />;
     case 'vendors':
       return <VendorManagement />;
+    case 'moderation':
+      return <ModerationCockpit />;
     case 'users':
       return <UserPanel />;
     case 'orders':

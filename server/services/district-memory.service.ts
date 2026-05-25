@@ -512,15 +512,9 @@ export class DistrictMemoryLayer {
         lastQueried: new Date(),
         query,
         originalQuery: query ?? null,
-        // ALWAYS write canonical metadata, never conditional
-        intent: intent ?? null,
-        category: category ?? null,
-        signals: signals ? JSON.stringify(signals) : null, // Store full signal constitution
         normalizedIntent: normalizedIntent ?? null,
         confidence: confidence ?? null,
-        matchedEntities: matchedEntities ?? 0,
-        // Semantic augmentation - additive fields to enable semantic memory without breaking legacy keys
-        resolvedCategory: resolvedCategory ?? null
+        matchedEntities: matchedEntities ?? 0
       };
 
       console.log('UPSERT_UPDATE_PAYLOAD', {
@@ -546,9 +540,6 @@ export class DistrictMemoryLayer {
           entity: entity || 'unknown',
           query,
           originalQuery: query ?? null,
-          intent: intent ?? null,
-          category: category ?? null,
-          signals: signals ? JSON.stringify(signals) : null,
           normalizedIntent: normalizedIntent ?? null,
           confidence: confidence ?? null,
           matchedEntities: matchedEntities ?? 0,
@@ -575,16 +566,11 @@ export class DistrictMemoryLayer {
               entity: entity || 'unknown',
               query,
               originalQuery: query ?? null,
-              intent: intent ?? null,
-              category: category ?? null,
-              signals: signals ? JSON.stringify(signals) : null,
               normalizedIntent: normalizedIntent ?? null,
               confidence: confidence ?? null,
               matchedEntities: matchedEntities ?? 0,
               demandCount: 1,
-              lastQueried: new Date(),
-              // store resolvedCategory on row for observability
-              resolvedCategory: resolvedCategory ?? null
+              lastQueried: new Date()
             }
           });
         } catch (err) {
@@ -711,28 +697,16 @@ export class DistrictMemoryLayer {
           },
           update: {
             demandCount: { increment: 1 },
-            lastDetected: new Date(),
-            severity: 'medium',
-            context: {
-              failedQuery: query,
-              expandedTerms,
-              confidence,
-              timestamp: new Date().toISOString()
-            }
+            lastUpdated: new Date()
           },
           create: {
             districtId,
             domain: attemptedCategories,
             entity: 'unmet_demand',
             demandCount: 1,
-            severity: 'medium',
-            lastDetected: new Date(),
-            context: {
-              failedQuery: query,
-              expandedTerms,
-              confidence,
-              timestamp: new Date().toISOString()
-            }
+            urgencyScore: 5.0,
+            trendScore: 1.0,
+            lastUpdated: new Date()
           }
         });
       }
@@ -834,10 +808,9 @@ export class DistrictMemoryLayer {
         }
       });
 
-      // Create supply map
       const supplyMap = new Map<string, number>();
       supplyData.forEach(item => {
-        const categoryKey = item.category.toString();
+        const categoryKey = item.category ? item.category.toString() : 'unknown';
         supplyMap.set(categoryKey, item._count.id);
       });
 
@@ -889,7 +862,7 @@ export class DistrictMemoryLayer {
    * Get query trends over time periods
    * Tracks hourly, daily, weekly demand patterns
    */
-  async getQueryTrends(districtId: number, hoursBack: number = 24): Promise<{
+  async getDemandQueryTrends(districtId: number, hoursBack: number = 24): Promise<{
     query: string;
     intent: string;
     searches: number;
@@ -1051,8 +1024,8 @@ export class DistrictMemoryLayer {
 
   private analyzeTemporalPatterns(timestamp: Date) {
     const hour = timestamp.getHours();
-    const day = timestamp.toLocaleLowerCase('en-US', { weekday: 'long' });
-    const month = timestamp.toLocaleLowerCase('en-US', { month: 'long' });
+    const day = timestamp.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const month = timestamp.toLocaleDateString('en-US', { month: 'long' }).toLowerCase();
 
     return {
       peakHours: [hour],
@@ -1285,7 +1258,7 @@ export class DistrictMemoryLayer {
       query: t.query,
       frequency: t.frequency,
       lastSeen: t.lastSeen,
-      trend: t.trend,
+      trend: t.trend || 'stable',
       velocity: t.velocity,
       category: t.category || undefined,
       intent: t.intent || undefined
@@ -1308,26 +1281,25 @@ export class DistrictMemoryLayer {
 
     await prisma.serviceGap.upsert({
       where: {
-        districtId_serviceType_locality: {
+        districtId_serviceType: {
           districtId,
-          serviceType,
-          locality: locality || 'general'
+          serviceType
         }
       },
       update: {
         frequency: { increment: 1 },
-        lastDemand: new Date(),
+        lastUpdated: new Date(),
         demandLevel: urgency,
         urgencyScore: Math.max(urgencyScore, { low: 1, medium: 3, high: 7, critical: 10 }[urgency])
       },
       create: {
         districtId,
         serviceType,
-        locality,
+        locality: locality || null,
         demandLevel: urgency,
         frequency: 1,
         urgencyScore,
-        lastDemand: new Date(),
+        lastUpdated: new Date(),
         availableProviders: 0
       }
     });
@@ -1418,6 +1390,31 @@ export class DistrictMemoryLayer {
       context: s.context,
       expiresAt: s.expiresAt || undefined
     }));
+  }
+
+  // ============================================
+  // QUERY METRICS BRIDGING
+  // ============================================
+
+  async updateQueryMetrics(params: {
+    districtId: number;
+    query: string;
+    intent?: string;
+    confidence?: number;
+    resultsCount?: number;
+    responseTime?: number;
+    success?: boolean;
+    userId?: number;
+  }): Promise<void> {
+    try {
+      await this.updateQueryTrend({
+        districtId: params.districtId,
+        query: params.query,
+        intent: params.intent
+      });
+    } catch (err) {
+      console.warn('updateQueryMetrics failed:', err);
+    }
   }
 
   // ============================================
@@ -1777,7 +1774,7 @@ class TrustIntegrityEngine {
 
   private async runAnomalyDetection(vendorId: number): Promise<void> {
     // Get recent signals for analysis
-    const recentSignals = await prisma.trustSignal.findMany({
+    const recentSignalsPrisma = await prisma.trustSignal.findMany({
       where: {
         vendorId,
         timestamp: {
@@ -1785,6 +1782,23 @@ class TrustIntegrityEngine {
         }
       },
       orderBy: { timestamp: 'desc' }
+    });
+
+    const recentSignals: TrustSignal[] = recentSignalsPrisma.map(s => {
+      const signalType = ['click', 'view', 'booking', 'review', 'search'].includes(s.signalType)
+        ? (s.signalType as any)
+        : 'view';
+      const source = ['organic', 'suspicious', 'verified'].includes(s.source)
+        ? (s.source as any)
+        : 'organic';
+      return {
+        vendorId: s.vendorId,
+        signalType,
+        value: s.value,
+        timestamp: s.timestamp,
+        source,
+        context: typeof s.context === 'object' && s.context !== null ? (s.context as any) : {}
+      };
     });
 
     const anomalies: TrustAnomaly[] = [];

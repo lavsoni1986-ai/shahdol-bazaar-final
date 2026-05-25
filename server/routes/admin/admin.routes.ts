@@ -6,19 +6,6 @@ import { storage, prisma } from "../../storage";
 import { success, failure, unauthorized, notFound, forbidden, serverError, validationError } from "../../lib/apiResponse";
 import { SystemLockdown } from "../../services/system.health";
 
-declare global {
-  namespace Express {
-    interface Request {
-      ctx?: {
-        role?: string;
-        districtId?: number;
-        userId?: number;
-        requestId?: string;
-      };
-    }
-  }
-}
-
 const router = express.Router();
 
 // Admin actions rate limiter - prevent abuse
@@ -106,7 +93,7 @@ router.get("/fraud-summary", requireAuth, requireSuperAdmin, async (req: Request
       success: true,
       data: {
         pendingAlerts: fraudRecords.length,
-        resolvedToday: fraudRecords.filter(f => (f.flags as any)?.resolved === true).length,
+        resolvedToday: fraudRecords.filter(f => (f.details as any)?.resolved === true).length,
         highRiskVendors: highRiskGroups.length,
         trend: "stable"
       }
@@ -199,7 +186,7 @@ router.get("/activity-feed", requireAuth, requireSuperAdmin, async (req: Request
           amount: o.totalPrice,
           status: o.status,
           customer: o.customerName,
-          vendor: vendorsById.get(o.vendorId),
+          vendor: o.vendorId ? vendorsById.get(o.vendorId) : undefined,
           createdAt: o.createdAt
         })),
         recentVendors: recentVendors.map((v, index) => ({
@@ -286,7 +273,7 @@ router.patch("/vendors/:id/status", requireAuth, requireCityAdmin, async (req: R
     const vendor = await prisma.vendor.update({
       where: { id: vendorId },
       data: {
-        status,
+        status: status as any,
         isShadowBanned: status === "APPROVED" ? false : true,
       },
     });
@@ -582,12 +569,14 @@ router.post("/user-feedback", requireAuth, requireSuperAdmin, async (req: Reques
       data: {
         adminId: req.ctx?.userId!,
         action: "USER_FEEDBACK",
-        targetId: userId,
-        targetType: "user",
-        decision: "FEEDBACK_SUBMITTED",
-        reason: feedback,
-        evidence: { category },
-        districtId: req.ctx?.districtId!
+        details: {
+          targetId: userId,
+          targetType: "user",
+          decision: "FEEDBACK_SUBMITTED",
+          reason: feedback,
+          evidence: { category },
+          districtId: req.ctx?.districtId!
+        }
       }
     });
     return res.json({ success: true, data: { message: "Feedback submitted" } });
@@ -984,6 +973,123 @@ router.get("/districts", requireAuth, requireSuperAdmin, async (req: Request, re
   } catch (e) {
     console.error("Districts fetch error", e);
     return res.status(500).json({ success: false, error: "Failed to fetch districts" });
+  }
+});
+
+// --- MODERATE VENDOR ---
+router.post("/vendors/:id/moderate", requireAuth, requireCityAdmin, adminActionLimiter, async (req: Request, res: Response) => {
+  try {
+    const districtId = req.ctx?.districtId;
+    if (!districtId) {
+      return res.status(403).json({ success: false, error: "District assignment required" });
+    }
+
+    const vendorId = parseInt(req.params.id);
+    if (isNaN(vendorId)) {
+      return res.status(400).json({ success: false, error: "Invalid vendor ID" });
+    }
+
+    const { action, reason } = req.body;
+    if (!action || !["APPROVE", "FLAG", "SHADOW_BAN", "ESCALATE"].includes(action)) {
+      return res.status(400).json({ success: false, error: "Invalid action" });
+    }
+
+    const existingVendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!existingVendor) {
+      return res.status(404).json({ success: false, error: "Vendor not found" });
+    }
+
+    if (existingVendor.districtId !== districtId) {
+      return res.status(403).json({ success: false, error: "Access denied - vendor not in your district" });
+    }
+
+    let updateData: any = {};
+    let logAction = "";
+
+    switch (action) {
+      case "APPROVE":
+        updateData = { status: "APPROVED", isShadowBanned: false, isVerified: true };
+        logAction = "VENDOR_APPROVED";
+        break;
+      case "FLAG":
+        updateData = { isVerified: false };
+        logAction = "VENDOR_FLAGGED";
+        break;
+      case "SHADOW_BAN":
+        updateData = { isShadowBanned: true };
+        logAction = "VENDOR_SHADOW_BANNED";
+        break;
+      case "ESCALATE":
+        updateData = { status: "PENDING" };
+        logAction = "VENDOR_ESCALATED";
+        break;
+    }
+
+    const vendor = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: updateData,
+    });
+
+    try {
+      await prisma.adminActionLog.create({
+        data: {
+          adminId: req.ctx?.userId!,
+          action: logAction,
+          details: {
+            targetId: vendorId,
+            targetType: "vendor",
+            decision: action,
+            reason: reason || `Vendor moderated with action: ${action}`,
+            districtId: districtId,
+          }
+        }
+      });
+    } catch (auditErr) {
+      console.error("[AUDIT_FAIL] VENDOR_MODERATE:", auditErr);
+    }
+
+    return res.json({ success: true, data: vendor });
+  } catch (e) {
+    console.error("Vendor moderate error", e);
+    return res.status(500).json({ success: false, error: "Failed to moderate vendor" });
+  }
+});
+
+// --- GET VENDOR MODERATION HISTORY ---
+router.get("/vendors/:id/history", requireAuth, requireCityAdmin, async (req: Request, res: Response) => {
+  try {
+    const districtId = req.ctx?.districtId;
+    if (!districtId) {
+      return res.status(403).json({ success: false, error: "District assignment required" });
+    }
+
+    const vendorId = parseInt(req.params.id);
+    if (isNaN(vendorId)) {
+      return res.status(400).json({ success: false, error: "Invalid vendor ID" });
+    }
+
+    const existingVendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!existingVendor) {
+      return res.status(404).json({ success: false, error: "Vendor not found" });
+    }
+
+    if (existingVendor.districtId !== districtId) {
+      return res.status(403).json({ success: false, error: "Access denied - vendor not in your district" });
+    }
+
+    const allLogs = await prisma.adminActionLog.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+
+    const vendorLogs = allLogs.filter(log => {
+      const details = log.details as any;
+      return details && details.targetId === vendorId && details.targetType === "vendor";
+    });
+
+    return res.json({ success: true, data: vendorLogs });
+  } catch (e) {
+    console.error("Vendor history fetch error", e);
+    return res.status(500).json({ success: false, error: "Failed to fetch vendor history" });
   }
 });
 

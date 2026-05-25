@@ -23,7 +23,7 @@ router.get("/pulse", async (req: Request, res: Response) => {
 // Get personalized homepage recommendations
 router.get("/homepage", async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id ? parseInt(req.user.id) : undefined;
+    const userId = req.ctx?.userId || ((req.user as any)?.id ? Number((req.user as any).id) : undefined);
     const districtId = parseInt(req.query.districtId as string) || 1;
 
     const recommendations = await getPredictiveHomepage(userId, districtId);

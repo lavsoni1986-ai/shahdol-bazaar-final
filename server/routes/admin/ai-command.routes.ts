@@ -57,7 +57,7 @@ router.get("/metrics", async (req: any, res: Response) => {
     });
   } catch (e) {
     console.error("AI metrics error", e);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed to fetch metrics"));
+    return failure(res, "SERVER_ERROR", "Failed to fetch metrics", 500);
   }
 });
 
@@ -75,7 +75,7 @@ router.get("/fraud-analysis/:vendorId", async (req: any, res: Response) => {
     });
 
     if (!vendor) {
-      return res.status(404).json(failure("NOT_FOUND", "Vendor not found"));
+      return failure(res, "NOT_FOUND", "Vendor not found", 404);
     }
 
     const fraudRows = await prisma.fraudHistory.findMany({
@@ -110,7 +110,7 @@ router.get("/fraud-analysis/:vendorId", async (req: any, res: Response) => {
     });
   } catch (e) {
     console.error("Fraud analysis error", e);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed fraud analysis"));
+    return failure(res, "SERVER_ERROR", "Failed fraud analysis", 500);
   }
 });
 
@@ -155,7 +155,7 @@ router.get("/trends", async (req: any, res: Response) => {
     });
   } catch (e) {
     console.error("Trend error", e);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed trend fetch"));
+    return failure(res, "SERVER_ERROR", "Failed trend fetch", 500);
   }
 });
 
@@ -184,7 +184,7 @@ router.get("/alerts", async (req: any, res: Response) => {
     );
   } catch (e) {
     console.error("Alert fetch error", e);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed alerts"));
+    return failure(res, "SERVER_ERROR", "Failed alerts", 500);
   }
 });
 
@@ -234,7 +234,7 @@ router.get("/fraud-network", async (req: any, res: Response) => {
     });
   } catch (e) {
     console.error("Fraud network error", e);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed fraud network"));
+    return failure(res, "SERVER_ERROR", "Failed fraud network", 500);
   }
 });
 
@@ -250,14 +250,17 @@ router.get("/vendor-insights/:vendorId", async (req: any, res: Response) => {
         ...(districtId ? { districtId } : {})
       },
       include: {
-        orders: true,
         products: true
       }
     });
 
     if (!vendor) {
-      return res.status(404).json(failure("NOT_FOUND", "Vendor not found"));
+      return failure(res, "NOT_FOUND", "Vendor not found", 404);
     }
+
+    const orderCount = await prisma.order.count({
+      where: { vendorId: vendor.id }
+    });
 
     const latestFraud = await prisma.fraudHistory.findFirst({
       where: { vendorId },
@@ -272,14 +275,14 @@ router.get("/vendor-insights/:vendorId", async (req: any, res: Response) => {
         dsslScore: vendor.dsslScore
       },
       insights: {
-        totalOrders: vendor.orders.length,
+        totalOrders: orderCount,
         totalProducts: vendor.products.length,
         latestFraudScore: latestFraud?.riskScore || 0
       }
     });
   } catch (e) {
     console.error("Vendor insights error", e);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed vendor insights"));
+    return failure(res, "SERVER_ERROR", "Failed vendor insights", 500);
   }
 });
 
@@ -299,7 +302,7 @@ router.post("/policy-simulate", async (req: Request, res: Response) => {
     });
   } catch (e) {
     console.error("Policy simulation error", e);
-    return res.status(500).json(failure("SERVER_ERROR", "Failed policy simulation"));
+    return failure(res, "SERVER_ERROR", "Failed policy simulation", 500);
   }
 });
 

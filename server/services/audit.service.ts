@@ -9,6 +9,8 @@ export interface AuditLogEntry {
   userId?: number;
   targetId?: number;
   targetType?: string;
+  entityType?: string;
+  entityId?: number;
   details?: string;
   metadata?: any;
   ipAddress?: string;
@@ -55,9 +57,14 @@ export const auditService = {
 
       const hash = computeHash(dataToHash, prevHash);
 
+      const entityType = entry.entityType || entry.targetType || "SYSTEM";
+      const entityId = entry.entityId || entry.targetId || 0;
+
       await createAuditLog({
         action: entry.action,
         userId: entry.userId,
+        entityType,
+        entityId,
         targetId: entry.targetId,
         targetType: entry.targetType,
         details: entry.details,

@@ -12,10 +12,9 @@ async function fixVendorData() {
       where: { id: vendor.id },
       data: {
         status: 'APPROVED',
-        isAiIndexed: true,
         searchText: searchText,
-        dsslScore: vendor.trustScore || 50,
-        aiRankScore: vendor.trustScore || 50
+        dsslScore: vendor.dsslScore || 50,
+        aiRankScore: vendor.dsslScore || 50
       }
     });
   }

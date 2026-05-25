@@ -17,17 +17,10 @@ export function getPublicUrl(): string {
   // Fallback for SSR/Node environments
   // Check environment variables
   const envUrl = 
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-    process.env.VITE_PUBLIC_URL ||
-    process.env.NEXT_PUBLIC_URL ||
-    process.env.PUBLIC_URL;
+    (typeof process !== 'undefined' && process.env?.VERCEL_URL) ? `https://${process.env.VERCEL_URL}` : 
+    import.meta.env.VITE_PUBLIC_URL || "";
   
-  if (envUrl) {
-    return envUrl;
-  }
-  
-  // Last resort: assume localhost in development
-  return 'http://localhost:5173';
+  return envUrl;
 }
 
 /**
@@ -37,6 +30,7 @@ export function getPublicUrl(): string {
  */
 export function getPublicUrlFor(path: string): string {
   const baseUrl = getPublicUrl();
+  if (!baseUrl) return path;
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${baseUrl}${cleanPath}`;
 }
@@ -44,20 +38,11 @@ export function getPublicUrlFor(path: string): string {
 /**
  * Get API base URL
  * In production, API routes are on same domain
- * In development, use VITE_API_URL or default to localhost:5000
+ * In development, use VITE_API_URL or relative origin
  */
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
-    // In browser, check if we're in production
-    const isProduction = window.location.hostname !== 'localhost' && 
-                        window.location.hostname !== '127.0.0.1';
-    
-    if (isProduction) {
-      // Production: API is on same domain
-      return window.location.origin;
-    }
+    return window.location.origin;
   }
-  
-  // Development: use environment variable or default
-  return (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+  return (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 }

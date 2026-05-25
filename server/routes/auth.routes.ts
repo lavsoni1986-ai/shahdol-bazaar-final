@@ -157,19 +157,19 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     });
 
     // 🔧 M-3 — AUTO VENDOR PROVISION FOR MERCHANTS
-if (finalRole === "MERCHANT") {
+    if (finalRole === "MERCHANT") {
       try {
         console.log(`🔧 [VENDOR PROVISION START] user=${user.id} slug=${String(username).trim()} district=${district.id}`);
         await prisma.vendor.create({
           data: {
             name: String(shopName || username).trim(),
             slug: String(username).trim(),
-            district: { connect: { id: district.id } },
-            user: { connect: { id: user.id } },
+            districtId: district.id,
+            userId: user.id,
             status: "PENDING" as any,
             isShadowBanned: false,
-            category: "SERVICE" as any,
-            trustScore: 70,
+            businessType: "SERVICE",
+            category: "SERVICE",
             dsslScore: 70,
             phone: phone || null,
             address: shopAddress || null,

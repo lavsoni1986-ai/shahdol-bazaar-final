@@ -26,8 +26,8 @@ export default function HealthPulse({ hospitals = [] }: HealthPulseProps) {
     <section>
       <h2 className="text-xl font-black text-white mb-6 tracking-tighter">Health Pulse</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {safeHospitals.slice(0, 4).map((hospital) => (
-          <div key={`hospital-${hospital.id}`} onClick={() => setLocation(hospital.route)}>
+        {safeHospitals.slice(0, 4).map((hospital, index) => (
+          <div key={`healthcare-${hospital.slug || hospital.id}-${index}`} onClick={() => setLocation(hospital.route)}>
             <SovereignEntityCard entity={hospital} variant="grid" />
           </div>
         ))}

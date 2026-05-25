@@ -5,8 +5,9 @@
  * Ensures events are delivered reliably with replay capabilities.
  */
 
+import crypto from 'crypto';
 import { prisma } from '../storage.js';
-import { EventType, EventBus, EventPublisher, CommerceEvent } from '../events/index.js';
+import { EventType, EventBus, EventPublisher, CommerceEvent, EventHandler } from '../events/index.js';
 
 // ============================================
 // OUTBOX PATTERN IMPLEMENTATION
@@ -40,7 +41,7 @@ export class DurableEventBus implements EventBus {
    * PUBLISH EVENT TO OUTBOX
    */
   async publish(event: CommerceEvent): Promise<void> {
-    console.log(`📤 Publishing event: ${event.type} for ${event.data?.orderId || event.data?.productId || 'unknown'}`);
+    console.log(`📤 Publishing event: ${event.type} for ${(event.data as any)?.orderId || (event.data as any)?.productId || 'unknown'}`);
 
     // Store in outbox first (outbox pattern)
     await this.storeInOutbox(event);
@@ -81,24 +82,29 @@ export class DurableEventBus implements EventBus {
   private async storeInOutbox(event: CommerceEvent): Promise<void> {
     // In a real implementation, this would be a separate outbox table
     // For now, we'll use the existing audit log as a proxy
-    const targetId = parseInt(event.data?.orderId || event.data?.productId || '0') || null;
+    const targetId = parseInt((event.data as any)?.orderId || (event.data as any)?.productId || '0') || null;
+    const logPayload = {
+      action: `EVENT_OUTBOX:${event.type}`,
+      entityType: 'EVENT',
+      entityId: targetId || 0,
+      details: `Event published: ${event.type}`,
+      metadata: {
+        eventType: event.type,
+        eventData: event.data,
+        outboxId: event.id,
+        status: 'PENDING'
+      },
+      ipAddress: 'system',
+      userAgent: 'DurableEventBus',
+      districtId: event.districtId ?? null
+    };
+
+    const hash = crypto.createHash('sha256').update(JSON.stringify(logPayload)).digest('hex');
+
     await prisma.auditLog.create({
       data: {
-        action: `EVENT_OUTBOX:${event.type}`,
-        entityType: 'EVENT',
-        entityId: targetId || 0,
-        targetType: 'EVENT',
-        targetId: targetId,
-        details: `Event published: ${event.type}`,
-        metadata: {
-          eventType: event.type,
-          eventData: event.data,
-          outboxId: event.id,
-          status: 'PENDING'
-        },
-        ipAddress: 'system',
-        userAgent: 'DurableEventBus',
-        districtId: event.districtId ?? null
+        ...logPayload,
+        hash
       }
     });
   }
@@ -124,7 +130,7 @@ export class DurableEventBus implements EventBus {
         console.error(`❌ Event ${event.type} delivery failed to subscriber ${id}:`, error);
 
         // Mark for retry
-        await this.scheduleRetry(event, error.message);
+        await this.scheduleRetry(event, (error as any).message || String(error));
       }
     });
 
@@ -136,25 +142,30 @@ export class DurableEventBus implements EventBus {
    */
   private async scheduleRetry(event: CommerceEvent, errorMessage: string): Promise<void> {
     // Update outbox entry with retry information
-    const retryTargetId = parseInt(event.data?.orderId || event.data?.productId || '0') || null;
+    const retryTargetId = parseInt((event.data as any)?.orderId || (event.data as any)?.productId || '0') || null;
+    const logPayload = {
+      action: `EVENT_RETRY:${event.type}`,
+      entityType: 'EVENT',
+      entityId: retryTargetId || 0,
+      details: `Event delivery failed, scheduled for retry: ${errorMessage}`,
+      metadata: {
+        eventType: event.type,
+        eventData: event.data,
+        errorMessage,
+        retryCount: 1,
+        nextRetryAt: new Date(Date.now() + this.retryDelayMs)
+      },
+      ipAddress: 'system',
+      userAgent: 'DurableEventBus',
+      districtId: event.districtId ?? null
+    };
+
+    const hash = crypto.createHash('sha256').update(JSON.stringify(logPayload)).digest('hex');
+
     await prisma.auditLog.create({
       data: {
-        action: `EVENT_RETRY:${event.type}`,
-        entityType: 'EVENT',
-        entityId: retryTargetId || 0,
-        targetType: 'EVENT',
-        targetId: retryTargetId,
-        details: `Event delivery failed, scheduled for retry: ${errorMessage}`,
-        metadata: {
-          eventType: event.type,
-          eventData: event.data,
-          errorMessage,
-          retryCount: 1,
-          nextRetryAt: new Date(Date.now() + this.retryDelayMs)
-        },
-        ipAddress: 'system',
-        userAgent: 'DurableEventBus',
-        districtId: event.districtId ?? null
+        ...logPayload,
+        hash
       }
     });
   }
@@ -193,7 +204,7 @@ export class DurableEventBus implements EventBus {
           id: `retry_${failedEvent.id}`,
           type: eventData.eventType,
           timestamp: failedEvent.createdAt,
-          districtId: failedEvent.districtId,
+          districtId: failedEvent.districtId || 0,
           data: eventData.eventData
         };
 
@@ -202,21 +213,26 @@ export class DurableEventBus implements EventBus {
 
         // Mark as successfully retried
         const successEntityId = failedEvent.targetId || failedEvent.id || null;
+        const logPayload = {
+          action: `EVENT_RETRY_SUCCESS:${event.type}`,
+          entityType: 'EVENT',
+          entityId: successEntityId || 0,
+          details: `Event retry succeeded after ${retryCount + 1} attempts`,
+          metadata: {
+            originalEventId: failedEvent.id,
+            retryCount: retryCount + 1
+          },
+          ipAddress: 'system',
+          userAgent: 'DurableEventBus',
+          districtId: failedEvent.districtId ?? null
+        };
+
+        const hash = crypto.createHash('sha256').update(JSON.stringify(logPayload)).digest('hex');
+
         await prisma.auditLog.create({
           data: {
-            action: `EVENT_RETRY_SUCCESS:${event.type}`,
-            entityType: 'EVENT',
-            entityId: successEntityId || 0,
-            targetType: 'EVENT',
-            targetId: failedEvent.targetId,
-            details: `Event retry succeeded after ${retryCount + 1} attempts`,
-            metadata: {
-              originalEventId: failedEvent.id,
-              retryCount: retryCount + 1
-            },
-            ipAddress: 'system',
-            userAgent: 'DurableEventBus',
-            districtId: failedEvent.districtId ?? null
+            ...logPayload,
+            hash
           }
         });
 
@@ -231,19 +247,26 @@ export class DurableEventBus implements EventBus {
    * MARK EVENT AS FAILED
    */
   private async markEventFailed(failedEvent: any): Promise<void> {
+    const logPayload = {
+      action: `EVENT_FAILED:${failedEvent.action.split(':')[1]}`,
+      entityType: 'EVENT',
+      entityId: failedEvent.targetId || 0,
+      details: `Event permanently failed after ${this.maxRetries} retries`,
+      metadata: {
+        originalEventId: failedEvent.id,
+        finalError: failedEvent.metadata?.errorMessage
+      },
+      ipAddress: 'system',
+      userAgent: 'DurableEventBus',
+      districtId: failedEvent.districtId
+    };
+
+    const hash = crypto.createHash('sha256').update(JSON.stringify(logPayload)).digest('hex');
+
     await prisma.auditLog.create({
       data: {
-        action: `EVENT_FAILED:${failedEvent.action.split(':')[1]}`,
-        targetType: 'EVENT',
-        targetId: failedEvent.targetId,
-        details: `Event permanently failed after ${this.maxRetries} retries`,
-        metadata: {
-          originalEventId: failedEvent.id,
-          finalError: failedEvent.metadata?.errorMessage
-        },
-        ipAddress: 'system',
-        userAgent: 'DurableEventBus',
-        districtId: failedEvent.districtId
+        ...logPayload,
+        hash
       }
     });
   }
@@ -312,8 +335,8 @@ export class DurableEventBus implements EventBus {
 // ============================================
 
 export class ReliableEventPublisher extends EventPublisher {
-  constructor(private eventBus: DurableEventBus) {
-    super(eventBus);
+  constructor(private durableEventBus: DurableEventBus) {
+    super(durableEventBus);
   }
 
   /**
@@ -328,7 +351,7 @@ export class ReliableEventPublisher extends EventPublisher {
       data: { orderId, userId, totalAmountPaisa, itemCount, vendorIds }
     };
 
-    await this.eventBus.publish(event);
+    await this.durableEventBus.publish(event);
   }
 
   /**
@@ -343,7 +366,7 @@ export class ReliableEventPublisher extends EventPublisher {
       data: { productId, quantity, availableStock, reservedStock, soldStock: 0 }
     };
 
-    await this.eventBus.publish(event);
+    await this.durableEventBus.publish(event);
   }
 }
 
