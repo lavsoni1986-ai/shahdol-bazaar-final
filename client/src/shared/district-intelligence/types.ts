@@ -106,7 +106,7 @@ export interface ExecutionInsight extends DistrictInsight {
   };
 }
 
-export interface LocalityInsight extends DistrictInsight {
+export interface LocalityInsight {
   type: 'shortage_locality' | 'locality_trend';
   locality: {
     name: string;

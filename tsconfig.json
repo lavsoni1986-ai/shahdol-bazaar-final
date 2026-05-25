@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -17,16 +21,37 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["client/src/*"],
-      "@/components/*": ["client/src/components/*"],
-      "@/lib/*": ["client/src/lib/*"],
-      "@/hooks/*": ["client/src/hooks/*"],
-      "@/pages/*": ["client/src/pages/*"],
-      "@/contexts/*": ["client/src/contexts/*"],
-      "@/constants/*": ["client/src/constants/*"],
-      "@/types/*": ["client/src/types/*"],
-      "@/shared/*": ["client/src/shared/*", "./shared/*"],
-      "@shared/*": ["./shared/*"]
+      "@/*": [
+        "client/src/*"
+      ],
+      "@/components/*": [
+        "client/src/components/*"
+      ],
+      "@/lib/*": [
+        "client/src/lib/*"
+      ],
+      "@/hooks/*": [
+        "client/src/hooks/*"
+      ],
+      "@/pages/*": [
+        "client/src/pages/*"
+      ],
+      "@/contexts/*": [
+        "client/src/contexts/*"
+      ],
+      "@/constants/*": [
+        "client/src/constants/*"
+      ],
+      "@/types/*": [
+        "client/src/types/*"
+      ],
+      "@/shared/*": [
+        "client/src/shared/*",
+        "./shared/*"
+      ],
+      "@shared/*": [
+        "./shared/*"
+      ]
     }
   },
   "include": [
@@ -57,6 +82,16 @@
     "archive/**",
     "client/src/pages/archive/**",
     "client/src/components/archive/**",
-    "client/src/archive/**"
+    "client/src/archive/**",
+    "client/src/core/**",
+    "client/src/ranking-engine/**",
+    "client/src/execution-engine/**",
+    "client/src/shared/cognition/**",
+    "client/src/shared/contracts/**",
+    "client/src/shared/domain/**",
+    "client/src/shared/intent-taxonomy.ts",
+    "client/src/shared/roles.ts",
+    "client/src/shared/schema.ts",
+    "client/src/shared/index.ts"
   ]
 }

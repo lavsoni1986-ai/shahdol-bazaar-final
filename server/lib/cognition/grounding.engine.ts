@@ -62,7 +62,7 @@ export async function groundQuery(context: GroundingContext): Promise<GroundingR
 
   // Add graph expansion terms to search terms
   for (const term of graphExpandedTerms) {
-    if (!searchTerms.some(st => st.toLowerCase().includes(term.toLowerCase()))) {
+    if (!searchTerms.some((st: string) => st.toLowerCase().includes(term.toLowerCase()))) {
       searchTerms.push(term);
       bharatOSLogger.info(LogComponent.GROUNDING, 'graph_expansion', 'Added term from knowledge graph', {
         term,
@@ -80,7 +80,7 @@ export async function groundQuery(context: GroundingContext): Promise<GroundingR
   });
 
   // Get entities from unified discovery feed (with error handling)
-  let allEntities = [];
+  let allEntities: any[] = [];
   try {
     allEntities = await getUnifiedDiscoveryFeed(districtId);
   } catch (error) {

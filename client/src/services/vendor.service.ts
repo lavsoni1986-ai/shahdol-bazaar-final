@@ -26,9 +26,16 @@ export interface CanonicalVendorEntity {
   meta?: any;
 }
 
+// Helper to extract data from apiRequest response
+function extractData(result: any): any {
+  if (result && result.data !== undefined) return result.data;
+  if (result && result.success !== undefined) return result;
+  return result;
+}
+
 // Vendor fetching operations - throw on error for useQuery compatibility
 export async function fetchVendorBySlug(slug: string): Promise<CanonicalVendorEntity> {
-  const result = await apiRequest<CanonicalVendorEntity>('GET', `marketplace/stores/${slug}`);
+  const result = await apiRequest('GET', `marketplace/stores/${slug}`);
   if (!result.success) {
     throw new Error(result.error || "Failed to fetch vendor");
   }
@@ -39,7 +46,7 @@ export async function fetchVendorBySlug(slug: string): Promise<CanonicalVendorEn
 }
 
 export async function fetchVendorById(id: string): Promise<CanonicalVendorEntity> {
-  const result = await apiRequest<CanonicalVendorEntity>('GET', `marketplace/vendors/id/${id}`);
+  const result = await apiRequest('GET', `marketplace/vendors/id/${id}`);
   if (!result.success) {
     throw new Error(result.error || "Failed to fetch vendor");
   }
@@ -57,7 +64,7 @@ export async function fetchVendorProducts(vendorId: number): Promise<any[]> {
     console.warn('[VENDOR.SERVICE] fetchVendorProducts called with invalid vendorId:', vendorId);
     return [];
   }
-  const result = await apiRequest<any[]>('GET', `marketplace/products?vendorId=${vendorId}`);
+  const result = await apiRequest('GET', `marketplace/products?vendorId=${vendorId}`);
   if (!result.success) {
     throw new Error(result.error || "Failed to fetch products");
   }
@@ -71,8 +78,8 @@ export async function trackAnalytics(data: {
   source: string;
   action: string;
   value?: any;
-}): Promise<ApiResponse<void>> {
-  return apiRequest('POST', 'analytics/track', { body: data });
+}): Promise<void> {
+  await apiRequest('POST', 'analytics/track', { body: data });
 }
 
 // Lead operations
@@ -81,6 +88,6 @@ export async function captureLead(data: {
   vendorName: string;
   customerName?: string;
   message: string;
-}): Promise<ApiResponse<void>> {
-  return apiRequest('POST', 'leads', { body: data });
+}): Promise<void> {
+  await apiRequest('POST', 'leads', { body: data });
 }

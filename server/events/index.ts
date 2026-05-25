@@ -57,8 +57,8 @@ export interface BaseEvent {
 
 export interface OrderEvent extends BaseEvent {
   type: EventType.ORDER_CREATED | EventType.ORDER_CONFIRMED | EventType.ORDER_PREPARING |
-        EventType.ORDER_READY | EventType.ORDER_SHIPPED | EventType.ORDER_DELIVERED |
-        EventType.ORDER_CANCELLED | EventType.ORDER_REFUNDED;
+  EventType.ORDER_READY | EventType.ORDER_SHIPPED | EventType.ORDER_DELIVERED |
+  EventType.ORDER_CANCELLED | EventType.ORDER_REFUNDED;
   data: {
     orderId: number;
     userId?: number;
@@ -108,7 +108,7 @@ export type EventHandler = (event: CommerceEvent) => Promise<void>;
 // ============================================
 
 export class EventPublisher {
-  constructor(private eventBus: EventBus) {}
+  constructor(private eventBus: EventBus) { }
 
   async publishOrderCreated(orderId: number, districtId: number, userId: number | undefined, totalAmountPaisa: number, itemCount: number, vendorIds: number[]): Promise<void> {
     await this.eventBus.publish({
@@ -124,13 +124,14 @@ export class EventPublisher {
     const eventType = getOrderStatusEventType(newStatus);
     if (!eventType) return;
 
-    await this.eventBus.publish({
+    const orderEvent: OrderEvent = {
       id: generateEventId(),
-      type: eventType,
+      type: eventType as OrderEvent['type'],
       timestamp: new Date(),
       districtId,
-      data: { orderId }
-    });
+      data: { orderId, totalAmountPaisa: 0, itemCount: 0, vendorIds: [] }
+    };
+    await this.eventBus.publish(orderEvent);
   }
 
   async publishStockReserved(productId: number, districtId: number, quantity: number, availableStock: number, reservedStock: number): Promise<void> {

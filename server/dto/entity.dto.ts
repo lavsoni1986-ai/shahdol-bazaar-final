@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import crypto from "crypto";
 import { normalizeBusinessType, CanonicalBusinessType } from "../lib/entityNormalization";
 import type { CanonicalEntityV2, CanonicalVendorEntityV2, AISearchResultContract } from '../../shared/contracts/entity.contract';
 
@@ -76,11 +77,11 @@ export const canonicalEntitySchema = z.object({
 
     // ACTIONABILITY COMPUTATION
     actionability: z.object({
-        canCall: z.boolean(),
-        canWhatsApp: z.boolean(),
-        canNavigate: z.boolean(),
-        canBook: z.boolean(),
-        canOrder: z.boolean(),
+        canCall: z.boolean().nullable().optional(),
+        canWhatsApp: z.boolean().nullable().optional(),
+        canNavigate: z.boolean().nullable().optional(),
+        canBook: z.boolean().nullable().optional(),
+        canOrder: z.boolean().nullable().optional(),
     }).optional(),
 
     // Visibility & Ranking
@@ -269,18 +270,20 @@ function getVendorDisplayName(vendor: any): string {
 
     // Audit vendor name collapse
     import("../storage").then(({ prisma }) => {
+        const auditPayload = {
+            vendorId: vendor?.id,
+            hasName: !!vendor?.name,
+            hasSlug: !!vendor?.slug,
+            nameValue: vendor?.name,
+            slugValue: vendor?.slug
+        };
         prisma.auditLog.create({
             data: {
                 action: "VENDOR_NAME_COLLAPSE",
                 entityType: "VENDOR",
                 entityId: vendor?.id || 0,
-                details: JSON.stringify({
-                    vendorId: vendor?.id,
-                    hasName: !!vendor?.name,
-                    hasSlug: !!vendor?.slug,
-                    nameValue: vendor?.name,
-                    slugValue: vendor?.slug
-                })
+                hash: crypto.createHash('sha256').update(JSON.stringify(auditPayload)).digest('hex'),
+                details: JSON.stringify(auditPayload)
             }
         }).catch(() => { }); // Never block on audit
     });
@@ -306,7 +309,7 @@ export async function mapVendorToDTO(vendor: any, include?: any): Promise<Vendor
 
     // HYDRATE RICH METADATA (P1 Expansion)
     const { hydrateVendorMetadata } = await import("../../shared/discovery-gateway");
-    const richMetadata = await hydrateVendorMetadata(vendor);
+    const richMetadata = await hydrateVendorMetadata(vendor, {});
 
     return {
         id: vendor.id,
@@ -328,7 +331,7 @@ export async function mapVendorToDTO(vendor: any, include?: any): Promise<Vendor
         isTrending: vendor.isTrending ?? null,
 
         // DECISION INTELLIGENCE FIELDS (P1)
-        trustLabel: richMetadata.trustLabel,
+        trustLabel: richMetadata.trustAssessment?.label,
         specializations: richMetadata.specializations,
         openNow: richMetadata.openNow,
         waitTime: richMetadata.waitTime,
@@ -363,22 +366,31 @@ export async function mapProductToDTO(product: any, vendor?: any): Promise<Produ
     if (!product.title || product.title.trim() === "") {
         // Import prisma here for audit logging
         import("../storage").then(({ prisma }) => {
+            const auditPayload = {
+                productId: product.id,
+                vendorId: product.vendorId,
+                hasTitle: !!product.title,
+                titleValue: product.title,
+                slug: product.slug
+            };
             prisma.auditLog.create({
                 data: {
                     action: "ENTITY_TITLE_COLLAPSE",
                     entityType: "PRODUCT",
                     entityId: product.id,
-                    details: JSON.stringify({
-                        productId: product.id,
-                        vendorId: product.vendorId,
-                        hasTitle: !!product.title,
-                        titleValue: product.title,
-                        slug: product.slug
-                    })
+                    hash: crypto.createHash('sha256').update(JSON.stringify(auditPayload)).digest('hex'),
+                    details: JSON.stringify(auditPayload)
                 }
             }).catch(() => { }); // Never block on audit
         });
     }
+
+    const productImages: string[] =
+        product.images?.length
+            ? product.images.map((img: any) => img.url)
+            : product.imageUrl
+                ? [product.imageUrl]
+                : [];
 
     return {
         id: product.id,
@@ -389,24 +401,18 @@ export async function mapProductToDTO(product: any, vendor?: any): Promise<Produ
         districtId: vendor?.districtId || 1,
         address: vendor?.address,
         phone: vendor?.phone || vendor?.mobile,
-        logo: product.imageUrl,
-        imageUrl: product.imageUrl || (product.images?.[0]?.url) || null,
-        images:
-            product.images?.length
-                ? product.images.map((img: any) => img.url)
-                : product.imageUrl
-                    ? [product.imageUrl]
-                    : [],
+        logo: product.imageUrl || null,
+        images: productImages,
         price: product.price || 0,
         mrp: product.mrp || null,
         stock: product.stock || 0,
         inStock: (product.stock || 0) > 0,
         isVerified: isVendorVerified(vendor),
-        dsslScore: vendor?.dsslScore || 60,
         rating: vendor?.rating || null,
         reviewCount: 0,
         isSponsored: false,
         isTrending: product.isTrending ?? null,
+        trustScore: vendor?.trustScore ?? vendor?.dsslScore ?? 60,
         vendorId: product.vendorId,
         vendorName: vendor ? getVendorDisplayName(vendor) : undefined,
         vendor: vendor ? await mapVendorToDTO(vendor) : undefined,
@@ -540,7 +546,6 @@ export function mapServiceToDTO(vendor: any): ServiceEntity {
 /**
  * Universal mapper - converts any vendor to appropriate DTO based on businessType
  */
-import type { CanonicalVendorEntityV2 } from '../../shared/contracts/entity.contract';
 
 export async function mapVendorByType(vendor: any, include?: any):
     Promise<CanonicalVendorEntityV2 | VendorEntity | HealthcareEntity | SchoolEntity | ServiceEntity> {
@@ -563,8 +568,9 @@ export async function mapVendorByType(vendor: any, include?: any):
             return mapServiceToDTO(vendor);
         default: {
             const base = await mapVendorToDTO(vendor, include);
+            const id = typeof base.id === "string" ? parseInt(base.id, 10) || 0 : base.id;
             const canonical: CanonicalVendorEntityV2 & { id: number } = {
-                id: base.id,
+                id,
                 canonicalId: base.slug ? `vendor:${base.slug}` : String(base.id),
                 title: base.name,
                 subtitle: base.slug || undefined,
