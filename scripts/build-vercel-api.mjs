@@ -1,22 +1,18 @@
 /**
  * ============================================
- * VERCEL API PRE-BUNDLER — BharatOS Sovereign
+ * VERCEL API PRE-BUNDLER — BharatOS Sovereign (VALIDATION MODE)
  * ============================================
- * Uses esbuild to bundle api/index.ts and ALL server dependencies
- * into a single CommonJS file for Vercel serverless deployment.
+ * Uses esbuild to bundle api/index.ts and ALL server dependencies.
+ * Output goes to dist-api/index.js for CI validation only.
  *
- * WHY THIS IS NEEDED:
- * - package.json has "type": "module" (pure ESM)
- * - Vercel's @vercel/node esbuild pass cannot resolve extensionless
- *   ESM imports at runtime (ERR_MODULE_NOT_FOUND)
- * - server/lib/swagger.ts is excluded from tsconfig, breaking the
- *   esbuild trace for apiRegistry → swagger chain
- * - "build": "build:client" never compiles backend TypeScript
+ * THIS FILE IS NOT THE VERCEL DEPLOYMENT ENTRYPOINT.
+ * Vercel uses api/index.ts compiled by @vercel/node directly.
+ * @vercel/node is forced to CJS mode via api/package.json.
  *
- * RESULT:
- * - api/index.js = fully self-contained CJS bundle (~single file)
- * - Zero runtime module resolution needed
- * - Vercel deploys it as a Node.js serverless function
+ * WHY WE KEEP THIS STEP:
+ * - Validates the full import chain can be bundled (no missing files)
+ * - Catches ERR_MODULE_NOT_FOUND before deployment
+ * - Detects circular deps and bad imports at build time
  * ============================================
  */
 
@@ -36,9 +32,9 @@ try {
     entryPoints: [path.join(root, 'api', 'index.ts')],
 
     // ── OUTPUT ──────────────────────────────────────────────────────
-    // Write to api/index.js — Vercel picks up the .js file and runs
-    // it directly without any further compilation step.
-    outfile: path.join(root, 'api', 'index.js'),
+    // Write to dist-api/index.js for CI validation.
+    // Vercel uses api/index.ts compiled by @vercel/node (CJS via api/package.json).
+    outfile: path.join(root, 'dist-api', 'index.js'),
 
     // ── BUNDLING ────────────────────────────────────────────────────
     // bundle: true makes esbuild follow ALL imports and inline them.
@@ -105,13 +101,14 @@ try {
     const metaPath = path.join(root, '.vercel-build-meta.json');
     fs.writeFileSync(metaPath, JSON.stringify(result.metafile, null, 2));
 
-    const outFile = path.join(root, 'api', 'index.js');
+    const outFile = path.join(root, 'dist-api', 'index.js');
     const stat = fs.statSync(outFile);
     const sizeMB = (stat.size / 1024 / 1024).toFixed(2);
 
-    console.log(`✅ [BUILD-API] Bundle written: api/index.js (${sizeMB} MB)`);
+    console.log(`✅ [BUILD-API] Validation bundle: dist-api/index.js (${sizeMB} MB)`);
     console.log(`📊 [BUILD-API] Build meta: .vercel-build-meta.json`);
-    console.log(`🚀 [BUILD-API] Ready for Vercel serverless deployment`);
+    console.log(`✅ [BUILD-API] Import chain validated — @vercel/node will bundle api/index.ts directly`);
+    console.log(`🚀 [BUILD-API] CJS boundary: api/package.json forces @vercel/node into CJS mode`);
   });
 } catch (err) {
   console.error('❌ [BUILD-API] Bundle failed:', err);

@@ -1,7 +1,6 @@
 {
   "name": "rest-express",
   "version": "1.0.0",
-  "type": "module",
   "license": "MIT",
   "scripts": {
     "predev": "npx tsc -p tsconfig.dev.json --noEmit 2>nul; exit 0",
