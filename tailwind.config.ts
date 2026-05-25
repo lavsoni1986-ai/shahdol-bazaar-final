@@ -1,5 +1,4 @@
 /** @type {import('tailwindcss').Config} */
-/* Tailwind v4 - Minimal config for IDE support */
 export default {
   content: [
     "./index.html",

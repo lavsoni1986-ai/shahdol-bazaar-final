@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "./sovereign-theme.css";
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* बाकी का कोड इसके नीचे आए... */
 
@@ -64,14 +66,13 @@
   background-attachment: scroll !important;
 }
 
-/* Tailwind v4 Theme Configuration */
-@theme {
-  /* === SOVEREIGN-NIGHT PALETTE === */
+/* === SOVEREIGN-NIGHT PALETTE (CSS Custom Properties) === */
+:root {
   --color-nebula-orange: #f97316;
   --color-sovereign-bg: #030003;
   --color-sovereign-surface: #0a0a0a;
 
-  /* 🔥 FLUID TYPOGRAPHY (Smoother Ramps as per your math) */
+  /* 🔥 FLUID TYPOGRAPHY */
   --text-xs: clamp(0.7rem, 0.5vw + 0.5rem, 0.75rem);
   --text-sm: clamp(0.8rem, 0.8vw + 0.5rem, 0.875rem);
   --text-base: clamp(0.9rem, 1vw + 0.5rem, 1rem);
@@ -79,7 +80,6 @@
   --text-xl: clamp(1.125rem, 1.5vw + 0.75rem, 1.25rem);
   --text-2xl: clamp(1.25rem, 1.8vw + 0.75rem, 1.5rem);
   --text-3xl: clamp(1.5rem, 2vw + 1rem, 1.875rem);
-  /* Smoother transition for ultra-wide screens */
   --text-4xl: clamp(1.875rem, 2vw + 1rem, 2.25rem);
 }
 
@@ -98,7 +98,8 @@
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     overflow-x: hidden;
     /* Clean base apply */
-    @apply text-base text-slate-200 bg-sovereign-bg;
+    @apply text-base text-slate-200;
+    background-color: var(--color-sovereign-bg, #030003);
   }
 
   /* 🛡️ SOVEREIGN IMAGE BASELINE — prevents inline whitespace bleeding */
