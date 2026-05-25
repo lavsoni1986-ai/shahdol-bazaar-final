@@ -270,16 +270,23 @@ app.options("*", cors());
 // Cookie parser for JWT cookies
 app.use(cookieParser());
 
-// Global API rate limiting - protects against abuse
-app.use('/api', rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // 1000 requests per 15 minutes per IP
-  message: { success: false, error: "API rate limit exceeded. Please slow down." },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // 🛡️ SAFE BYPASS: Trusted E2E test traffic in development only
-  skip: (req) => isTrustedE2E(req),
-}));
+// 🛡️ VERCEL GUARD: express-rate-limit uses an in-memory store that's not
+// shared across serverless invocations. On Vercel, skip rate limiting
+// (Vercel Edge functions handle DDoS protection at the platform level).
+if (process.env.VERCEL) {
+  console.log("🔵 [VERCEL] Skipping express-rate-limit for serverless mode");
+} else {
+  // Global API rate limiting - protects against abuse
+  app.use('/api', rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // 1000 requests per 15 minutes per IP
+    message: { success: false, error: "API rate limit exceeded. Please slow down." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // 🛡️ SAFE BYPASS: Trusted E2E test traffic in development only
+    skip: (req) => isTrustedE2E(req),
+  }));
+}
 
 // ============================================
 // 🛡️ RATE LIMITING (ANTI-ABUSE PROTECTION)
@@ -582,18 +589,25 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // ✅ Security: Additional rate limiting via apiLimiter (applied to /api)
-app.use('/api/', (req, res, next) => {
-  const authRoutes = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh', '/api/auth/logout'];
-  if (authRoutes.some(route => req.path === route || req.originalUrl === route)) {
-    return next();
-  }
-  return apiLimiter(req, res, next);
-});
+// 🛡️ VERCEL GUARD: In-memory rate-limit doesn't work across serverless invocations.
+// Vercel platform-level DDoS protection makes this unnecessary.
+if (!process.env.VERCEL) {
+  app.use('/api/', (req, res, next) => {
+    const authRoutes = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh', '/api/auth/logout'];
+    if (authRoutes.some(route => req.path === route || req.originalUrl === route)) {
+      return next();
+    }
+    return apiLimiter(req, res, next);
+  });
+} else {
+  console.log("🔵 [VERCEL] Skipping apiLimiter (serverless incompatible)");
+}
 
 // ✅ SECURITY FIX: Require separate SESSION_SECRET
 // Session secret is critical for security - fail fast if not configured
+// 🛡️ VERCEL GUARD: SESSION_SECRET is optional on Vercel (JWT is primary auth)
 const SESSION_SECRET = process.env.SESSION_SECRET;
-if (!SESSION_SECRET) {
+if (!SESSION_SECRET && !process.env.VERCEL) {
   throw new Error("SESSION_SECRET environment variable is required!");
 }
 
@@ -614,8 +628,18 @@ app.use(session({
 }));
 
 // Ensure uploads folder exists with open permissions
-const uploadsDir = path.resolve(process.cwd(), "public", "uploads");
-fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o777 });
+// 🛡️ VERCEL GUARD: Serverless filesystem is read-only — skip mkdirSync
+if (!process.env.VERCEL) {
+  try {
+    const uploadsDir = path.resolve(process.cwd(), "public", "uploads");
+    fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o777 });
+    console.log("✅ [FS] Uploads directory created at", uploadsDir);
+  } catch (err: any) {
+    console.warn("⚠️ [FS] Could not create uploads directory:", err?.message);
+  }
+} else {
+  console.log("🔵 [VERCEL] Skipping uploads directory creation (read-only filesystem)");
+}
 
 // ============================================
 // 📊 OBSERVABILITY: Request Tracking & Monitoring
@@ -684,18 +708,17 @@ app.use("/api", (req, _res, next) => {
 // ============================================
 // On Vercel, routes must be registered at import time (not inside startServer).
 // This block runs only on Vercel serverless, not in local dev.
+// 🛡️ CRITICAL: registerSovereignRoutes is async but contains NO await statements.
+// All app.use() calls are synchronous. Call it before export default app
+// so routes are mounted when the first request arrives.
 if (process.env.VERCEL) {
   console.log("🔵 [VERCEL] Setting up serverless bridge...");
   const apiRouter = express.Router();
-  registerSovereignRoutes(apiRouter).then(() => {
-    app.use("/api", apiRouter);
-    console.log("✅ [VERCEL] Sovereign routes mounted on /api");
-  }).catch((err: any) => {
+  registerSovereignRoutes(apiRouter).catch((err: any) => {
     console.error("❌ [VERCEL] Failed to register routes:", err?.message || err);
   });
-
-  // Health endpoint for Vercel
-  app.get("/api/health-fn", (_req: any, res: any) => res.json({ status: "ok", scope: "vercel-bridge" }));
+  app.use("/api", apiRouter);
+  console.log("✅ [VERCEL] Sovereign routes mounted on /api");
 }
 
 async function startServer() {
