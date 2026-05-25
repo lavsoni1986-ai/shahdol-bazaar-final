@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "npm run build:client",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist/client",
-  "installCommand": "npm install && npx prisma generate || true",
-  "framework": null,
+  "installCommand": "npm install",
+  "framework": "vite",
   "rewrites": [
     {
       "source": "/api/(.*)",
