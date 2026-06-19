@@ -30,6 +30,7 @@ import type { JWTPayload } from './jwt';
 import { findUserById } from '../repositories/user.repo';
 import { normalizeRole, UserRole, isSuperAdminRole, isAdminRole, isMerchantRole, hasRoleOrHigher, getRoleLevel } from '../../shared/roles';
 import { ErrorCode, sendError } from '../middleware/errorHandler';
+import { tenantContext } from '../storage';
 
 // Note: Global Express Request augmentation in server/types/express.d.ts provides
 // canonical req.ctx with districtSlug, districtId, userId, role, etc.
@@ -207,6 +208,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     };
 
     req.districtId = req.ctx.districtId;
+
+    // ✅ Synchronize verified district and user authority into ALS
+    const store = tenantContext.getStore();
+    if (store) {
+      store.districtId = dbUser.districtId ?? -1;
+      store.userId = dbUser.id;
+    }
+
     next();
   } catch (err) {
     return sendError(res, 401, ErrorCode.INVALID_TOKEN, "Invalid token");
@@ -445,6 +454,13 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
 
         if (user.districtId && !req.districtId) {
           req.districtId = user.districtId;
+        }
+
+        // ✅ Synchronize verified district and user authority into ALS
+        const store = tenantContext.getStore();
+        if (store) {
+          store.districtId = user.districtId ?? -1;
+          store.userId = user.id;
         }
       }
     }
