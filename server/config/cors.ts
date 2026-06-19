@@ -11,7 +11,8 @@ const ALLOWED_ORIGIN_REGEXES = [
   /^https:\/\/shahdolbazaar\.com$/,
   /^https:\/\/www\.shahdolbazaar\.com$/,
   /^https:\/\/[a-z0-9-]+\.vercel\.app$/i,
-  /^https?:\/\/localhost(:\d+)?$/
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https?:\/\/.*\.bharatos\.in$/
 ];
 
 export const corsOptionsDelegate = (req: Request, callback: (err: Error | null, options?: cors.CorsOptions) => void) => {
@@ -40,6 +41,10 @@ export const corsOptionsDelegate = (req: Request, callback: (err: Error | null, 
     isAllowed = true;
   } else {
     isAllowed = ALLOWED_ORIGIN_REGEXES.some(regex => regex.test(origin!));
+    if (!isAllowed && process.env.FRONTEND_URL) {
+      const normalizedFrontend = process.env.FRONTEND_URL.trim().replace(/\/$/, "").toLowerCase();
+      isAllowed = (origin === normalizedFrontend);
+    }
   }
 
   if (isAllowed) {

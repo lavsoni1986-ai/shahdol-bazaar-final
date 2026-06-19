@@ -3,7 +3,6 @@ import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../storage";
 import { requireAuth, requireSuperAdmin, requireCSRF } from "../auth/middleware";
-import { tenantResolver } from "../middleware/tenantResolver";
 import { findActiveOffersByDistrict, deleteOfferById } from "../repositories/offer.repo";
 import { findAllCategories, deleteCategoryById } from "../repositories/category.repo";
 import { adminRateLimiter } from "../auth/rateLimiter";
@@ -350,11 +349,11 @@ export const registerSovereignRoutes = async (app: RouteHost) => {
   app.use("/local", localRoutes); // Local: schools, bus, etc.
   app.use("", merchantRoutes); // Merchant: products
   app.use("/upload", uploadRoutes); // Upload: Cloudinary images
-  app.use("/marketplace", tenantResolver, storesRoutes); // Marketplace: stores (with tenant resolution)
-  app.use("/marketplace", tenantResolver, productsRoutes); // Marketplace: products (with tenant resolution)
-  app.use("/marketplace/reviews", tenantResolver, reviewsRoutes); // Marketplace: reviews (with tenant resolution)
-  app.use("/analytics", tenantResolver, analyticsRoutes); // Analytics: tracking with tenant resolution
-  app.use("/search", tenantResolver, searchUnifiedRoutes); // Unified search (with tenant resolution)
+  app.use("/marketplace", storesRoutes); // Marketplace: stores
+  app.use("/marketplace", productsRoutes); // Marketplace: products
+  app.use("/marketplace/reviews", reviewsRoutes); // Marketplace: reviews
+  app.use("/analytics", analyticsRoutes); // Analytics: tracking
+  app.use("/search", searchUnifiedRoutes); // Unified search
   app.use("/orders", requireCSRF, ordersRoutes); // Orders: with CSRF
 
   app.use("/appointments", appointmentsRoutes); // Appointments: POST /create
