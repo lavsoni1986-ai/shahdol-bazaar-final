@@ -14,7 +14,6 @@
 import "dotenv/config";
 
 import express, { type Request, type Response, type NextFunction } from "express";
-import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import cookieParser from "cookie-parser";
@@ -28,6 +27,7 @@ import { apiCacheMiddleware } from "../api-cache-headers";
 import { tenantContext } from "../server/storage";
 import { tenantResolver } from "../server/middleware/tenantResolver";
 import { errorHandler } from "../server/middleware/errorHandler";
+import { centralizedCors } from "../server/config/cors";
 
 // ============================================
 // DIAGNOSTICS
@@ -66,39 +66,8 @@ app.use(
   })
 );
 
-// ============================================
-// SOVEREIGN CORS WHITELIST
-// ============================================
-const ALLOWED_ORIGINS = [
-  "http://localhost:5174",
-  "http://localhost:5002",
-  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
-  /^https?:\/\/.*\.bharatos\.in$/,
-];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        ALLOWED_ORIGINS.some((allowed) =>
-          typeof allowed === "string" ? allowed === origin : allowed.test(origin)
-        )
-      ) {
-        callback(null, true);
-      } else {
-        console.error(`🚨 [VERCEL] CORS BLOCKED: ${origin}`);
-        callback(new Error("CORS policy violation: Origin not allowed"));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-District-Id", "X-District-Slug"],
-  })
-);
-
-// Handle OPTIONS preflight
-app.options("*", cors());
+app.use(centralizedCors);
+app.options("*", centralizedCors);
 
 // ============================================
 // SECURITY HEADERS (Helmet — production CSP)

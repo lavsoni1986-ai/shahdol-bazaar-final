@@ -53,6 +53,7 @@ import { tenantResolver } from "./middleware/tenantResolver";
 import { isTrustedE2E } from "./middleware/trustedE2E";
 import { apiLimiter } from "./auth/rateLimiter";
 import { errorHandler } from "./middleware/errorHandler";
+import { centralizedCors } from "./config/cors";
 import { findActiveOffersByDistrict, deleteOfferById } from "./repositories/offer.repo";
 import { findAllCategories, deleteCategoryById } from "./repositories/category.repo";
 // ✅ OpenAPI/Swagger imports
@@ -239,33 +240,8 @@ app.use(compression({
 // SECURITY MIDDLEWARE
 // ============================================
 
-const ALLOWED_ORIGINS = [
-  "http://localhost:5174",  // ✅ आपके फ्रंटएंड का लोकल एड्रेस (अनिवार्य)
-  "http://localhost:5002",
-  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
-  // भविष्य के जिलों के लिए
-  /^https?:\/\/.*\.bharatos\.in$/,
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // अगर कोई ओरिजिन नहीं है (जैसे मोबाइल ऐप या सर्वर-टू-सर्वर) या व्हाइटलिस्ट में है
-    if (!origin || ALLOWED_ORIGINS.some(allowed =>
-      typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
-    )) {
-      callback(null, true);
-    } else {
-      console.error(`🚨 CORS BLOCKED: Origin ${origin} not in whitelist`);
-      callback(new Error('CORS policy violation: Origin not allowed'));
-    }
-  },
-  credentials: true, // 🔐 Cookies के लिए यह ज़रूरी है
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-District-Id", "X-District-Slug"],
-}));
-
-// 🚨 CRITICAL FIX: Handle OPTIONS preflight AFTER CORS but BEFORE tenantResolver
-app.options("*", cors());
+app.use(centralizedCors);
+app.options("*", centralizedCors);
 
 // Cookie parser for JWT cookies
 app.use(cookieParser());
