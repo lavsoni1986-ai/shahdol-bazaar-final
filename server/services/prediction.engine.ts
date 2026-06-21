@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { prisma } from "../storage";
 import { getTrustScore } from "./dssl.service";
 

@@ -137,6 +137,16 @@ function validateAuth(input: CheckoutValidationInput): ValidationResult {
             errorCode: "AUTH_003",
         };
     }
+    if (input.authState !== "authenticated") {
+        return {
+            scope: "auth",
+            valid: false,
+            severity: "error",
+            reason: "auth_required",
+            message: "You must be logged in to complete your checkout.",
+            errorCode: "AUTH_004",
+        };
+    }
     return {
         scope: "auth",
         valid: true,

@@ -95,7 +95,11 @@ function adaptDiscoveryHomePayload(feed: any[]) {
         id: x.sourceId,
         name: x.title,
         slug: x.slug,
-        imageUrl: x.image,
+        imageUrl:
+          x.image ||
+          x.meta?.images?.[0] ||
+          x.meta?.imageUrls?.[0] ||
+          null,
         price: x.meta?.price,
         mrp: x.meta?.mrp,
         category: x.subtitle,

@@ -155,6 +155,7 @@ function generateEventId(): string {
 
 function getOrderStatusEventType(status: string): EventType | null {
   switch (status.toUpperCase()) {
+    case 'ACCEPTED':
     case 'CONFIRMED': return EventType.ORDER_CONFIRMED;
     case 'PREPARING': return EventType.ORDER_PREPARING;
     case 'READY': return EventType.ORDER_READY;

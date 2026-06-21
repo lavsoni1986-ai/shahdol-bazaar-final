@@ -12,7 +12,8 @@ export default function OrderSuccess() {
   const [, params] = useRoute("/order-success");
   const [, setLocation] = useLocation();
   const routeParams = params as { orderId?: string } | null;
-  const orderId = routeParams?.orderId || new URLSearchParams(window.location.search).get("orderId");
+  const searchParams = new URLSearchParams(window.location.search);
+  const orderId = routeParams?.orderId || searchParams.get("orderId") || searchParams.get("id");
   const paymentMethod = new URLSearchParams(window.location.search).get("paymentMethod");
   const isCOD = paymentMethod === "cod";
   const [orderDetails, setOrderDetails] = useState<any>(null);

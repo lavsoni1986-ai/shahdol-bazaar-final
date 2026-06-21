@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { apiRequest, persistPortalContext, getPortalContext } from "@/lib/api-client";
+import { apiRequest } from "@/lib/api-client";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -92,14 +92,11 @@ export default function AuthPage() {
   const [fetching, setFetching] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   
-  const [authMode] = useState<string>(() => {
-    const urlMode = getAuthMode();
-    if (urlMode === "partner") {
-      persistPortalContext("partner");
-      return "partner";
-    }
-    return getPortalContext();
-  });
+  // 🛡️ SOVEREIGN AUTHORITY: URL is sole authority for authMode.
+  // /auth (no params)       → customer mode ALWAYS
+  // /auth?role=partner      → partner mode ALWAYS
+  // localStorage is NOT read — eliminates portal context contamination.
+  const [authMode] = useState<string>(() => getAuthMode());
 
 
 

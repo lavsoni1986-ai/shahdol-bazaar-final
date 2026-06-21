@@ -41,6 +41,7 @@ export interface CreateOrderRequest {
   customerAddress: string;
   paymentMethod: 'CASH' | 'ONLINE' | 'CARD' | 'WALLET';
   idempotencyKey?: string;
+  deliveryAddressSnapshot?: any;
 }
 
 export interface OrderResult {
@@ -66,7 +67,7 @@ export class SovereignOrderEngine {
    * This is the ONLY place where financial calculations happen
    */
   async createOrder(request: CreateOrderRequest): Promise<OrderResult> {
-    const { userId, districtId, items, customerName, customerPhone, customerAddress, paymentMethod, idempotencyKey } = request;
+    const { userId, districtId, items, customerName, customerPhone, customerAddress, paymentMethod, idempotencyKey, deliveryAddressSnapshot } = request;
 
     return await prisma.$transaction(async (tx) => {
       // 1. Idempotency check
@@ -112,6 +113,7 @@ export class SovereignOrderEngine {
           customerName,
           customerPhone,
           customerAddress,
+          deliveryAddressSnapshot: deliveryAddressSnapshot || null,
           idempotencyKey,
           items: {
             create: validatedItems.map(item => ({

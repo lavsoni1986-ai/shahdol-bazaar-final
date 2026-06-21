@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Store, ShoppingCart, Home as HomeIcon, User, LogOut, Package, Search, Sparkles, Menu, MapPin, Brain, ChevronLeft, Share2, Heart } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { useAuth, getClientRoleRedirectPath } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { Cart } from "@/components/Cart";
@@ -87,12 +87,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setLocation("/");
   }, [logout, setLocation]);
 
+  // Bottom nav — last item is auth-conditional
   const navItems = [
     { href: "/", icon: HomeIcon, label: "Home" },
     { href: "/marketplace", icon: Store, label: "Shops" },
     { href: "/ai/concierge", icon: Sparkles, label: "AI" },
     { href: "/cart", icon: ShoppingCart, label: "Cart", hasCart: true },
-    { href: "/auth", icon: User, label: "Profile" },
+    {
+      href: isAuthenticated ? "/customer-dashboard" : "/auth",
+      icon: User,
+      label: isAuthenticated ? "Account" : "Sign In",
+    },
   ];
 
   // Center AI button index
@@ -168,6 +173,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
                   {/* 🗺️ NAVIGATION */}
                   <nav className="flex-1 flex flex-col p-4 gap-2 overflow-y-auto">
+                  {/* Always-visible nav links */}
                     {[
                       { href: "/", label: "🏠 Home" },
                       { href: "/services", label: "🔧 Essential Services" },
@@ -184,6 +190,49 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         {link.label}
                       </Link>
                     ))}
+
+                    {/* Auth-conditional section */}
+                    <div className="mt-2 pt-2 border-t border-white/5 flex flex-col gap-1">
+                      {!isAuthenticated ? (
+                        // Guest: show Login + Create Account
+                        <>
+                          <Link
+                            href="/auth"
+                            className="flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-sm hover:bg-white/5 text-gray-400"
+                          >
+                            👤 Login
+                          </Link>
+                          <Link
+                            href="/auth?mode=register"
+                            className="flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-sm hover:bg-white/5 text-gray-400"
+                          >
+                            📝 Create Account
+                          </Link>
+                        </>
+                      ) : (
+                        // Authenticated: show Orders, Account, Logout
+                        <>
+                          <Link
+                            href="/my-orders"
+                            className="flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-sm hover:bg-white/5 text-gray-400"
+                          >
+                            📦 My Orders
+                          </Link>
+                          <Link
+                            href="/customer-dashboard"
+                            className="flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-sm hover:bg-white/5 text-gray-400"
+                          >
+                            👤 My Account
+                          </Link>
+                          <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-sm hover:bg-red-500/10 text-red-400 text-left w-full"
+                          >
+                            🚪 Logout
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </nav>
 
                   {/* 🏪 FOOTER ACTION */}

@@ -81,6 +81,39 @@ export default function SuperAIHome() {
 
         <AISearchTerminal />
 
+        {/* 🛡️ SOVEREIGN: Guest-only Customer Auth CTA — hidden for authenticated users */}
+        {!isAuthenticated && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+            className="mt-6 mx-auto max-w-sm"
+          >
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
+              <p className="text-xs font-black uppercase tracking-widest text-orange-400 mb-1">
+                Apna Account Banayein
+              </p>
+              <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+                Orders Track Karein • Wishlist Save Karein • Apne Jile ki Dukaano se Kharidein
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setLocation("/auth")}
+                  className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all active:scale-95 border border-white/10"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => setLocation("/auth?mode=register")}
+                  className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-orange-600 to-red-600 hover:opacity-90 text-white text-xs font-bold transition-all active:scale-95 shadow-lg shadow-orange-900/30"
+                >
+                  Create Account
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* AI TOGGLE STATUS */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="flex justify-center mt-4">
           <div className="px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center gap-2">
@@ -101,6 +134,7 @@ export default function SuperAIHome() {
           <LocalPulseBanner />
         </div>
       </section>
+
 
       {/* 🔥 2. LIVE BUYING SIGNAL (GPT INSPIRED) */}
       <section className="px-4 mt-8">

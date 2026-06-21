@@ -86,6 +86,22 @@ async function main() {
         headers: { "x-district-slug": "shahdol" },
         expectedStatus: 401, // Blocked without JWT
       },
+      {
+        name: "7. GET /api/user/verify (Deprecated User Alias Redirect)",
+        method: "GET",
+        url: "/api/user/verify",
+        redirect: "manual",
+        expectedStatus: 301,
+        expectedLocation: "/api/auth/verify",
+      },
+      {
+        name: "8. POST /api/user/login (Deprecated User Alias Redirect)",
+        method: "POST",
+        url: "/api/user/login",
+        redirect: "manual",
+        expectedStatus: 301,
+        expectedLocation: "/api/auth/login",
+      },
     ];
 
     let allPassed = true;
@@ -99,10 +115,11 @@ async function main() {
             ...t.headers,
           },
           body: t.body,
+          redirect: (t as any).redirect || "follow",
         });
 
         const status = res.status;
-        const pass = status === t.expectedStatus || (t.expectedStatus === 200 && status < 400);
+        let pass = status === t.expectedStatus || (t.expectedStatus === 200 && status < 400);
         
         let errorMsg = "";
         try {
@@ -114,6 +131,20 @@ async function main() {
 
         console.log(`   - Status: Received ${status} (Expected ${t.expectedStatus})`);
         console.log(`   - CORS Headers: Vary = ${res.headers.get("vary")}, OriginReflect = ${res.headers.get("access-control-allow-origin")}`);
+        
+        // Validate Location header for redirects
+        if ((t as any).redirect === "manual") {
+          const location = res.headers.get("location") || "";
+          const expected = (t as any).expectedLocation;
+          const locMatch = location === expected || location.endsWith(expected);
+          if (!locMatch) {
+            console.log(`   - Location: Received "${location}" (Expected matching "${expected}")`);
+            pass = false;
+          } else {
+            console.log(`   - Location: Received "${location}" (Valid redirect)`);
+          }
+        }
+
         if (errorMsg) {
           console.log(`   - Response Error: "${errorMsg}"`);
         }

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { apiRequest } from "@/lib/api-client";
 import { authRoutes } from "@/shared/routing/sovereign-routes";
+import { fetchCsrfToken, clearCsrfToken } from "@/lib/csrf";
 
 /* =========================
    ROLE HELPERS
@@ -136,6 +137,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hydratedRef.current = true;
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    if (authState === "authenticated") {
+      console.log("[CSRF] Authenticated state detected, bootstrapping token...");
+      fetchCsrfToken()
+        .then((token) => {
+          if (token) {
+            console.log("[CSRF] Token fetched");
+            console.log("[CSRF] Token cached");
+          } else {
+            console.warn("[CSRF] Bootstrap fetched null/empty token");
+          }
+        })
+        .catch((err) => {
+          console.error("[CSRF] Bootstrap error:", err);
+        });
+    } else if (authState === "guest") {
+      console.log("[CSRF] Guest state detected, clearing token");
+      clearCsrfToken();
+    }
+  }, [authState]);
 
   const logout = useCallback(
     async (redirectToAuth = true) => {
