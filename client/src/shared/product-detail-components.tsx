@@ -42,7 +42,6 @@ interface ProductImageProps {
     alt: string;
     /** Aspect ratio hint used before media detection completes */
     aspectRatio?: "square" | "4/3" | "16/9";
-    maxHeight?: number;
     onError?: () => void;
     priority?: boolean;
     /** Contextual hint for media detection bias (e.g., "doctor", "clinic", "storefront") */
@@ -57,7 +56,6 @@ export function ProductImage({
     src,
     alt,
     aspectRatio = "4/3",
-    maxHeight,
     onError,
     priority = false,
     contextHint,
@@ -83,7 +81,7 @@ export function ProductImage({
     const imageClasses = resolveImageClasses(activeGovernance, loaded);
 
     return (
-        <div className={cn(containerClasses, maxHeight ? "" : "")}>
+        <div className={containerClasses}>
             {/* 🛡️ Dev debug badge */}
             {import.meta.env.DEV && isDetected && (
                 <span className="absolute top-2 left-2 z-20 bg-black/80 text-white text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border border-white/10 pointer-events-none select-none">
@@ -117,7 +115,6 @@ export function ProductImage({
                         onError?.();
                     }}
                     className={imageClasses}
-                    style={maxHeight ? { maxHeight: `${maxHeight}px` } : undefined}
                 />
             )}
         </div>

@@ -298,7 +298,6 @@ export default function ProductDetail() {
               src={primaryImage}
               alt={product.name}
               aspectRatio="square"
-              maxHeight={320}
               priority
             />
 

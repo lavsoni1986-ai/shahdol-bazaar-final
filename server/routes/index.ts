@@ -29,6 +29,7 @@ import searchUnifiedRoutes from "./search.unified.routes";
 import analyticsRoutes from "./analytics.routes";
 import transitRoutes from "./transit.routes";
 import appointmentsRoutes from "./appointments.routes";
+import customerRoutes from "./customer.routes";
 
 
 // 🧾 AUDIT LOGGING HELPER (TAMPER-PROOF)
@@ -337,7 +338,24 @@ export const registerSovereignRoutes = async (app: RouteHost) => {
   // So they become: /api/auth/verify, /api/districts, etc.
   app.use("", router);          // Main router: /districts, /offers, etc.
   app.use("/auth", authRoutes); // Auth: /login, /verify, /register, /balance, /transactions
-  app.use("/user", authRoutes); // User: /balance, /transactions (mirrored)
+  app.use("/user", (req, res) => {
+    const oldPath = req.originalUrl;
+    const newPath = oldPath.replace("/api/user", "/api/auth");
+    console.warn(`[DEPRECATED_ROUTE]\n${oldPath}\n${newPath}`);
+    return res.redirect(301, newPath);
+  });
+
+  // ============================================
+  // 🗑️  ADR-002 PHASE 2B: PRODUCT ALIAS RETIREMENT
+  // Legacy /api/products/* → Canonical /api/marketplace/products/*
+  // HTTP 301 Moved Permanently — query params and dynamic segments preserved
+  // ============================================
+  app.use("/products", (req, res) => {
+    const oldPath = req.originalUrl;
+    const newPath = oldPath.replace("/api/products", "/api/marketplace/products");
+    console.warn(`[DEPRECATED_ROUTE]\n${oldPath}\n${newPath}`);
+    return res.redirect(301, newPath);
+  });
   app.use("/ai", aiRoutes);   // AI: /chat, /search, etc.
   app.use("/ai", dsslRoutes); // DSSL: /score, /analysis, etc.
   app.use("/admin", adminRoutes); // Admin: /users, /vendors, etc.
@@ -357,6 +375,7 @@ export const registerSovereignRoutes = async (app: RouteHost) => {
   app.use("/orders", requireCSRF, ordersRoutes); // Orders: with CSRF
 
   app.use("/appointments", appointmentsRoutes); // Appointments: POST /create
+  app.use("/customer", customerRoutes); // Customer profile & addresses
 
   app.use("", transitRoutes); // Transit: /bus-timetable, etc.
 

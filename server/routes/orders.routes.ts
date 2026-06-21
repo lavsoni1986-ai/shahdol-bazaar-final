@@ -21,7 +21,8 @@ const createOrderSchema = z.object({
   customerName: z.string().min(2).max(100),
   customerPhone: z.string().regex(/^\+?[\d\s\-\(\)]{10,15}$/),
   customerAddress: z.string().min(10).max(500),
-  paymentMethod: z.enum(["cod", "cash", "online", "card"])
+  paymentMethod: z.enum(["cod", "cash", "online", "card"]),
+  deliveryAddressSnapshot: z.any().optional()
 });
 
 const router = express.Router();
@@ -38,7 +39,7 @@ const router = express.Router();
 // --- CREATE ORDER (LEGACY/SOVEREIGN ROUTING) ---
 router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: Request, res: Response) => {
   try {
-    const { items, customerName, customerPhone, customerAddress, paymentMethod } = req.body;
+    const { items, customerName, customerPhone, customerAddress, paymentMethod, deliveryAddressSnapshot } = req.body;
     const userId = req.ctx?.userId!;
     const districtId = req.ctx?.districtId;
 
@@ -71,7 +72,8 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
           customerName,
           customerPhone,
           customerAddress,
-          paymentMethod: paymentMethod.toUpperCase()
+          paymentMethod: paymentMethod.toUpperCase(),
+          deliveryAddressSnapshot
         });
 
         logMigrationEvent('Sovereign order created successfully', {
@@ -181,10 +183,10 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
           districtId: strictDistrictId,
           quantity: item.quantity,
           totalPrice,
-          commission: platformCommission,
           customerName,
           customerPhone,
           customerAddress,
+          deliveryAddressSnapshot,
           paymentMethod,
           status: "pending"
         });
@@ -245,7 +247,97 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       }
     );
 
-    return sendSuccess(res, orders);
+    // Construct authoritative timelines from the AuditLog ledger for each order
+    const ordersWithTimeline = await Promise.all(orders.map(async (order) => {
+      const logs = await prisma.auditLog.findMany({
+        where: {
+          entityId: order.id,
+          entityType: { in: ['ORDER', 'SOVEREIGN_ORDER'] }
+        },
+        orderBy: { createdAt: 'asc' }
+      });
+
+      const timelineEvents: Record<string, string> = {};
+      let cancelledAt: string | null = null;
+      let cancelledReason: string | null = null;
+
+      // Seed pending milestone from the order's creation timestamp
+      timelineEvents['pending'] = order.createdAt.toISOString();
+
+      for (const log of logs) {
+        if (log.action === 'ORDER_CREATED') {
+          timelineEvents['pending'] = log.createdAt.toISOString();
+        } else if (log.action === 'ORDER_STATUS_CHANGED') {
+          const meta = log.metadata as any;
+          const status = (meta?.newStatus || meta?.status || '').toLowerCase();
+          if (status === 'cancelled' || status === 'rejected') {
+            cancelledAt = log.createdAt.toISOString();
+            cancelledReason = typeof log.details === 'string' ? log.details : (log.details ? JSON.stringify(log.details) : 'Order was cancelled.');
+          } else if (status) {
+            timelineEvents[status] = log.createdAt.toISOString();
+          }
+        }
+      }
+
+      // Canonical status mappings
+      if (timelineEvents['confirmed'] && !timelineEvents['accepted']) {
+        timelineEvents['accepted'] = timelineEvents['confirmed'];
+      }
+      if (timelineEvents['accepted'] && !timelineEvents['confirmed']) {
+        timelineEvents['confirmed'] = timelineEvents['accepted'];
+      }
+      const readyTime = timelineEvents['ready'] || timelineEvents['shipped'] || timelineEvents['out_for_delivery'];
+      if (readyTime) {
+        timelineEvents['ready'] = readyTime;
+      }
+      const deliveredTime = timelineEvents['delivered'] || timelineEvents['completed'];
+      if (deliveredTime) {
+        timelineEvents['delivered'] = deliveredTime;
+      }
+
+      const stagesKeys = ['pending', 'accepted', 'preparing', 'ready', 'delivered'];
+      const stagesLabels: Record<string, string> = {
+        pending: "ऑर्डर प्राप्त",
+        accepted: "विक्रेता द्वारा स्वीकार",
+        preparing: "तैयार किया जा रहा है",
+        ready: "डिलीवरी हेतु तैयार",
+        delivered: "सफलतापूर्वक वितरित"
+      };
+
+      const stages = stagesKeys.map((key, index) => {
+        const timestamp = timelineEvents[key] || null;
+        let completed = !!timestamp;
+
+        // Propagate completion chronologically if a subsequent stage is reached
+        if (!completed) {
+          for (let i = index + 1; i < stagesKeys.length; i++) {
+            if (timelineEvents[stagesKeys[i]]) {
+              completed = true;
+              break;
+            }
+          }
+        }
+
+        return {
+          key,
+          label: stagesLabels[key],
+          timestamp,
+          completed
+        };
+      });
+
+      return {
+        ...order,
+        timeline: {
+          currentStatus: order.status,
+          stages,
+          cancelledAt,
+          cancelledReason
+        }
+      };
+    }));
+
+    return sendSuccess(res, ordersWithTimeline);
   } catch (err: any) {
     console.error("Orders fetch error:", err);
     return sendError(res, 500, ErrorCode.INTERNAL_ERROR, err.message);

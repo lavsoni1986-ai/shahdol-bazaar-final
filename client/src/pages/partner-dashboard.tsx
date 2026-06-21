@@ -40,10 +40,33 @@ export default function PartnerDashboard() {
 
       console.log("🟢 [PARTNER] Merchant products loaded:", products);
       setProducts(products);
-      setOrders([]);
+
+      // Fetch live merchant orders with secure isolation
+      const ordersRes = await apiRequest("GET", "/vendor/orders");
+      const orders = Array.isArray(ordersRes?.data)
+        ? ordersRes.data
+        : Array.isArray(ordersRes)
+        ? ordersRes
+        : [];
+      console.log("🟢 [PARTNER] Merchant orders loaded:", orders);
+      setOrders(orders);
     } catch (err) {
       console.error("🔴 [PARTNER] API error:", err);
       toast.error("Failed to sync with Command Center");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (orderId: number, status: string) => {
+    try {
+      setLoading(true);
+      await apiRequest("PATCH", `/vendor/orders/${orderId}/status`, { status });
+      toast.success(`Order status updated to ${status}! 🎉`);
+      await loadVendorData();
+    } catch (err: any) {
+      console.error("🔴 [PARTNER] Status update failed:", err);
+      toast.error(err.message || "Failed to update order status");
     } finally {
       setLoading(false);
     }
@@ -164,6 +187,15 @@ if (!isAuthenticated) {
     </button>
   );
 
+  // 📊 CALCULATIONS FOR STATS CARDS (SOVEREIGN RETRIEVAL)
+  const todayOrdersCount = orders.filter(o => {
+    const orderDate = new Date(o.createdAt).toDateString();
+    const todayDate = new Date().toDateString();
+    return orderDate === todayDate;
+  }).length;
+
+  const potentialRevenue = orders.reduce((sum, o) => sum + Number(o.totalPrice || 0), 0);
+
   if (authLoading || loading) return (
     <div className="min-h-screen sovereign-bg flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
@@ -216,9 +248,9 @@ if (!isAuthenticated) {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-10">
               {[
-                { label: "Today's Orders", val: orders.length, icon: ShoppingBag, color: "text-blue-500", bg: "bg-blue-500/10" },
+                { label: "Today's Orders", val: todayOrdersCount, icon: ShoppingBag, color: "text-blue-500", bg: "bg-blue-500/10" },
                 { label: "Active Products", val: products.length, icon: Package, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-                { label: "Total Earnings", val: "₹0", icon: TrendingUp, color: "text-orange-500", bg: "bg-orange-500/10" }
+                { label: "Potential Revenue", val: `₹${potentialRevenue}`, icon: TrendingUp, color: "text-orange-500", bg: "bg-orange-500/10" }
               ].map((s, i) => (
                 <div key={i} className="glass-card-sovereign p-5 md:p-6 border border-white/5 relative group overflow-hidden rounded-2xl">
                   <div className="flex justify-between items-start">
@@ -308,12 +340,99 @@ if (!isAuthenticated) {
              <header className="mb-6">
                 <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Live Orders</h2>
              </header>
-             <div className="glass-card-sovereign border border-white/10 p-16 text-center rounded-2xl">
-                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
-                  <Clock className="text-gray-600 w-8 h-8" />
+
+             {orders.length === 0 ? (
+                <div className="glass-card-sovereign border border-white/10 p-16 text-center rounded-2xl">
+                   <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+                     <Clock className="text-gray-600 w-8 h-8" />
+                   </div>
+                   <h4 className="text-white font-black uppercase tracking-widest text-sm">No Live Orders</h4>
+                   <p className="text-gray-500 text-xs md:text-sm mt-2">Incoming orders will appear here in real-time.</p>
                 </div>
-                <h4 className="text-white font-black uppercase tracking-widest text-sm">No Pending Orders</h4>
-             </div>
+             ) : (
+                <div className="glass-card-sovereign border border-white/10 overflow-x-auto shadow-2xl rounded-xl">
+                  <table className="w-full min-w-[900px] text-left border-collapse">
+                   <thead>
+                     <tr className="bg-white/5 text-[10px] md:text-[11px] font-black uppercase text-gray-500 tracking-widest border-b border-white/10">
+                       <th className="py-4 md:py-5 px-4 md:px-6">Order ID</th>
+                       <th className="py-4 md:py-5 px-4 md:px-6">Customer</th>
+                       <th className="py-4 md:py-5 px-4 md:px-6">Product</th>
+                       <th className="py-4 md:py-5 px-4 md:px-6">Qty</th>
+                       <th className="py-4 md:py-5 px-4 md:px-6">Amount</th>
+                       <th className="py-4 md:py-5 px-4 md:px-6">Status</th>
+                       <th className="py-4 md:py-5 px-4 md:px-6">Created Time</th>
+                       <th className="py-4 md:py-5 px-4 md:px-6 text-right">Actions</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-white/5">
+                     {orders.map(o => {
+                       console.log(`🛡️ [INVARIANT CHECK] Order ID: ${o.id} | Vendor ID: ${o.vendorId} | Product ID: ${o.productId} | District ID: ${o.districtId}`);
+                       return (
+                         <tr key={o.id} className="hover:bg-white/[0.02] transition-all group">
+                           <td className="py-4 md:py-5 px-4 md:px-6 font-mono text-xs font-bold text-amber-500">#{o.id}</td>
+                           <td className="py-4 md:py-5 px-4 md:px-6">
+                             <div>
+                               <p className="text-xs md:text-sm font-black text-white">{o.customerName || "Walk-in Customer"}</p>
+                               <p className="text-[10px] md:text-xs text-gray-500">{o.customerPhone || ""}</p>
+                             </div>
+                           </td>
+                           <td className="py-4 md:py-5 px-4 md:px-6">
+                             <p className="text-xs md:text-sm font-black text-white">{o.product?.title || `Product #${o.productId}`}</p>
+                           </td>
+                           <td className="py-4 md:py-5 px-4 md:px-6 font-bold text-xs">{o.quantity}</td>
+                           <td className="py-4 md:py-5 px-4 md:px-6 font-black text-xs text-emerald-500">₹{o.totalPrice}</td>
+                           <td className="py-4 md:py-5 px-4 md:px-6">
+                             <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
+                               o.status === "delivered" || o.status === "completed"
+                                 ? "text-emerald-500 bg-emerald-500/10"
+                                 : o.status === "cancelled" || o.status === "failed"
+                                 ? "text-red-500 bg-red-500/10"
+                                 : o.status === "preparing"
+                                 ? "text-orange-400 bg-orange-400/10 animate-pulse"
+                                 : o.status === "ready"
+                                 ? "text-teal-400 bg-teal-400/10 animate-pulse"
+                                 : o.status === "accepted"
+                                 ? "text-indigo-400 bg-indigo-400/10 animate-pulse"
+                                 : "text-amber-500 bg-amber-500/10 animate-pulse"
+                             }`}>
+                               {o.status}
+                             </span>
+                           </td>
+                           <td className="py-4 md:py-5 px-4 md:px-6 text-xs text-gray-500 font-medium">
+                             {new Date(o.createdAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+                           </td>
+                           <td className="py-4 md:py-5 px-4 md:px-6 text-right">
+                             <div className="flex items-center justify-end gap-2">
+                               {o.status === "pending" && (
+                                 <>
+                                   <button onClick={() => handleUpdateStatus(o.id, "accepted")} className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-black text-xs font-black uppercase transition-all shadow-[0_0_10px_rgba(16,185,129,0.2)]">Accept</button>
+                                   <button onClick={() => handleUpdateStatus(o.id, "cancelled")} className="px-2.5 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-black uppercase transition-all border border-red-500/20">Cancel</button>
+                                 </>
+                               )}
+                               {o.status === "accepted" && (
+                                 <>
+                                   <button onClick={() => handleUpdateStatus(o.id, "preparing")} className="px-2.5 py-1 rounded bg-orange-600 hover:bg-orange-500 text-black text-xs font-black uppercase transition-all shadow-[0_0_10px_rgba(249,115,22,0.2)]">Prepare</button>
+                                   <button onClick={() => handleUpdateStatus(o.id, "cancelled")} className="px-2.5 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-black uppercase transition-all border border-red-500/20">Cancel</button>
+                                 </>
+                               )}
+                               {o.status === "preparing" && (
+                                 <button onClick={() => handleUpdateStatus(o.id, "ready")} className="px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 text-black text-xs font-black uppercase transition-all shadow-[0_0_10px_rgba(20,184,166,0.2)]">Ready</button>
+                               )}
+                               {o.status === "ready" && (
+                                 <button onClick={() => handleUpdateStatus(o.id, "delivered")} className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-black text-xs font-black uppercase transition-all shadow-[0_0_10px_rgba(37,99,235,0.2)]">Deliver</button>
+                               )}
+                               {["delivered", "completed", "cancelled", "failed"].includes(o.status) && (
+                                 <span className="text-xs text-gray-500 font-bold uppercase mr-2">Done</span>
+                               )}
+                             </div>
+                           </td>
+                         </tr>
+                       );
+                     })}
+                   </tbody>
+                 </table>
+                </div>
+             )}
           </div>
         )}
 

@@ -44,6 +44,8 @@ export const tenantResolver = async (req: Request, res: Response, next: NextFunc
       req.originalUrl.startsWith("/api/health") ||
       req.originalUrl.startsWith("/api/docs") ||
       req.originalUrl.startsWith("/api/auth/") ||
+      req.originalUrl.startsWith("/api/user/") ||
+      req.originalUrl === "/api/user" ||
       req.originalUrl.startsWith("/api/districts");
 
     if (isPublicRoute) {

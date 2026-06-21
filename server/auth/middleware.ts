@@ -136,17 +136,17 @@ export function requireCSRF(req: Request, res: Response, next: NextFunction) {
 
     // Both tokens must be present and match
     if (!cookieToken || !headerToken) {
-      return sendError(res, 403, ErrorCode.AUTH_REQUIRED, "CSRF token required");
+      return sendError(res, 403, ErrorCode.FORBIDDEN, "CSRF token required");
     }
 
     if (cookieToken !== headerToken) {
-      return sendError(res, 403, ErrorCode.AUTH_REQUIRED, "CSRF token invalid");
+      return sendError(res, 403, ErrorCode.FORBIDDEN, "CSRF token invalid");
     }
 
     next();
   } catch (error) {
     console.error("CSRF validation error:", error);
-    return sendError(res, 403, ErrorCode.AUTH_REQUIRED, "CSRF validation failed");
+    return sendError(res, 403, ErrorCode.FORBIDDEN, "CSRF validation failed");
   }
 }
 

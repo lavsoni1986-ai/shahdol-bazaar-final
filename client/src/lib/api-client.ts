@@ -12,6 +12,7 @@
  */
 
 import { extractDistrictSlug } from "@/shared/routing/reserved-routes";
+import { getCsrfToken } from "./csrf";
 
 function serializeBody(body?: any) {
   if (body === undefined || body === null) return undefined;
@@ -111,6 +112,12 @@ export async function apiRequest(
     "x-district-slug": resolveCanonicalDistrictSlug(),
     ...options?.headers,
   };
+
+  const csrfToken = getCsrfToken();
+  if (csrfToken && ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {
+    headers["x-csrf-token"] = csrfToken;
+    console.log("[CSRF] Header attached");
+  }
 
   if (!(typeof FormData !== "undefined" && body instanceof FormData)) {
     headers["Content-Type"] = "application/json";

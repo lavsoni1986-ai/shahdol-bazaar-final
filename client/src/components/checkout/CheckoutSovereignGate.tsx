@@ -16,7 +16,9 @@
 
 import { ReactNode } from "react";
 import { useCheckoutReady, CheckoutGateState } from "@/hooks/useCheckoutReady";
-import { Loader2, ShoppingBag, AlertTriangle, RefreshCw } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLocation } from "wouter";
+import { Loader2, ShoppingBag, AlertTriangle, RefreshCw, LogIn, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface CheckoutSovereignGateProps {
@@ -83,6 +85,46 @@ function CheckoutSkeleton() {
 }
 
 /**
+ * AuthRequiredGate — shown when an unauthenticated guest reaches checkout.
+ * Replaces the infinite skeleton with a clear login prompt and recovery actions.
+ */
+function AuthRequiredGate() {
+    const [, setLocation] = useLocation();
+    return (
+        <div className="min-h-screen bg-[#030303] flex items-center justify-center px-4">
+            <div className="text-center space-y-5 max-w-sm w-full">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-600/15 border border-orange-500/20 mb-2">
+                    <ShoppingBag className="h-8 w-8 text-orange-500" />
+                </div>
+                <div>
+                    <h2 className="text-xl font-black text-white mb-2">Login Required</h2>
+                    <p className="text-sm text-slate-400 leading-relaxed">
+                        Please login to continue your checkout.
+                    </p>
+                </div>
+                <div className="flex flex-col gap-3">
+                    <Button
+                        onClick={() => setLocation("/auth?return=/checkout")}
+                        className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:opacity-90 text-white font-bold gap-2"
+                    >
+                        <LogIn className="h-4 w-4" />
+                        Login
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => setLocation("/cart")}
+                        className="w-full border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 gap-2"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Return to Cart
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
  * Recovery banner shown when some cart items were removed or vendors unavailable
  */
 function CheckoutRecoveryBanner({ gate }: { gate: CheckoutGateState }) {
@@ -121,13 +163,19 @@ function CheckoutRecoveryBanner({ gate }: { gate: CheckoutGateState }) {
 
 export function CheckoutSovereignGate({ children, skeleton }: CheckoutSovereignGateProps) {
     const gate = useCheckoutReady();
+    const { authState, initialized } = useAuth();
 
     // SOVEREIGN: Render skeleton while loading
     if (gate.loading) {
         return skeleton || <CheckoutSkeleton />;
     }
 
-    // SOVEREIGN: If auth not ready, show loading state (edge case)
+    // SOVEREIGN: Auth initialized and user is a guest — show login prompt (not infinite skeleton)
+    if (!gate.authReady && initialized && authState === "guest") {
+        return <AuthRequiredGate />;
+    }
+
+    // SOVEREIGN: Auth not ready for other reasons (e.g. initializing) — show loading state
     if (!gate.authReady) {
         return skeleton || <CheckoutSkeleton />;
     }

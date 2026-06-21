@@ -24,6 +24,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import OrderTimeline from "@/components/OrderTimeline";
 
 interface Order {
   id: number;
@@ -57,17 +58,17 @@ interface Order {
 
 export default function MyOrders() {
   const [, setLocation] = useLocation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { currentDistrict } = useDistrict();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Check auth
+  // 🛡️ Auth guard — wait for auth to resolve before redirecting (prevents premature redirect)
   useEffect(() => {
-    if (!isAuthenticated) {
-      setLocation("/auth?redirect=/my-orders");
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/auth?return=/my-orders");
     }
-  }, [isAuthenticated, setLocation]);
+  }, [authLoading, isAuthenticated, setLocation]);
 
   // Fetch user's orders
   useEffect(() => {
@@ -99,6 +100,10 @@ export default function MyOrders() {
       case 'accepted':
       case 'confirmed':
         return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'preparing':
+        return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'ready':
+        return 'bg-teal-100 text-teal-700 border-teal-200';
       case 'completed':
       case 'delivered':
         return 'bg-green-100 text-green-700 border-green-200';
@@ -117,7 +122,12 @@ export default function MyOrders() {
       case 'accepted':
       case 'confirmed':
         return <CheckCircle className="w-4 h-4" />;
+      case 'preparing':
+        return <Clock className="w-4 h-4 animate-pulse" />;
+      case 'ready':
+        return <Package className="w-4 h-4" />;
       case 'completed':
+      case 'delivered':
         return <CheckCircle className="w-4 h-4" />;
       case 'rejected':
       case 'cancelled':
@@ -127,31 +137,12 @@ export default function MyOrders() {
     }
   };
 
-  // Order Status Timeline Stages
-  const orderStages = [
-    { key: 'pending', label: 'Order Placed', icon: Package },
-    { key: 'accepted', label: 'Accepted by Vendor', icon: CheckCircle },
-    { key: 'shipped', label: 'Out for Delivery', icon: Truck },
-    { key: 'completed', label: 'Completed', icon: CheckCircle },
-  ];
 
-  const getCurrentStageIndex = (status: string) => {
-    const statusMap: Record<string, number> = {
-      'pending': 0,
-      'accepted': 1,
-      'confirmed': 1,
-      'shipped': 2,
-      'out_for_delivery': 2,
-      'completed': 3,
-      'delivered': 3,
-    };
-    return statusMap[status?.toLowerCase()] ?? 0;
-  };
 
   // Separate orders by status
   const pendingOrders = orders.filter(o => o.status === 'pending');
-  const activeOrders = orders.filter(o => ['accepted', 'confirmed', 'shipped'].includes(o.status));
-  const completedOrders = orders.filter(o => ['completed', 'delivered'].includes(o.status));
+  const activeOrders = orders.filter(o => ['accepted', 'confirmed', 'preparing', 'ready', 'shipped', 'out_for_delivery'].includes(o.status));
+  const completedOrders = orders.filter(o => ['completed', 'delivered', 'cancelled', 'rejected'].includes(o.status));
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -264,31 +255,8 @@ export default function MyOrders() {
                         )}
 
                         {/* Status Timeline */}
-                        <div className="flex items-center justify-between">
-                          {orderStages.map((stage, index) => {
-                            const currentIndex = getCurrentStageIndex(order.status);
-                            const isCompleted = index <= currentIndex;
-                            const isCurrent = index === currentIndex;
-                            const StageIcon = stage.icon;
-
-                            return (
-                              <div key={stage.key} className="flex flex-col items-center flex-1">
-                                <div className={`
-                                  w-8 h-8 rounded-full flex items-center justify-center mb-1
-                                  ${isCompleted
-                                    ? 'bg-green-500 text-white'
-                                    : 'bg-slate-200 text-slate-400'
-                                  }
-                                  ${isCurrent && !['completed', 'delivered'].includes(order.status) ? 'ring-2 ring-orange-400' : ''}
-                                `}>
-                                  <StageIcon className="w-4 h-4" />
-                                </div>
-                                <span className={`text-xs text-center ${isCompleted ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
-                                  {stage.label}
-                                </span>
-                              </div>
-                            );
-                          })}
+                        <div className="py-2">
+                          <OrderTimeline order={order} />
                         </div>
 
                         {/* Delivery Address */}
@@ -375,31 +343,8 @@ export default function MyOrders() {
                         )}
 
                         {/* Status Timeline */}
-                        <div className="flex items-center justify-between">
-                          {orderStages.map((stage, index) => {
-                            const currentIndex = getCurrentStageIndex(order.status);
-                            const isCompleted = index <= currentIndex;
-                            const isCurrent = index === currentIndex;
-                            const StageIcon = stage.icon;
-
-                            return (
-                              <div key={stage.key} className="flex flex-col items-center flex-1">
-                                <div className={`
-                                  w-8 h-8 rounded-full flex items-center justify-center mb-1
-                                  ${isCompleted
-                                    ? 'bg-green-500 text-white'
-                                    : 'bg-slate-200 text-slate-400'
-                                  }
-                                  ${isCurrent && !['completed', 'delivered'].includes(order.status) ? 'ring-2 ring-blue-400' : ''}
-                                `}>
-                                  <StageIcon className="w-4 h-4" />
-                                </div>
-                                <span className={`text-xs text-center ${isCompleted ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
-                                  {stage.label}
-                                </span>
-                              </div>
-                            );
-                          })}
+                        <div className="py-2">
+                          <OrderTimeline order={order} />
                         </div>
 
                         {/* Delivery Address */}
@@ -454,6 +399,11 @@ export default function MyOrders() {
                               <span className="ml-1">{order.status}</span>
                             </Badge>
                           </div>
+                        </div>
+
+                        {/* Status Timeline */}
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                          <OrderTimeline order={order} />
                         </div>
                       </CardContent>
                     </Card>

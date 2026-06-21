@@ -386,7 +386,7 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                     alt={title}
                     categoryName={categoryName}
                     aspectRatioHint="square"
-                    className="w-full max-h-[260px] sm:max-h-none rounded-t-3xl border-0"
+                    className="w-full rounded-t-3xl border-0"
                 />
 
                 {/* Badge layer */}

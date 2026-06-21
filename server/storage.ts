@@ -148,7 +148,9 @@ const extendedPrisma = prismaRaw.$extends({
               'shop',
               'banner',
               'auditlog',
-              'adminactionlog'
+              'adminactionlog',
+              'customerprofile',
+              'address'
             ];
 
             if (directDistrictModels.includes(modelName)) {
@@ -709,7 +711,7 @@ export const storage: IStorage = {
   },
 
   // Order methods - using real Order model
-  async createOrder(order: InsertOrder): Promise<Order> {
+  async createOrder(order: InsertOrder & { deliveryAddressSnapshot?: any }): Promise<Order> {
     const data: Prisma.OrderUncheckedCreateInput = {
       userId: order.userId || null,
       productId: order.productId,
@@ -721,6 +723,7 @@ export const storage: IStorage = {
       customerName: order.customerName || null,
       customerPhone: order.customerPhone || null,
       customerAddress: order.customerAddress || null,
+      deliveryAddressSnapshot: order.deliveryAddressSnapshot || null,
       paymentStatus: order.paymentStatus || "pending",
       paymentMethod: order.paymentMethod || null,
     };

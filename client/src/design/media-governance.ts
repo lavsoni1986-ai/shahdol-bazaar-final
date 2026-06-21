@@ -557,25 +557,39 @@ export const GovernedImage = React.memo(function GovernedImage({
     return React.createElement(
         "div",
         { ref: containerRef as any, className: containerClasses },
-        isFallback 
+        isFallback
             ? React.createElement(GovernedFallback, { config: fallbackConfig, name, iconClassName: "w-8 h-8 text-white" })
             : React.createElement(
                 React.Fragment,
                 null,
-                !imgLoaded && !isLowEnd && React.createElement(
-                    "div",
-                    { className: "absolute inset-0 bg-zinc-800/60 animate-pulse flex items-center justify-center" },
-                    React.createElement("div", { className: "w-8 h-8 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" })
-                ),
-                React.createElement("img", {
-                    src: imgUrl || "",
-                    alt: alt,
-                    loading: lazy ? "lazy" : "eager",
-                    decoding: "async",
-                    onLoad: handleLoad,
-                    onError: handleError,
-                    className: imageClasses
-                })
+                // 🛡️ Phase 3A Fix: Never render <img src="">.
+                // When imgUrl is null (lazy + not yet in viewport), render only the
+                // skeleton placeholder. The img element is created only once we have
+                // a real URL, eliminating the empty-string src console warning.
+                !imgUrl
+                    ? React.createElement(
+                        "div",
+                        { className: "absolute inset-0 bg-zinc-800/60 animate-pulse flex items-center justify-center" },
+                        React.createElement("div", { className: "w-8 h-8 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" })
+                    )
+                    : React.createElement(
+                        React.Fragment,
+                        null,
+                        !imgLoaded && !isLowEnd && React.createElement(
+                            "div",
+                            { className: "absolute inset-0 bg-zinc-800/60 animate-pulse flex items-center justify-center" },
+                            React.createElement("div", { className: "w-8 h-8 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" })
+                        ),
+                        React.createElement("img", {
+                            src: imgUrl,
+                            alt: alt,
+                            loading: lazy ? "lazy" : "eager",
+                            decoding: "async",
+                            onLoad: handleLoad,
+                            onError: handleError,
+                            className: imageClasses
+                        })
+                    )
             ),
         import.meta.env.DEV && React.createElement(
             "span",

@@ -66,6 +66,7 @@ import "./lib/apiRegistry";
 import { startMemoryCleanupScheduler } from "./workers/memory.cleanup.scheduler";
 // import { runSovereignConnectEngine } from "./workers/revenue.worker";
 import type { Server } from "http";
+import { notificationDispatcher } from "./services/notification-dispatcher";
 
 // ============================================
 // SECURITY: Async Error Wrapper
@@ -812,6 +813,9 @@ async function startServer() {
     console.log(`🌍 URL: http://localhost:${port}`);
     console.log(`📚 Docs: http://localhost:${port}/api/docs`);
     console.log(`🔍 [DEBUG] Server listen callback executed successfully`);
+
+    // 🔔 Initialize Notification Dispatcher (FSM event listeners)
+    notificationDispatcher.initialize();
 
     // ✅ Initialize background workers after server starts
     console.log(`🔍 [DEBUG] Skipping background workers for now...`);

@@ -37,6 +37,8 @@ model District {
   vendors         Vendor[]         @relation("DistrictToVendors")
   schools         Schools[]
   sovereignOrders SovereignOrder[]
+  customerProfiles CustomerProfile[]
+  addresses       Address[]
 
   @@map("District")
 }
@@ -380,6 +382,8 @@ model User {
   district             District?        @relation(fields: [districtId], references: [id])
   orders               Order[]
   sovereignOrders      SovereignOrder[]
+  customerProfile      CustomerProfile?
+  addresses            Address[]
 
   fraudHistories FraudHistory[]
 
@@ -539,6 +543,7 @@ model Order {
   customerName    String?  @map("customer_name")
   customerPhone   String?  @map("customer_phone")
   customerAddress String?  @map("customer_address")
+  deliveryAddressSnapshot Json? @map("delivery_address_snapshot")
   paymentStatus   String?  @default("pending") @map("payment_status")
   paymentMethod   String?  @map("payment_method")
   paymentId       String?  @map("payment_id")
@@ -564,6 +569,7 @@ model SovereignOrder {
   customerName     String?
   customerPhone    String?
   customerAddress  String?
+  deliveryAddressSnapshot Json? @map("delivery_address_snapshot")
   paymentMethod    String?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -1092,4 +1098,47 @@ model VendorMetadata {
   vendor Vendor @relation(fields: [vendorId], references: [id])
 
   @@map("vendor_metadata")
+}
+
+model CustomerProfile {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique @map("user_id")
+  districtId Int      @map("district_id")
+  fullName   String   @map("full_name")
+  phone      String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, districtId])
+  @@index([userId])
+  @@index([districtId])
+  @@map("customer_profiles")
+}
+
+model Address {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  districtId    Int      @map("district_id")
+  streetAddress String   @map("street_address")
+  houseNumber   String?  @map("house_number")
+  landmark      String?
+  village       String?
+  ward          String?
+  city          String?
+  districtName  String?  @map("district_name")
+  state         String?
+  postalCode    String?  @map("postal_code")
+  type          String   @default("DELIVERY")
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  district      District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId])
+  @@index([districtId])
+  @@map("addresses")
 }

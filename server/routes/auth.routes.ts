@@ -90,6 +90,10 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     console.log("🍪 [LOGIN] Cookies set on response");
 
     // Return user data only (tokens are in cookies)
+    const profile = await prisma.customerProfile.findUnique({
+      where: { userId: user.id }
+    });
+
     console.log("[LOGIN] sending response");
     return res.status(200).json({
       success: true,
@@ -99,7 +103,9 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
           username: user.username,
           role: normalizeRole(user.role),
           isAdmin: user.isAdmin,
-          districtId: user.districtId
+          districtId: user.districtId,
+          name: profile?.fullName || user.username,
+          phone: profile?.phone || null,
         }
       }
     });
@@ -351,6 +357,10 @@ router.post("/refresh", async (req: Request, res: Response) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
+    const profile = await prisma.customerProfile.findUnique({
+      where: { userId: user.id }
+    });
+
     return res.json({
       success: true,
       data: {
@@ -358,7 +368,9 @@ router.post("/refresh", async (req: Request, res: Response) => {
           id: user.id,
           username: user.username,
           role: normalizeRole(user.role),
-          districtId: user.districtId
+          districtId: user.districtId,
+          name: profile?.fullName || user.username,
+          phone: profile?.phone || null,
         }
       }
     });
@@ -399,6 +411,10 @@ router.get("/verify", optionalAuth, async (req: any, res) => {
         user: null,
       });
     }
+    const profile = await prisma.customerProfile.findUnique({
+      where: { userId: req.user.userId }
+    });
+
     console.log("✅ [VERIFY] Verification successful, returning user data");
     return res.json({
       success: true,
@@ -409,6 +425,8 @@ router.get("/verify", optionalAuth, async (req: any, res) => {
           role: req.user.role,
           isAdmin: req.user.isAdmin,
           districtId: req.user.districtId,
+          name: profile?.fullName || req.user.username,
+          phone: profile?.phone || null,
         }
       },
       user: {
@@ -417,6 +435,8 @@ router.get("/verify", optionalAuth, async (req: any, res) => {
         role: req.user.role,
         isAdmin: req.user.isAdmin,
         districtId: req.user.districtId,
+        name: profile?.fullName || req.user.username,
+        phone: profile?.phone || null,
       }
     });
   } catch (err) {
