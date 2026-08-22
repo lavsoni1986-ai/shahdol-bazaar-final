@@ -2,8 +2,12 @@ import express, { Request, Response } from "express";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
+import { requireAuth } from "../auth/middleware";
 
 const router = express.Router();
+
+// Enforce authentication on all upload endpoints
+router.use(requireAuth);
 
 // Cloudinary configuration
 cloudinary.config({

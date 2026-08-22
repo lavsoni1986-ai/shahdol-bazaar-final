@@ -1,29 +1,42 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { hashPassword, generateSecurePassword } from '../server/auth/password';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Create admin user with strong password (12+ chars)
-  const hashedPassword = bcrypt.hashSync('Admin@123456', 10);
-  
+  const username = process.env.ADMIN_USERNAME || 'admin';
+  const rawPassword = process.env.ADMIN_PASSWORD || generateSecurePassword(16);
+  const hashedPassword = hashPassword(rawPassword);
+
+  const defaultDistrict = await prisma.district.findFirst({
+    where: { isDefault: true }
+  });
+  const districtId = defaultDistrict ? defaultDistrict.id : 1;
+
   const user = await prisma.user.upsert({
-    where: { username: 'admin' },
-    update: { password: hashedPassword },
-    create: {
-      username: 'admin',
+    where: { username },
+    update: {
       password: hashedPassword,
-      email: 'admin@shahdolbazaar.com',
       role: 'SUPER_ADMIN',
       isAdmin: true,
-      districtId: 121
+    },
+    create: {
+      username,
+      password: hashedPassword,
+      role: 'SUPER_ADMIN',
+      isAdmin: true,
+      districtId,
     }
   });
-  
-  console.log('✅ Admin user updated with strong password');
-  console.log('✅ Password: Admin@123456');
+
+  console.log(`✅ Admin user credential updated: username=${user.username}, role=${user.role}`);
 }
 
 main()
   .then(() => prisma.$disconnect())
-  .catch(console.error);
+  .catch((err) => {
+    console.error('❌ Admin update error:', err.message || err);
+    prisma.$disconnect();
+    process.exit(1);
+  });

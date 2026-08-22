@@ -1,28 +1,42 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { hashPassword, generateSecurePassword } from '../server/auth/password';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const hashedPassword = bcrypt.hashSync('CHANGE_ME_ADMIN', 10);
-  
+  const username = process.env.ADMIN_USERNAME || 'admin';
+  const rawPassword = process.env.ADMIN_PASSWORD || generateSecurePassword(16);
+  const hashedPassword = hashPassword(rawPassword);
+
+  const defaultDistrict = await prisma.district.findFirst({
+    where: { isDefault: true }
+  });
+  const districtId = defaultDistrict ? defaultDistrict.id : 1;
+
   const user = await prisma.user.upsert({
-    where: { username: 'admin' },
-    update: {},
-    create: {
-      username: 'admin',
+    where: { username },
+    update: {
       password: hashedPassword,
-      email: 'admin@shahdolbazaar.com',
       role: 'SUPER_ADMIN',
       isAdmin: true,
-      districtId: 121
+    },
+    create: {
+      username,
+      password: hashedPassword,
+      role: 'SUPER_ADMIN',
+      isAdmin: true,
+      districtId,
     }
   });
-  
-  console.log('✅ Admin user created:', user.username);
-  console.log('✅ Password: CHANGE_ME_ADMIN');
+
+  console.log(`✅ Admin user synchronized: username=${user.username}, role=${user.role}, districtId=${user.districtId}`);
 }
 
 main()
   .then(() => prisma.$disconnect())
-  .catch(console.error);
+  .catch((err) => {
+    console.error('❌ Admin creation error:', err.message || err);
+    prisma.$disconnect();
+    process.exit(1);
+  });
