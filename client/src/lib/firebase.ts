@@ -5,14 +5,14 @@ import { initializeApp } from "firebase/app";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getFirestore } from "firebase/firestore";
 
-// Aapki Config
+// Firebase Configuration
 const firebaseConfig = {
-  apiKey: "REDACTED_GEMINI_API_KEY",
-  authDomain: "shahdolbazaar-20221.firebaseapp.com",
-  projectId: "shahdolbazaar-20221",
-  storageBucket: "shahdolbazaar-20221.firebasestorage.app",
-  messagingSenderId: "1041061893156",
-  appId: "1:1041061893156:web:aace73b331ad5fbb5234b1",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "shahdolbazaar.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "shahdolbazaar",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "shahdolbazaar.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
 };
 
 // 1. App Start (for storage only)

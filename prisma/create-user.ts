@@ -6,7 +6,10 @@ const prisma = new PrismaClient()
 async function main() {
   console.log('Creating new user lav_soni...')
 
-  const password = 'CHANGE_ME_DEMO_ONLY'
+  const password = process.env.ADMIN_PASSWORD || 'CHANGE_ME_DEMO_ONLY'
+  if (!process.env.ADMIN_PASSWORD) {
+    console.warn('⚠️ WARNING: ADMIN_PASSWORD not set. Using temporary placeholder.')
+  }
   const saltRounds = 10
 
   const hashedPassword = await bcrypt.hash(password, saltRounds)

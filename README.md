@@ -49,17 +49,17 @@ Your complete digital marketplace platform is ready for deployment!
 
 ---
 
-## 🔑 Default Credentials
+## 🔑 Initial Account Setup
 
-**Admin:**
-- Username: `admin`
-- Password: `CHANGE_ME_ADMIN`
-- Access: `/admin`
+For local development and testing, create initial administrative and seller credentials using the secure CLI scripts:
 
-**Sample Seller:**
-- Username: `prarthana`
-- Password: `CHANGE_ME_DEMO`
-- Access: `/partner`
+```bash
+# Create initial Super Admin (generates a secure password or reads from ADMIN_PASSWORD env)
+npx tsx scripts/create-admin.ts
+```
+
+> [!NOTE]
+> Never deploy with default or demo passwords. Set `ADMIN_PASSWORD` in your production environment variables.
 
 ---
 
@@ -81,10 +81,23 @@ npm start
 
 ## 🔐 Environment Variables
 
-### Required for AI Chatbot:
-- `REDACTED_GEMINI_API_KEY` - Google Gemini API key
+Copy `.env.example` to `.env` and configure your environment variables:
 
-See `ENVIRONMENT_VARIABLES.md` for detailed setup instructions.
+```bash
+cp .env.example .env
+```
+
+### AI Chatbot Configuration:
+Configure your AI provider in `.env`:
+```bash
+# Groq (Primary conversational engine)
+GROQ_API_KEY=your_groq_api_key_here
+
+# Or Gemini (if using Google Generative AI)
+# GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+See `ENVIRONMENT_VARIABLES.md` and `.env.example.ai` for detailed setup instructions.
 
 ---
 

@@ -4,9 +4,11 @@ dist/
 build/
 coverage/
 .cache/
+# Environment variable files
 .env
-.env.local
-.env.production.local
+.env.*
+!.env.example
+!.env.example.*
 *.log
 .cursor/
 terminals/

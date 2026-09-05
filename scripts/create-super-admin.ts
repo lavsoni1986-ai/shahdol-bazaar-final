@@ -1,14 +1,14 @@
 // 📁 scripts/create-super-admin.ts
 import { PrismaClient } from "@prisma/client";
-import { hashPassword } from "../server/auth/password";
+import { hashPassword, generateSecurePassword } from "../server/auth/password";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("🚀 BHARAT-OS: Creating Sovereign Super Admin...");
 
-  const adminEmail = "lav@bharatos.com";
-  const adminPassword = "CHANGE_ME_DEMO_ONLY";
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@bharatos.com";
+  const adminPassword = process.env.ADMIN_PASSWORD || generateSecurePassword(16);
 
   // 1. Check District
   const district = await prisma.district.findUnique({ where: { id: 1 } });

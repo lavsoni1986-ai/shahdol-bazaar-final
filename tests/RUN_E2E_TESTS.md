@@ -9,7 +9,7 @@
 
 2. **Ensure Admin User Exists**:
    - Username: `admin`
-   - Password: `CHANGE_ME_TEST`
+   - Password: `CHANGE_ME_TEST_ONLY` (or configured via `ADMIN_PASSWORD`)
    - Role: `SUPER_ADMIN` or `admin`
 
 3. **Server Must Be Running** (if testing locally)

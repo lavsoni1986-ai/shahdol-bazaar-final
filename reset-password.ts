@@ -3,7 +3,12 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function reset() {
-  const hash = await bcrypt.hash('CHANGE_ME_DEMO_ONLY', 10);
+  const newPassword = process.env.ADMIN_PASSWORD;
+  if (!newPassword) {
+    console.error('❌ Error: ADMIN_PASSWORD environment variable must be set.');
+    process.exit(1);
+  }
+  const hash = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({
     where: { username: 'lav_soni' },
     data: { password: hash, role: 'SUPER_ADMIN' }

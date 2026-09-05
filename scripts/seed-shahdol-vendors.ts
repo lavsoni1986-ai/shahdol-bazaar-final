@@ -442,7 +442,7 @@ async function main() {
             },
             create: {
                 username: merchant.mobile,
-                password: hashPassword("CHANGE_ME_DEMO_ONLY"),
+                password: hashPassword(process.env.PILOT_VENDOR_PASSWORD || "CHANGE_ME_DEMO_ONLY"),
                 role: "VENDOR",
                 isAdmin: false,
                 districtId: district.id,
@@ -549,8 +549,8 @@ async function main() {
     console.log(`   Merchants:    ${created} created/verified`);
     console.log(`   Total Data:   ${PILOT_MERCHANTS.length} merchants × ~3.5 products avg`);
     console.log("═══════════════════════════════════════════════\n");
-    console.log("🔑 Default login password for all pilots: CHANGE_ME_DEMO_ONLY");
-    console.log("   (Change immediately in production via admin panel)\n");
+    console.log("🔑 Pilot vendor password initialized via PILOT_VENDOR_PASSWORD or placeholder.");
+    console.log("   (Configure secure credentials before production launch)\n");
 }
 
 main()

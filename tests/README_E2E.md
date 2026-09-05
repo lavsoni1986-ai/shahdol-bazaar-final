@@ -40,7 +40,7 @@ npm run test:report
 
 1. **Base URL**: Tests run against the URL in `playwright.config.ts`
 2. **Test Data**: Tests create temporary users/products and clean up after
-3. **Admin User**: Tests assume admin user exists (username: `admin`, password: `CHANGE_ME_TEST`)
+3. **Admin User**: Tests assume test admin user exists (configured via test environment)
 4. **Shop Requirement**: Merchants need a shop before creating products
 
 ## Troubleshooting

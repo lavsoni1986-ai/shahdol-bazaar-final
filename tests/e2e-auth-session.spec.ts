@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, logout, waitForSovereignHydration } from './helpers/auth.helper';
+import { loginAsAdmin, logout, waitForSovereignHydration, TEST_ADMIN_USERNAME, TEST_ADMIN_PASSWORD } from './helpers/auth.helper';
 
 test.describe('P0 — Auth + Session Persistence', () => {
     const DISTRICT_HEADERS = {
@@ -15,8 +15,8 @@ test.describe('P0 — Auth + Session Persistence', () => {
         await expect(page.getByPlaceholder('Username')).toBeVisible({ timeout: 15000 });
         await expect(page.getByPlaceholder('••••••••')).toBeVisible();
 
-        await page.getByPlaceholder('Username').fill('lav_soni');
-        await page.getByPlaceholder('••••••••').fill('CHANGE_ME_DEMO_ONLY');
+        await page.getByPlaceholder('Username').fill(TEST_ADMIN_USERNAME);
+        await page.getByPlaceholder('••••••••').fill(TEST_ADMIN_PASSWORD);
 
         await page.getByRole('button', { name: /Enter Command Center/i }).click();
 

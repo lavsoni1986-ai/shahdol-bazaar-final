@@ -15,10 +15,13 @@ const DISTRICT_HEADERS = {
 
 /**
  * Login as admin using the REAL UI flow at /admin/login.
- * Credentials match seeded super admin from create-user.ts:
- *   username: lav_soni
- *   password: CHANGE_ME_DEMO_ONLY
+ * Credentials match seeded super admin:
+ *   username: TEST_ADMIN_USERNAME || lav_soni
+ *   password: TEST_ADMIN_PASSWORD || CHANGE_ME_DEMO_ONLY
  */
+export const TEST_ADMIN_USERNAME = process.env.TEST_ADMIN_USERNAME || 'lav_soni';
+export const TEST_ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || 'CHANGE_ME_DEMO_ONLY';
+
 export async function loginAsAdmin(page: Page): Promise<void> {
     await page.goto('/admin/login');
     await page.waitForLoadState('networkidle');
@@ -26,8 +29,8 @@ export async function loginAsAdmin(page: Page): Promise<void> {
     await expect(page.getByPlaceholder('Username')).toBeVisible({ timeout: 20000 });
     await expect(page.getByPlaceholder('••••••••')).toBeVisible();
 
-    await page.getByPlaceholder('Username').fill('lav_soni');
-    await page.getByPlaceholder('••••••••').fill('CHANGE_ME_DEMO_ONLY');
+    await page.getByPlaceholder('Username').fill(TEST_ADMIN_USERNAME);
+    await page.getByPlaceholder('••••••••').fill(TEST_ADMIN_PASSWORD);
 
     await page.getByRole('button', { name: /Enter Command Center/i }).click();
 
