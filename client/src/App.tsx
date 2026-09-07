@@ -1,4 +1,4 @@
-import { Route, useLocation, Switch, Redirect } from "wouter";
+import { Route, useLocation, useRoute, Switch, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import React, { lazy, Suspense, useEffect, useState, ComponentType, useRef } from "react";
 
@@ -13,6 +13,7 @@ import { DistrictProvider } from "@/contexts/DistrictContext";
 import SuperAIHome from "./pages/SuperAIHome";
 import { LiquidRoute } from "@/components/LiquidMotion";
 import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
+import { isRegisteredDistrictSlug } from "@/shared/routing/reserved-routes";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -190,6 +191,21 @@ function ShopRedirect() {
   return null;
 }
 
+function DistrictHomeRoute() {
+  const [location] = useLocation();
+  const [, params] = useRoute("/:district");
+  const districtSlug = params?.district;
+
+  if (districtSlug && isRegisteredDistrictSlug(districtSlug)) {
+    return (
+      <LiquidRoute location={location}>
+        <SuperAIHome />
+      </LiquidRoute>
+    );
+  }
+  return <NotFound />;
+}
+
 /* ===================== MAIN ROUTER ===================== */
 
 const Router = () => {
@@ -300,6 +316,9 @@ const Router = () => {
             requiredRole={["admin", "superadmin", "SUPER_ADMIN", "cityadmin", "CITY_ADMIN"]}
           />
         </Route>
+
+        {/* 🏛️ SOVEREIGN DISTRICT HOME - Renders SuperAIHome ONLY for registered active districts */}
+        <Route path="/:district" component={DistrictHomeRoute} />
 
         <Route path="*">
           <NotFound />
