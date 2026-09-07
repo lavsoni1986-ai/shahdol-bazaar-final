@@ -95,7 +95,13 @@ export default function AISearchTerminal() {
       rating: v.rating ?? 4.5,
       description: v.reason || v.description || null,
       isVerified: v.isVerified ?? true,
-    }));
+      entityType: v.entityType,
+      type: v.type || v.entityType,
+      category: v.category,
+      slug: v.slug,
+      meta: v.meta,
+      raw: v,
+    }, district?.slug));
   };
 
   return (

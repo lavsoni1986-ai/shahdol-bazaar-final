@@ -15,7 +15,7 @@
 import { normalizePartnerEntity, type CanonicalPartner } from "../canonical/partner.adapter";
 import { getCurrentDistrictSlug, buildCanonicalRoute } from "../routing/sovereign-routes";
 
-export type CanonicalEntityKind = 'partner' | 'hospital' | 'school' | 'service' | 'product';
+export type CanonicalEntityKind = 'partner' | 'hospital' | 'school' | 'service' | 'product' | 'bus';
 
 export interface CanonicalEntity {
   id: number;
@@ -40,9 +40,22 @@ export interface CanonicalEntity {
 function detectEntityKind(entity: any, hint?: CanonicalEntityKind): CanonicalEntityKind {
   if (hint) return hint;
 
+  const entityType = (entity.entityType || '').toString().toLowerCase();
   const type = (entity.type || entity.serviceType || entity.businessType || entity.category || '').toString().toLowerCase();
   const category = (entity.category || entity.businessType || entity.type || '').toString().toLowerCase();
   const name = (entity.name || entity.title || '').toString().toLowerCase();
+
+  if (
+    entityType === 'bus' ||
+    type === 'bus' ||
+    type === 'transport' ||
+    category.includes('bus') ||
+    category.includes('transport') ||
+    name.includes('bus') ||
+    (typeof entity.id === 'string' && entity.id.startsWith('BUS-'))
+  ) {
+    return 'bus';
+  }
 
   if (type === 'product' || entity.price != null || entity.mrp != null) {
     return 'product';
@@ -81,6 +94,10 @@ function buildEntityRoute(kind: CanonicalEntityKind, districtSlug: string, slug:
     districtSlug = getCurrentDistrictSlug();
   }
 
+  if (kind === 'bus') {
+    return `/${districtSlug}/bus-timetable`;
+  }
+
   // Map CanonicalEntityKind to ResolvableEntityKind
   const kindMap: Record<string, string> = {
     product: 'product',
@@ -88,6 +105,7 @@ function buildEntityRoute(kind: CanonicalEntityKind, districtSlug: string, slug:
     hospital: 'healthcare',
     school: 'education',
     partner: 'marketplace',
+    bus: 'bus',
   };
 
   return buildCanonicalRoute({

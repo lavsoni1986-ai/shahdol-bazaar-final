@@ -144,10 +144,14 @@ export function buildCanonicalRoute(input: {
   id?: string | number | null;
   districtSlug?: string;
 }): string {
+  const kind = input.entityKind?.toLowerCase() || '';
+  if (kind === 'bus' || kind === 'transport') {
+    return `/${input.districtSlug || getCurrentDistrictSlug()}/bus-timetable`;
+  }
+
   const identifier = input.slug || (input.id != null ? String(input.id) : '');
   if (!identifier) return '/marketplace';
 
-  const kind = input.entityKind.toLowerCase();
   switch (kind) {
     case 'product':
       return `/marketplace/products/${identifier}`;
@@ -167,6 +171,9 @@ export function buildCanonicalRoute(input: {
       return `/restaurants/${identifier}`;
     case 'emergency':
       return `/emergency/${identifier}`;
+    case 'bus':
+    case 'transport':
+      return `/${input.districtSlug || getCurrentDistrictSlug()}/bus-timetable`;
     case 'marketplace':
     case 'partner':
     default:

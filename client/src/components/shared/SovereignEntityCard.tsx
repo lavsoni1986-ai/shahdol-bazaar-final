@@ -21,6 +21,7 @@ import {
     Briefcase,
     Ambulance,
     Building2,
+    Bus,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SovereignProductCard, type ProductCardData } from "@/components/shared/SovereignProductCard";
@@ -44,6 +45,8 @@ const ENTITY_ICON_MAP: Partial<Record<string, React.ComponentType<any>>> = {
     emergency: Ambulance,
     hospital: HeartPulse,
     school: GraduationCap,
+    bus: Bus,
+    transport: Bus,
 };
 
 const ENTITY_LABEL_MAP: Record<string, string> = {
@@ -59,6 +62,8 @@ const ENTITY_LABEL_MAP: Record<string, string> = {
     booking: 'Booking',
     marketplace: 'Marketplace',
     emergency: 'Emergency',
+    bus: 'Bus',
+    transport: 'Transport',
 };
 
 export interface SovereignEntityCardProps {
@@ -99,6 +104,15 @@ function toProductCardData(entity: CanonicalEntity): ProductCardData {
 // 🏛️ Renders the primary CTA button driven by the governance engine.
 // NEVER hardcodes "Add to Cart", "Buy Now", etc.
 function EntityCTAButton({ entity }: { entity: CanonicalEntity }) {
+    if (entity.kind === 'bus') {
+        return (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600/90 text-white text-label font-black uppercase tracking-wider rounded-full transition-all group-hover:bg-orange-600">
+                View Timetable
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+            </span>
+        );
+    }
+
     // Determine entity kind for CTA resolution
     const kind = mapToCanonicalKind(entity.kind) as any;
     const category = typeof entity.category === 'string' ? entity.category : '';
@@ -140,6 +154,8 @@ function mapToCanonicalKind(rawKind: string): string | undefined {
         booking: 'booking',
         marketplace: 'marketplace',
         emergency: 'emergency',
+        bus: 'bus',
+        transport: 'bus',
     };
     return mapping[rawKind] ?? rawKind;
 }
@@ -147,7 +163,7 @@ function mapToCanonicalKind(rawKind: string): string | undefined {
 export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: SovereignEntityCardProps) {
     const Icon = ENTITY_ICON_MAP[entity.kind] || Store;
     const label = ENTITY_LABEL_MAP[entity.kind] || 'Entity';
-    const route = buildCanonicalRoute({
+    const route = entity.route || buildCanonicalRoute({
         entityKind: entity.kind,
         slug: entity.slug,
         id: entity.id,

@@ -29,7 +29,8 @@ export type ResolvableEntityKind =
     | "emergency"
     | "partner"
     | "hospital"
-    | "school";
+    | "school"
+    | "bus";
 
 // ─── INPUT TYPE ──────────────────────────────────────────
 
@@ -96,6 +97,11 @@ export function resolveEntityRoute(input: EntityRouteInput): EntityRouteResult {
     const { entityKind, slug, id, districtSlug } = input;
     const district = districtSlug || getCurrentDistrictSlug();
 
+    // ── Bus entities route to district timetable ──
+    if (entityKind === "bus") {
+        return buildRoute(entityKind, district, slug || "bus-timetable", slug || "bus-timetable");
+    }
+
     // ── Try slug first (most semantic, SEO-friendly) ──
     if (slug && isValidSlug(slug)) {
         return buildRoute(entityKind, district, slug, slug);
@@ -160,6 +166,9 @@ function buildRoute(
             break;
         case "emergency":
             href = `/emergency/${identifier}`;
+            break;
+        case "bus":
+            href = `/${district}/bus-timetable`;
             break;
         case "marketplace":
         case "partner":
