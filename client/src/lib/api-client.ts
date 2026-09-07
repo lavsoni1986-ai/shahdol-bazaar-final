@@ -11,7 +11,7 @@
  * - { token: ... } (for login responses)
  */
 
-import { extractDistrictSlug } from "@/shared/routing/reserved-routes";
+import { extractDistrictSlug, isReservedRoute, isValidDistrictSlug } from "@/shared/routing/reserved-routes";
 import { getCsrfToken } from "./csrf";
 
 function serializeBody(body?: any) {
@@ -25,7 +25,7 @@ export function resolveCanonicalDistrictSlug(): string {
   if (typeof window === "undefined") return "shahdol";
 
   const urlSlug = extractDistrictSlug(window.location.pathname);
-  if (urlSlug) {
+  if (urlSlug && isValidDistrictSlug(urlSlug) && !isReservedRoute(urlSlug)) {
     try {
       localStorage.setItem("districtSlug", urlSlug);
     } catch { }
@@ -33,7 +33,15 @@ export function resolveCanonicalDistrictSlug(): string {
   }
 
   const savedSlug = localStorage.getItem("districtSlug");
-  if (savedSlug) return savedSlug;
+  if (savedSlug) {
+    if (!isReservedRoute(savedSlug) && isValidDistrictSlug(savedSlug)) {
+      return savedSlug;
+    }
+    // Clean up corrupted or reserved slugs stored previously
+    try {
+      localStorage.removeItem("districtSlug");
+    } catch { }
+  }
 
   return "shahdol";
 }
