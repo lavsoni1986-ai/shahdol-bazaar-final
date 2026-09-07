@@ -101,21 +101,23 @@ export default function BusTimetable() {
                       <Clock className="w-4 h-4 text-gray-500" />
                       <div>
                         <p className="text-[8px] font-black text-gray-600 uppercase">Departure</p>
-                        <p className="text-xs font-bold text-white tracking-tighter">{bus.firstBusTime || "06:00 AM"}</p>
+                        <p className="text-xs font-bold text-white tracking-tighter">{bus.firstBusTime || bus.time || "06:00 AM"}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <IndianRupee className="w-4 h-4 text-emerald-500" />
                       <div>
                         <p className="text-[8px] font-black text-gray-600 uppercase">Fare</p>
-                        <p className="text-xs font-black text-emerald-500 tracking-tighter">{bus.fare || "₹100"}</p>
+                        <p className="text-xs font-black text-emerald-500 tracking-tighter">
+                          {bus.fare || (bus.price ? `₹${bus.price}` : "₹100")}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Activity className="w-4 h-4 text-blue-500" />
                       <div>
                         <p className="text-[8px] font-black text-gray-600 uppercase">Type</p>
-                        <p className="text-xs font-bold text-blue-400 tracking-tighter">{bus.busType || "Express"}</p>
+                        <p className="text-xs font-bold text-blue-400 tracking-tighter">{bus.busType || bus.type || "Express"}</p>
                       </div>
                     </div>
                   </div>
@@ -143,7 +145,9 @@ export default function BusTimetable() {
         {filteredBuses.length === 0 && !isLoading && (
           <div className="text-center py-20">
             <p className="text-gray-500 font-black uppercase tracking-widest text-xs italic">
-              No results found for "{searchQuery}"
+              {searchQuery.trim()
+                ? `No results found for "${searchQuery}"`
+                : "No bus routes available for this district yet."}
             </p>
           </div>
         )}

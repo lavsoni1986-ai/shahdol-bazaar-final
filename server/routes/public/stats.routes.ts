@@ -228,46 +228,4 @@ router.get("/service-workers", async (req: Request, res: Response) => {
   }
 });
 
-// ==========================================
-// 🚌 GET LIVE BUS TIMETABLE (STRICT SOVEREIGN MODE - PAGINATED)
-// ==========================================
-router.get("/bus-timetable", async (req: Request, res: Response) => {
-  try {
-    if (!req.districtId) {
-      return sendError(res, 400, ErrorCode.DISTRICT_REQUIRED, "District context required");
-    }
-    const districtId = Number(req.districtId);
-    const page = Math.max(1, Number(req.query?.page) || 1);
-    const limit = Math.min(50, Math.max(1, Number(req.query?.limit) || 20));
-    const skip = (page - 1) * limit;
-
-    console.log("🚌 BUS TIMETABLE: districtId =", districtId, "page =", page);
-
-    const [buses, total] = await Promise.all([
-      prisma.busTimetable.findMany({
-        where: { districtId: districtId, isActive: true },
-        skip,
-        take: limit,
-        orderBy: { firstBusTime: 'asc' }
-      }),
-      prisma.busTimetable.count({ where: { districtId: districtId, isActive: true } })
-    ]);
-
-    const mappedBuses = buses.map(bus => ({
-      id: bus.id,
-      fromCity: bus.fromCity,
-      toCity: bus.toCity,
-      time: bus.firstBusTime,
-      price: bus.fare.replace('₹', ''),
-      type: bus.busType,
-      routeDescription: bus.travelTime || bus.publicNote || 'Main Highway'
-    }));
-
-    return sendSuccess(res, mappedBuses);
-  } catch (e: any) {
-    console.error("🚨 Bus timetable fetch error:", e.message);
-    return sendError(res, 500, ErrorCode.INTERNAL_ERROR, "Failed to fetch bus timetable");
-  }
-});
-
 export default router;
