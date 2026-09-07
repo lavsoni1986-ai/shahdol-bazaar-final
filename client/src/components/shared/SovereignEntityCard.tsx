@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SovereignProductCard, type ProductCardData } from "@/components/shared/SovereignProductCard";
-import { GovernedImage } from "@/design/media-governance";
 import type { CanonicalEntity } from "@/shared/api/response-normalizers";
 import { resolveEntityCTAs, hasCommerceDisplay, resolveEntityExperience } from "@/governance";
 import { trackEvent } from "@/lib/analytics";
@@ -198,19 +197,25 @@ export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: Sover
             href={route}
             className={
                 variant === 'search'
-                    ? 'group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-orange-500/40 hover:bg-white/10'
+                    ? 'group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 overflow-hidden transition hover:border-orange-500/40 hover:bg-white/10'
                     : 'block rounded-[1.75rem] border border-white/10 bg-white/5 p-5 transition hover:border-orange-500/30 hover:bg-white/10'
             }
             onClick={handleClick}
         >
-            <GovernedImage
-                src={entity.imageUrl}
-                alt={entity.title}
-                categoryName={entity.category}
-                name={entity.title}
-                aspectRatioHint="square"
-                className="h-14 w-14 rounded-3xl flex-shrink-0"
-            />
+            {entity.imageUrl ? (
+                <div className="flex-shrink-0 h-14 w-14 rounded-2xl overflow-hidden bg-zinc-800 border border-white/10">
+                    <img
+                        src={entity.imageUrl}
+                        alt={entity.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                    />
+                </div>
+            ) : (
+                <div className="flex-shrink-0 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                    <Icon className="h-6 w-6" />
+                </div>
+            )}
 
             <div className={variant === 'search' ? 'min-w-0 flex-1' : 'space-y-4'}>
                 <div className="flex items-start justify-between gap-3">
