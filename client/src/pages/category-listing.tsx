@@ -3,7 +3,7 @@ import { useLocation, useRoute, Link } from "wouter";
 import { Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 import { partnerRoutes, getCurrentDistrictSlug } from "@/shared/routing/sovereign-routes";
-import { CanonicalEntity, normalizeDistrictSnapshot } from "@/shared/api/response-normalizers";
+import { CanonicalEntity, normalizeDistrictSnapshot, normalizeCanonicalEntity } from "@/shared/api/response-normalizers";
 import { SovereignEntityCard } from "@/components/shared/SovereignEntityCard";
 
 export default function CategoryListing() {
@@ -52,16 +52,41 @@ export default function CategoryListing() {
       setLoading(true);
       setError("");
 
+      // 1. Primary: Query unified search across vendors, products, and services
+      try {
+        const unifiedRes = await apiRequest("GET", `/search/unified?q=${encodeURIComponent(category)}`);
+        if (unifiedRes?.success && unifiedRes?.data?.results) {
+          const r = unifiedRes.data.results;
+          const vendors = Array.isArray(r.vendors) ? r.vendors.map((v: any) => normalizeCanonicalEntity(v)) : [];
+          const products = Array.isArray(r.products) ? r.products.map((p: any) => normalizeCanonicalEntity(p, undefined, 'product')) : [];
+          const buses = Array.isArray(r.busRoutes) ? r.busRoutes.map((b: any) => normalizeCanonicalEntity(b)) : [];
+          const combined = [...vendors, ...products, ...buses];
+          if (combined.length > 0) {
+            setEntities(combined);
+            return;
+          }
+        }
+      } catch (searchErr) {
+        console.warn("Unified search failed, trying AI concierge fallback:", searchErr);
+      }
+
+      // 2. Secondary / Fallback: AI Concierge
       const res = await apiRequest("POST", "/ai/concierge", { message: category });
 
       if (!res.success) {
         throw new Error("Failed to load entities");
       }
 
+      // If concierge returned direct results array
+      if (Array.isArray(res?.data?.results) && res.data.results.length > 0) {
+        setEntities(res.data.results.map((e: any) => normalizeCanonicalEntity(e)));
+        return;
+      }
+
+      // Or fallback to snapshot normalization
       const rawResponse = res;
       const snapshot = normalizeDistrictSnapshot(rawResponse);
 
-      // Combine all entities from the snapshot for semantic search results
       const allEntities = [
         ...snapshot.partners,
         ...snapshot.hospitals,

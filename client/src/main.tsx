@@ -55,12 +55,11 @@ createRoot(document.getElementById("root")!).render(
   </GlobalErrorBoundary>
 );
 
-// 🛡️ SERVICE WORKER - DISABLED TO PREVENT CACHING ISSUES
-// Unregister any existing service workers
-if ("serviceWorker" in navigator) {
+// 🛡️ SERVICE WORKER - In dev mode, unregister any active workers to avoid cache conflicts
+if ("serviceWorker" in navigator && !import.meta.env.PROD) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     registrations.forEach((registration) => {
-      console.log("🔧 Unregistering service worker:", registration.scope);
+      console.log("🔧 [DEV] Unregistering service worker:", registration.scope);
       registration.unregister();
     });
   });

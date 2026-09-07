@@ -95,6 +95,7 @@ export interface ConciergeResponse {
   confidenceMessage?: string;
   cognitionTrace?: any;
   telemetry?: TelemetryTruth;
+  telemetryTruth?: TelemetryTruth;
   operationErrors?: string[];
   error?: string;
   stage?: CognitionStage;

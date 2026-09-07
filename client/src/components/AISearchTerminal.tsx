@@ -11,10 +11,16 @@ import { useDistrict } from "@/contexts/DistrictContext";
 import { SovereignEntityCard } from "@/components/shared/SovereignEntityCard";
 
 export default function AISearchTerminal() {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("q") || "";
+    }
+    return "";
+  });
   const [isListening, setIsListening] = useState(false);
   const { currentDistrict: district } = useDistrict();
-  const { data, isLoading } = useSearch(query);
+  const { data, isLoading, isError, error, refetch } = useSearch(query);
 
   const handleSearch = (q: string) => {
     if (q.trim() !== query.trim()) {
@@ -82,12 +88,13 @@ export default function AISearchTerminal() {
   const normalizeSearchResults = (results: any[]): CanonicalEntity[] => {
     return results.map(v => normalizeCanonicalEntity({
       id: v.id,
-      name: v.name,
-      phone: v.phone,
-      address: v.address,
-      rating: v.rating,
-      description: v.reason,
-      isVerified: true,
+      name: v.name || v.title || "Local Partner",
+      title: v.title || v.name || "Local Partner",
+      phone: v.phone || null,
+      address: v.address || null,
+      rating: v.rating ?? 4.5,
+      description: v.reason || v.description || null,
+      isVerified: v.isVerified ?? true,
     }));
   };
 
@@ -164,10 +171,30 @@ export default function AISearchTerminal() {
 
       {/* 📊 RESULTS */}
       <div className="mt-4">
-        {isLoading && <p className="text-white">Searching...</p>}
+        {isLoading && (
+          <div className="flex items-center gap-2 py-4 text-orange-400">
+            <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm font-medium">Searching in {district?.name || "Shahdol"}...</span>
+          </div>
+        )}
+
+        {/* ERROR STATE WITH RETRY */}
+        {isError && !isLoading && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
+            <p className="text-red-400 text-sm mb-2">
+              {(error as any)?.message || "सर्च लोड करने में समस्या आई। कृपया पुनः प्रयास करें।"}
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold transition-colors"
+            >
+              फिर से कोशिश करें (Retry)
+            </button>
+          </div>
+        )}
 
         {/* AI ANSWER */}
-        {data?.answer && (
+        {data?.answer && !isLoading && (
           <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 mb-4">
             <p className="text-orange-400 text-sm">{data.answer}</p>
             {data.confidenceMessage && (
@@ -177,7 +204,7 @@ export default function AISearchTerminal() {
         )}
 
         {/* DEFAULT STATE - Show when no query and no results */}
-        {!isLoading && !query && (!data?.results || data.results.length === 0) && (
+        {!isLoading && !isError && !query && (!data?.results || data.results.length === 0) && (
           <div className="text-center py-6">
             <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">🔥</span>
@@ -208,11 +235,22 @@ export default function AISearchTerminal() {
           </div>
         )}
 
-        {!isLoading && data?.telemetryTruth?.matchedEntities > 0 && (
-          <p className="text-sm text-gray-300 mb-3">
-            Found {data.telemetryTruth.matchedEntities} results in Shahdol
-          </p>
+        {/* NO RESULTS FALLBACK */}
+        {!isLoading && !isError && query.length >= 2 && (!data?.results || data.results.length === 0) && !data?.answer && (
+          <div className="text-center py-8 text-gray-400 text-sm">
+            <p>"{query}" के लिए कोई सीधा परिणाम नहीं मिला।</p>
+            <p className="text-xs text-gray-500 mt-1">अन्य कीवर्ड से खोजें या ट्रेंडिंग सुझाव देखें।</p>
+          </div>
         )}
+
+        {(() => {
+          const telemetryCount = data?.telemetryTruth?.matchedEntities ?? data?.telemetry?.matchedEntities ?? 0;
+          return !isLoading && telemetryCount > 0 ? (
+            <p className="text-sm text-gray-300 mb-3">
+              Found {telemetryCount} results in {district?.name || "Shahdol"}
+            </p>
+          ) : null;
+        })()}
 
         {(() => {
           const safeResults = Array.isArray(data?.results) ? data.results : [];

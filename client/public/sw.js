@@ -1,13 +1,14 @@
-// 🚀 STRIKE 104: Cache Exorcism - Service Worker with Dynamic Versioning
-// Version: Dynamic (v + Date.now())
-const CACHE_NAME = 'shahdolbazaar-v' + Date.now();
+// 🚀 BharatOS Production Service Worker
+// Version: Stable Semantic Release
+const CACHE_VERSION = 'v1.1.0';
+const CACHE_NAME = `shahdolbazaar-${CACHE_VERSION}`;
 
 // 🚨 DEVELOPMENT MODE DETECTION
 const isDev = self.location.hostname === 'localhost' || 
              self.location.hostname === '127.0.0.1' ||
              self.location.hostname.includes('localhost');
 
-console.log('[SW] 🚀 STRIKE 104 - Cache Exorcism Active');
+console.log('[SW] 🚀 BharatOS Service Worker Active');
 console.log('[SW] Mode:', isDev ? 'DEVELOPMENT' : 'PRODUCTION');
 console.log('[SW] Cache Version:', CACHE_NAME);
 
@@ -24,13 +25,12 @@ const ASSETS_TO_CACHE = isDev ? [] : [
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
   
-  // 🚨 DEVELOPMENT: Skip waiting, activate immediately
   if (isDev) {
     console.log('[SW] 🚨 DEV MODE: Skipping wait, activating immediately');
     return self.skipWaiting();
   }
   
-  // Production: Cache assets
+  // Production: Pre-cache basic static assets
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -82,7 +82,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - Network-First with No-Store for Critical Resources
+// Fetch event
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') {
@@ -91,15 +91,9 @@ self.addEventListener('fetch', (event) => {
 
   // 🚨 DEVELOPMENT MODE: Always use network, no caching
   if (isDev) {
-    console.log('[SW] 🚨 DEV MODE: Bypassing cache for:', event.request.url);
     event.respondWith(
       fetch(event.request)
-        .then(response => {
-          // Clone and return fresh response
-          return response;
-        })
         .catch(() => {
-          // ✅ Fallback: If network fails, return a proper empty Response object
           return new Response(JSON.stringify({ success: false, message: "Offline" }), {
             headers: { 'Content-Type': 'application/json' }
           });
@@ -108,95 +102,124 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // PRODUCTION MODE: Network-First with Stale-While-Revalidate
-  // Skip API requests (always use network) - /api and /api/ai both
+  // 🛡️ API Requests: NEVER intercept, always pass through to network
   if (event.request.url.includes('/api/')) {
     return;
   }
 
-  // Skip external requests
+  // Skip external cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
-  // 🚨 CRITICAL FIX: Use no-store for JS/HTML to always get fresh content
-  const isCriticalResource = 
-    event.request.url.includes('.js') || 
-    event.request.url.includes('.html') ||
-    event.request.url.includes('/src/');
-
-  if (isCriticalResource) {
-    console.log('[SW] 🔥 CRITICAL: Fetching fresh for:', event.request.url);
+  // 🌐 1. SPA NAVIGATION REQUESTS: Network-First with /index.html fallback
+  const isNavigation = event.request.mode === 'navigate' || event.request.destination === 'document';
+  if (isNavigation) {
     event.respondWith(
-      fetch(event.request, { cache: 'no-store' })
+      fetch(event.request)
         .then((response) => {
-          // Clone the response
-          const responseToCache = response.clone();
-          
-          // Cache the fresh response
-          if (response.status === 200) {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
             });
           }
-          
           return response;
         })
-        .catch(() => {
-          // Network failed - try cache
-          return caches.match(event.request).then((cachedResponse) => {
-            if (cachedResponse) {
-              console.log('[SW] 📦 Serving from cache:', event.request.url);
-              return cachedResponse;
-            }
-            
-            // If no cache and it's a navigation request, return index.html
-            if (event.request.destination === 'document') {
-              return caches.match('/index.html');
-            }
-            
-            return new Response('Offline', {
-              status: 503,
-              statusText: 'Service Unavailable',
-              headers: { 'Content-Type': 'text/plain' }
-            });
+        .catch(async () => {
+          console.warn('[SW] Navigation failed, attempting offline cache fallback for:', event.request.url);
+          const cachedDoc = await caches.match(event.request);
+          if (cachedDoc) return cachedDoc;
+
+          const cachedIndex = await caches.match('/index.html') || await caches.match('/');
+          if (cachedIndex) return cachedIndex;
+
+          return new Response('Offline - BharatOS', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' }
           });
         })
     );
     return;
   }
 
-  // Non-critical resources: Stale-While-Revalidate
+  // ⚡ 2. CRITICAL ASSETS (JS, CSS, HTML, Source): Network-First
+  const isCriticalResource = 
+    event.request.url.includes('.js') || 
+    event.request.url.includes('.css') ||
+    event.request.url.includes('.html') ||
+    event.request.url.includes('/src/');
+
+  if (isCriticalResource) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .then((response) => {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cachedResponse = await caches.match(event.request);
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return new Response('Offline', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        })
+    );
+    return;
+  }
+
+  // 📦 3. NON-CRITICAL STATIC ASSETS (Images, Fonts, Manifest): Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request)
-      .then((cachedResponse) => {
-        // Return cached immediately if available
+      .then(async (cachedResponse) => {
         if (cachedResponse) {
-          console.log('[SW] 📦 Cached:', event.request.url);
-          // Also fetch fresh in background
+          // Revalidate in background
           fetch(event.request)
-            .then((response) => {
-              if (response.status === 200) {
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
                 caches.open(CACHE_NAME).then((cache) => {
-                  cache.put(event.request, response);
+                  cache.put(event.request, networkResponse);
                 });
               }
             })
             .catch(() => {});
           return cachedResponse;
         }
-        
+
         // Not cached - fetch from network
-        return fetch(event.request)
-          .then((response) => {
-            const responseToCache = response.clone();
-            if (response.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-            }
-            return response;
+        try {
+          const networkResponse = await fetch(event.request);
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        } catch (fetchErr) {
+          return new Response('Offline', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' }
           });
+        }
+      })
+      .catch(() => {
+        return new Response('Offline', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'text/plain' }
+        });
       })
   );
 });

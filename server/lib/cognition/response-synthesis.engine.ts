@@ -3,7 +3,7 @@
 
 export const ENGINE_VERSION = "1.0.0";
 
-import { getGroq } from '../../middleware/groq';
+import { getGroq, DEFAULT_MODEL } from '../../middleware/groq';
 
 const SYNTHESIS_STRATEGIES: Record<string, { tone: string; constraints?: string; prefix: string; maxWords?: number }> = {
   EMERGENCY: {
@@ -216,7 +216,7 @@ Rules:
 `;
 
       const groqCall = groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: DEFAULT_MODEL,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.4,
         max_tokens: 120

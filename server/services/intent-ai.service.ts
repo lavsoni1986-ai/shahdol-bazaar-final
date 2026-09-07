@@ -3,7 +3,7 @@
  * Enhances rule-based parsing with AI understanding
  */
 
-import { getGroq } from "../middleware/groq";
+import { getGroq, DEFAULT_MODEL } from "../middleware/groq";
 import { DistrictManager } from "./district.manager";
 import { parseNaturalLanguage, IntentQuery } from "./intent.service";
 
@@ -48,7 +48,7 @@ Return ONLY JSON:
 
      const response = await groq.chat.completions.create({
        messages: [{ role: "user", content: prompt }],
-       model: "llama-3.3-70b-versatile",
+       model: DEFAULT_MODEL,
        temperature: 0.2,
        max_tokens: 200
      });

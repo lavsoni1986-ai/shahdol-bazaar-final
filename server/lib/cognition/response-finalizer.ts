@@ -56,6 +56,25 @@ export function finalizeCognitionResponse(res: Response, executionState: Cogniti
   // Ensure telemetry truth is included
   if (executionState.telemetry) {
     response.telemetry = executionState.telemetry;
+    response.telemetryTruth = executionState.telemetry;
+  }
+
+  // Attach grounded & ranked results for frontend UI display
+  if (!response.results && Array.isArray(executionState.allResults)) {
+    response.results = executionState.allResults.map((e: any) => ({
+      id: e.id || e.sourceId,
+      name: e.title || e.name || 'Local Partner',
+      title: e.title || e.name || 'Local Partner',
+      phone: e.phone || null,
+      address: e.address || null,
+      rating: e.meta?.rating ?? e.rating ?? 4.5,
+      reason: e.reason || e.subtitle || (e.relevanceScore ? `Relevance: ${Math.round(e.relevanceScore)}` : "Top match"),
+      entityType: e.entityType || 'SHOP',
+      dsslScore: e.dsslScore || 50,
+      image: e.image || e.logo || null,
+      isVerified: e.meta?.isVerified ?? e.isVerified ?? true,
+      meta: e.meta || {}
+    }));
   }
 
   // Add execution metadata

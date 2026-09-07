@@ -25,7 +25,7 @@
 import express, { type Request, type Response } from "express";
 import { requireAuth } from "../../auth/middleware";
 import { storage, prisma } from "../../storage";
-import { getGroq } from "../../middleware/groq";
+import { getGroq, DEFAULT_MODEL } from "../../middleware/groq";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
@@ -135,7 +135,7 @@ Respond ONLY with a JSON object in this exact format:
 If you cannot determine any field, use null. Do not add any explanation.`;
 
     const visionResponse = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: DEFAULT_MODEL,
       messages: [
         {
           role: "user",
@@ -363,7 +363,7 @@ Top Categories: ${categoryStats.map(c => `Category ${c.categoryId}(${c._count?.i
 Keep insights actionable and brief.`;
 
       const insightResponse = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: DEFAULT_MODEL,
         messages: [{ role: "user", content: insightPrompt }],
         temperature: 0.5,
         max_tokens: 256,
