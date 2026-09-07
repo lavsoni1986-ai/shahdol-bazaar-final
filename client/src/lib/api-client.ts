@@ -11,7 +11,11 @@
  * - { token: ... } (for login responses)
  */
 
-import { extractDistrictSlug, isReservedRoute, isValidDistrictSlug } from "@/shared/routing/reserved-routes";
+import {
+  extractDistrictSlug,
+  isRegisteredDistrictSlug,
+  DEFAULT_DISTRICT_SLUG,
+} from "@/shared/routing/reserved-routes";
 import { getCsrfToken } from "./csrf";
 
 function serializeBody(body?: any) {
@@ -22,10 +26,10 @@ function serializeBody(body?: any) {
 }
 
 export function resolveCanonicalDistrictSlug(): string {
-  if (typeof window === "undefined") return "shahdol";
+  if (typeof window === "undefined") return DEFAULT_DISTRICT_SLUG;
 
   const urlSlug = extractDistrictSlug(window.location.pathname);
-  if (urlSlug && isValidDistrictSlug(urlSlug) && !isReservedRoute(urlSlug)) {
+  if (urlSlug && isRegisteredDistrictSlug(urlSlug)) {
     try {
       localStorage.setItem("districtSlug", urlSlug);
     } catch { }
@@ -34,17 +38,18 @@ export function resolveCanonicalDistrictSlug(): string {
 
   const savedSlug = localStorage.getItem("districtSlug");
   if (savedSlug) {
-    if (!isReservedRoute(savedSlug) && isValidDistrictSlug(savedSlug)) {
+    if (isRegisteredDistrictSlug(savedSlug)) {
       return savedSlug;
     }
-    // Clean up corrupted or reserved slugs stored previously
+    // Clean up corrupted, stale, or non-registered slugs stored previously
     try {
       localStorage.removeItem("districtSlug");
     } catch { }
   }
 
-  return "shahdol";
+  return DEFAULT_DISTRICT_SLUG;
 }
+
 
 /**
  * SOVEREIGN: Check if a response is valid
@@ -75,11 +80,11 @@ export function normalizeApiUrl(baseUrl: string, endpoint: string): string {
     }
     return endpoint;
   }
-  
+
   // Otherwise resolve relative to baseUrl
   const cleanBase = (baseUrl || "").trim().replace(/\/+$/, "");
   const cleanEndpoint = endpoint.trim().replace(/^\/*(api\/+)*/, "");
-  
+
   let resolvedBase = cleanBase;
   if (!resolvedBase) {
     if (typeof window !== "undefined") {
@@ -88,14 +93,14 @@ export function normalizeApiUrl(baseUrl: string, endpoint: string): string {
       resolvedBase = "";
     }
   }
-  
+
   let apiPath = resolvedBase;
   if (apiPath && !apiPath.endsWith("/api") && !apiPath.includes("/api/")) {
     apiPath = `${apiPath}/api`;
   } else if (!apiPath) {
     apiPath = "/api";
   }
-  
+
   const finalUrl = `${apiPath}/${cleanEndpoint}`;
   const protocolMatch = finalUrl.match(/^https?:\/\//i);
   if (protocolMatch) {
@@ -103,13 +108,13 @@ export function normalizeApiUrl(baseUrl: string, endpoint: string): string {
     const rest = finalUrl.slice(protocol.length);
     return protocol + rest.replace(/\/+/g, "/");
   }
-  
+
   return finalUrl.replace(/\/+/g, "/");
 }
 
 export async function apiRequest(
-  method: string, 
-  endpoint: string, 
+  method: string,
+  endpoint: string,
   body?: any,
   options?: { signal?: AbortSignal; headers?: Record<string, string> }
 ) {

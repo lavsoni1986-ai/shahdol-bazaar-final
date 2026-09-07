@@ -4,33 +4,30 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { District, DistrictContextContract, validateContract, CONTRACT_VALIDATION_RULES } from '@shared/contracts';
-import { extractDistrictSlug, isReservedRoute, isValidDistrictSlug } from '@/shared/routing/reserved-routes';
+import {
+  extractDistrictSlug,
+  isRegisteredDistrictSlug,
+  DEFAULT_DISTRICT_SLUG,
+  getDistrictIdFromRegisteredSlug,
+  type RegisteredDistrictSlug,
+} from '@/shared/routing/reserved-routes';
 
 const DistrictContext = createContext<DistrictContextContract | undefined>(undefined);
 
 export function getDistrictIdFromSlug(slug: string): number {
-  switch (slug.toLowerCase()) {
-    case "shahdol":
-      return 1;
-    case "anuppur":
-      return 2;
-    case "umaria":
-      return 3;
-    default:
-      return 1;
-  }
+  return getDistrictIdFromRegisteredSlug(slug);
 }
 
 /**
  * Canonical district slug resolver
  * Uses centralized extractDistrictSlug() from @/shared/routing/reserved-routes.
- * Guaranteed to never return a reserved route ("auth", "login", etc.).
- * Preserves existing valid district context from localStorage or falls back to "shahdol".
+ * Guaranteed to ONLY return a registered active district ("shahdol", "anuppur", "umaria").
+ * Preserves existing valid district context from localStorage or falls back to DEFAULT_DISTRICT_SLUG ("shahdol").
  */
 export function resolveDistrictSlugFromPath(path: string): string {
   // 1. Try extracting district slug from URL path (e.g. /shahdol, /anuppur, /umaria)
   const urlSlug = extractDistrictSlug(path);
-  if (urlSlug && isValidDistrictSlug(urlSlug) && !isReservedRoute(urlSlug)) {
+  if (urlSlug && isRegisteredDistrictSlug(urlSlug)) {
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("districtSlug", urlSlug);
@@ -39,31 +36,33 @@ export function resolveDistrictSlugFromPath(path: string): string {
     return urlSlug;
   }
 
-  // 2. If path is a reserved route (e.g. /auth, /login) or root ("/"), preserve existing valid district
+  // 2. If path is a non-district route (e.g. /auth, /login, /healthcare) or root ("/"), preserve existing valid district
   if (typeof window !== "undefined") {
     try {
       const savedSlug = localStorage.getItem("districtSlug");
-      if (savedSlug && isValidDistrictSlug(savedSlug) && !isReservedRoute(savedSlug)) {
+      if (savedSlug && isRegisteredDistrictSlug(savedSlug)) {
         return savedSlug;
       }
-      // Purge invalid/reserved values if present in localStorage
-      if (savedSlug && (isReservedRoute(savedSlug) || !isValidDistrictSlug(savedSlug))) {
+      // Purge ANY non-registered, reserved, or poisoned value from localStorage
+      if (savedSlug && !isRegisteredDistrictSlug(savedSlug)) {
         localStorage.removeItem("districtSlug");
       }
     } catch {}
   }
 
   // 3. Canonical default fallback
-  return "shahdol";
+  return DEFAULT_DISTRICT_SLUG;
 }
 
 export function createDistrictObject(slug: string): District {
+  const safeSlug = isRegisteredDistrictSlug(slug) ? slug : DEFAULT_DISTRICT_SLUG;
   return {
-    id: getDistrictIdFromSlug(slug),
-    slug,
-    name: slug.charAt(0).toUpperCase() + slug.slice(1),
+    id: getDistrictIdFromSlug(safeSlug),
+    slug: safeSlug,
+    name: safeSlug.charAt(0).toUpperCase() + safeSlug.slice(1),
   };
 }
+
 
 export function DistrictProvider({ children }: { children: React.ReactNode }) {
   const [currentDistrict, setDistrict] = useState<District | null>(null);

@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/api-client";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { normalizeDistrictSnapshot, type CanonicalDistrictSnapshot } from "@/shared/api/response-normalizers";
 import { QUERY_KEYS, QUERY_CONFIG } from "@shared/query-governance";
-import { isReservedRoute, isValidDistrictSlug } from "@/shared/routing/reserved-routes";
+import { isRegisteredDistrictSlug } from "@/shared/routing/reserved-routes";
 
 export function useHomeSnapshot() {
   const { currentDistrict } = useDistrict();
@@ -19,9 +19,9 @@ export function useHomeSnapshot() {
   const hasValidDistrict = Boolean(
     currentDistrict?.id &&
     currentDistrict?.slug &&
-    !isReservedRoute(currentDistrict.slug) &&
-    isValidDistrictSlug(currentDistrict.slug)
+    isRegisteredDistrictSlug(currentDistrict.slug)
   );
+
 
   return useQuery({
     queryKey: QUERY_KEYS.district.homeSnapshot(currentDistrict?.id || 0),
