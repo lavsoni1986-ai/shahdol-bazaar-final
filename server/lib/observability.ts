@@ -2,6 +2,7 @@
 // Structured logging for cognition operations and system health
 
 import { createDomainError } from "./errors";
+import type { Request, Response, NextFunction } from "express";
 
 // Cognition operation log structure
 export interface CognitionLogEntry {
@@ -98,4 +99,27 @@ export function logCognitionFailure(operation: string, error: string, data: Part
 export function logApiCall(endpoint: string, method: string, startTime: number, success: boolean, error?: string): void {
   const duration = Date.now() - startTime;
   cognitionLogger.logApiOperation(endpoint, method, duration, success, error);
+}
+
+/**
+ * Telemetry middleware for HTTP requests
+ * Logs API duration, method, endpoint, and status to the observability layer.
+ */
+export function telemetryMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const startTime = Date.now();
+  res.on("finish", () => {
+    const isSuccess = res.statusCode < 400;
+    const errorMsg = isSuccess ? undefined : `HTTP_${res.statusCode}`;
+    logApiCall(req.originalUrl || req.url, req.method, startTime, isSuccess, errorMsg);
+  });
+  next();
+}
+
+/**
+ * Route time tracking middleware
+ * Attaches request start time to the request object for diagnostic profiling.
+ */
+export function routeTimeTracker(req: Request, _res: Response, next: NextFunction): void {
+  (req as any)._startTime = Date.now();
+  next();
 }

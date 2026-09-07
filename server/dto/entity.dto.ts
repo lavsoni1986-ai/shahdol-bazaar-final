@@ -256,6 +256,18 @@ export type EntityListResponse = z.infer<typeof entityListResponseSchema>;
 // MAPPERS: Convert DB models to DTO
 // ============================================
 
+function isValidImageUrl(url?: string | null): boolean {
+    if (!url || typeof url !== "string") return false;
+    const trimmed = url.trim();
+    return (
+        trimmed.startsWith("https://") ||
+        trimmed.startsWith("http://") ||
+        trimmed.startsWith("//") ||
+        trimmed.startsWith("data:") ||
+        trimmed.startsWith("/")
+    );
+}
+
 function normalizeNonEmptyString(value: any): string {
     if (typeof value !== "string") return "";
     return value.trim();
@@ -321,7 +333,9 @@ export async function mapVendorToDTO(vendor: any, include?: any): Promise<Vendor
         districtId: vendor.districtId,
         address: vendor.address,
         phone: vendor.phone || vendor.mobile,
-        logo: vendor.logo,
+        logo: isValidImageUrl(vendor.logo)
+            ? vendor.logo
+            : (Array.isArray(vendor.images) && vendor.images.length > 0 && isValidImageUrl(vendor.images[0]) ? vendor.images[0] : null),
         images: vendor.images || [],
         isVerified: verified,
         trustScore: vendor.trustScore ?? vendor.dsslScore,

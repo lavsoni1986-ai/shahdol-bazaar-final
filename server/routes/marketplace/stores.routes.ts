@@ -25,6 +25,18 @@ import { EntityResolutionFailure } from "../../services/entity-resolution/types"
 
 const router = express.Router();
 
+function isValidImageUrl(url?: string | null): boolean {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim();
+  return (
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("//") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("/")
+  );
+}
+
 // 🧠 AI EXPLANATION ENGINE
 function explainVendorRanking(vendor: any) {
   const reasons = [];
@@ -120,6 +132,19 @@ function adaptDiscoveryHomePayload(feed: any[]) {
 // 🏪 MERCHANT LISTINGS
 // ============================================
 
+// --- MARKETPLACE ROOT (Health & Discovery Overview) ---
+router.get("/", (req: Request, res: Response) => {
+  return success(res, {
+    status: "online",
+    service: "BharatOS Marketplace API",
+    endpoints: {
+      stores: "/api/marketplace/stores",
+      products: "/api/marketplace/products",
+      homeSnapshot: "/api/marketplace/home-snapshot"
+    }
+  });
+});
+
 // --- HOME SNAPSHOT (PSR FRONT PAGE FEED) ---
 router.get("/home-snapshot", safe(async (req: Request, res: Response) => {
   const districtId = req.ctx?.districtId || 1; // Default to Shahdol (id: 1) when tenant resolution bypassed
@@ -186,18 +211,24 @@ router.get("/stores", validateQuery(storesQueryDTO), async (req: Request, res: R
         take: Number(limit) || 20
       });
 
-      stores = directVendors.map((v) => ({
-        sourceId: v.id,
-        title: v.name,
-        slug: v.slug,
-        image: v.logo,
-        subtitle: v.category,
-        address: v.address,
-        phone: v.mobile || v.phone,
-        isSponsored: !!(v.boostedUntil && new Date(v.boostedUntil) > new Date()),
-        dsslScore: v.dsslScore,
-        rankScore: v.aiRankScore || v.dsslScore || 50
-      }));
+      stores = directVendors.map((v) => {
+        const primaryImage = isValidImageUrl(v.logo)
+          ? v.logo
+          : (Array.isArray(v.images) && v.images.length > 0 && isValidImageUrl(v.images[0]) ? v.images[0] : null);
+        return {
+          sourceId: v.id,
+          title: v.name,
+          slug: v.slug,
+          image: primaryImage,
+          images: v.images || [],
+          subtitle: v.category,
+          address: v.address,
+          phone: v.mobile || v.phone,
+          isSponsored: !!(v.boostedUntil && new Date(v.boostedUntil) > new Date()),
+          dsslScore: v.dsslScore,
+          rankScore: v.aiRankScore || v.dsslScore || 50
+        };
+      });
     }
 
     const limitedStores = stores.slice(0, Number(limit) || 20);
@@ -215,6 +246,7 @@ router.get("/stores", validateQuery(storesQueryDTO), async (req: Request, res: R
         slug: store.slug,
         logo: store.image,
         image: store.image,
+        images: store.meta?.images || store.images || [],
         category: store.subtitle,
         address: store.address,
         phone: store.phone,

@@ -25,6 +25,7 @@ interface StoreData {
   imageUrl?: string | null;
   image?: string | null;
   logo?: string | null;
+  images?: string[] | null;
   category?: string | { name: string } | null;
   businessType?: string;
   isSponsored?: boolean;

@@ -36,6 +36,7 @@ export interface StoreCardData {
     imageUrl?: string | null;
     image?: string | null;
     logo?: string | null;
+    images?: string[] | null;
     category?: string | { name: string } | null;
     businessType?: string;
     isSponsored?: boolean;
@@ -64,12 +65,30 @@ interface SovereignStoreCardProps {
 
 // ─── HELPERS ──────────────────────────────────────────────
 
+function isValidImageUrl(url?: string | null): boolean {
+    if (!url || typeof url !== "string") return false;
+    const trimmed = url.trim();
+    return (
+        trimmed.startsWith("https://") ||
+        trimmed.startsWith("http://") ||
+        trimmed.startsWith("//") ||
+        trimmed.startsWith("data:") ||
+        trimmed.startsWith("/")
+    );
+}
+
 function getStoreName(data: StoreCardData): string {
     return data.name || data.shopName || "Store";
 }
 
 function getStoreImage(data: StoreCardData): string | null {
-    return data.logo || data.imageUrl || data.image || null;
+    if (isValidImageUrl(data.logo)) return data.logo!;
+    if (isValidImageUrl(data.imageUrl)) return data.imageUrl!;
+    if (isValidImageUrl(data.image)) return data.image!;
+    if (Array.isArray(data.images) && data.images.length > 0 && isValidImageUrl(data.images[0])) {
+        return data.images[0];
+    }
+    return null;
 }
 
 function getCategoryLabel(category: string | { name: string } | undefined | null, businessType?: string): string {
