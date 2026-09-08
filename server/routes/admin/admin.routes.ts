@@ -1129,4 +1129,49 @@ router.get("/vendors/:id/history", requireAuth, requireCityAdmin, async (req: Re
   }
 });
 
+// --- ADMIN: GET ORDERS (Governance Overview) ---
+router.get("/orders", requireAuth, requireCityAdmin, async (req: Request, res: Response) => {
+  try {
+    const isSuperAdmin = req.ctx?.role === "SUPER_ADMIN";
+    const districtId = req.ctx?.districtId;
+
+    const where: any = {};
+    if (isSuperAdmin) {
+      if (districtId) {
+        where.districtId = districtId;
+      }
+      // If districtId is null/undefined, where remains empty => global visibility for SUPER_ADMIN
+    } else {
+      // CITY_ADMIN: strictly requires valid district assignment
+      if (!districtId) {
+        return res.status(403).json({ success: false, error: "District assignment required" });
+      }
+      where.districtId = districtId;
+    }
+
+    const orders = await prisma.order.findMany({
+      where,
+      take: 200,
+      orderBy: { id: "desc" },
+      select: {
+        id: true,
+        customerName: true,
+        totalPrice: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        orders,
+      },
+    });
+  } catch (e) {
+    console.error("Admin orders fetch error:", e);
+    return res.status(500).json({ success: false, error: "Failed to fetch admin orders" });
+  }
+});
+
 export default router;

@@ -22,12 +22,14 @@ export default function OrdersPanel() {
   }, []);
 
   const loadOrders = async () => {
-      try {
-        setLoading(true);
-        const res = await apiRequest("GET", "/orders?includeAll=true");
-        const list = safeData<Order[]>(res, []);
-        setOrders(Array.isArray(list) ? list : []);
-      } catch (err) {
+    try {
+      setLoading(true);
+      const res = await apiRequest("GET", "/admin/orders");
+      const list = Array.isArray(res?.data?.orders)
+        ? res.data.orders
+        : safeData<Order[]>(res, []);
+      setOrders(Array.isArray(list) ? list : []);
+    } catch (err) {
       console.error("Failed to load orders:", err);
     } finally {
       setLoading(false);
