@@ -73,7 +73,7 @@ const AIExplainerDashboard: React.FC = () => {
         <div className="flex items-center space-x-2">
           <Brain className="h-8 w-8 text-blue-600" />
           <Badge variant="secondary" className="text-sm">
-            System Health: {systemHealth?.accuracy ?? 0}%
+            System Health: {systemHealth?.status === 'healthy' ? '100% Operational' : (systemHealth?.status || 'Unknown')}
           </Badge>
         </div>
       </div>
@@ -89,7 +89,9 @@ const AIExplainerDashboard: React.FC = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{systemHealth?.accuracy ?? 0}%</div>
+              <div className="text-2xl font-bold text-green-600">
+                {systemHealth?.status === 'healthy' ? '100%' : (systemHealth?.status === 'degraded' ? 'Degraded' : 'Active')}
+              </div>
               <div className="text-sm text-gray-600">System Health</div>
             </div>
             <div className="text-center">

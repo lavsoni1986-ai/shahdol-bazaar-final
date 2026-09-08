@@ -146,28 +146,60 @@ router.get("/user-intelligence-summary", requireAuth, requireSuperAdmin, async (
 // --- ACTIVITY FEED ---
 router.get("/activity-feed", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
   try {
-    // Route is guarded by `requireSuperAdmin`, so district scoping is always global here.
-    // Keep `where` typed as an empty object to satisfy Prisma model-specific where inputs.
-    const districtFilter = {};
+    // District scoping: if admin request carries district context, filter by districtId, otherwise allow global
+    const districtFilter = req.ctx?.districtId ? { districtId: req.ctx.districtId } : {};
 
-    const recentOrders = await prisma.order.findMany({
+    // Canonical modern commerce model: SovereignOrder
+    const recentSovereignOrders = await prisma.sovereignOrder.findMany({
       where: districtFilter,
       take: 10,
       orderBy: { id: 'desc' },
+      include: {
+        items: {
+          take: 1,
+          include: {
+            product: {
+              select: {
+                id: true,
+                title: true,
+                vendorId: true,
+                vendor: { select: { id: true, name: true } }
+              }
+            }
+          }
+        }
+      }
     });
 
-    // Resolve vendor names explicitly (Order model exposes `vendorId` but not a typed `vendor` relation here)
-    const vendorIds = Array.from(new Set(recentOrders.map(o => o.vendorId).filter((id): id is number => typeof id === "number")));
-    const vendorsById = vendorIds.length
-      ? new Map((await prisma.vendor.findMany({ where: { id: { in: vendorIds } }, select: { id: true, name: true } })).map(v => [v.id, v.name]))
-      : new Map<number, string>();
-    const recentVendors = await prisma.vendor.findMany({
+    const recentOrders = recentSovereignOrders.map((o) => {
+      const firstItem = o.items?.[0];
+      const vendorName = firstItem?.product?.vendor?.name || undefined;
+      const amountInRupees = typeof o.totalAmountPaisa === 'number' ? o.totalAmountPaisa / 100 : 0;
+
+      return {
+        id: o.id,
+        amount: amountInRupees,
+        status: o.status,
+        customer: o.customerName || "Customer",
+        vendor: vendorName,
+        createdAt: o.createdAt
+      };
+    });
+
+    const recentVendorsRaw = await prisma.vendor.findMany({
       where: districtFilter,
       take: 5,
       orderBy: { id: 'desc' as const },
       select: { id: true, name: true, status: true }
     });
-    // Generate mock chart data for dashboard (since we may not have real time series data yet)
+
+    const recentVendors = recentVendorsRaw.map((v, index) => ({
+      type: "vendor",
+      message: `${v.name} vendor onboarded`,
+      time: new Date(Date.now() - index * 60000).toISOString()
+    }));
+
+    // Generate activity chart data for dashboard
     const chartData = [
       { name: 'Mon', vendors: 12, users: 45, fraud: 2 },
       { name: 'Tue', vendors: 15, users: 52, fraud: 1 },
@@ -181,24 +213,19 @@ router.get("/activity-feed", requireAuth, requireSuperAdmin, async (req: Request
     return res.json({
       success: true,
       data: {
-        recentOrders: recentOrders.map(o => ({
-          id: o.id,
-          amount: o.totalPrice,
-          status: o.status,
-          customer: o.customerName,
-          vendor: o.vendorId ? vendorsById.get(o.vendorId) : undefined,
-          createdAt: o.createdAt
-        })),
-        recentVendors: recentVendors.map((v, index) => ({
-          type: "vendor",
-          message: `${v.name} vendor onboarded`,
-          time: new Date(Date.now() - index * 60000).toISOString()
-        })),
+        recentOrders,
+        recentVendors,
         chartData
       }
     });
-  } catch (e) {
-    console.error("Activity feed error", e);
+  } catch (e: any) {
+    const errorDetails = {
+      name: e?.name || "UnknownError",
+      message: e?.message || String(e),
+      code: e?.code || undefined,
+      stack: e?.stack || undefined
+    };
+    console.error("Activity feed error:", JSON.stringify(errorDetails));
     return res.status(500).json({ success: false, error: "Failed to fetch activity feed" });
   }
 });
