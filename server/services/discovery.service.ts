@@ -317,8 +317,18 @@ function mapDoctor(d: any, sovereignMetadata?: any): DiscoveryEntity {
 =========================== */
 
 export async function getUnifiedDiscoveryFeed(districtId: number): Promise<DiscoveryEntity[]> {
+  const tBatch = performance.now();
+
+  const timedQuery = async <T>(name: string, fn: () => Promise<T>, fallback: T): Promise<T> => {
+    const t0 = performance.now();
+    const res = await safeQuery(fn, fallback);
+    console.log(`[PERF] discovery ${name}=${Math.round(performance.now() - t0)}ms`);
+    return res;
+  };
+
   const [vendors, products, hospitals, schools, workers, doctors, buses] = await Promise.all([
-    safeQuery(
+    timedQuery(
+      "vendors",
       () =>
         prisma.vendor.findMany({
           where: {
@@ -332,7 +342,8 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
       []
     ),
 
-    safeQuery(
+    timedQuery(
+      "products",
       () =>
         prisma.product.findMany({
           where: {
@@ -355,7 +366,8 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
     ),
 
     // Hospitals now from Vendor table
-    safeQuery(
+    timedQuery(
+      "healthcare",
       () =>
         prisma.vendor.findMany({
           where: {
@@ -371,7 +383,8 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
     ),
 
     // Schools now from Vendor table
-    safeQuery(
+    timedQuery(
+      "schools",
       () =>
         prisma.vendor.findMany({
           where: {
@@ -386,7 +399,8 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
     ),
 
     // Services now from Vendor table
-    safeQuery(
+    timedQuery(
+      "services",
       () =>
         prisma.vendor.findMany({
           where: {
@@ -400,7 +414,8 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
       []
     ),
 
-    safeQuery(
+    timedQuery(
+      "doctors",
       () =>
         prisma.doctor.findMany({
           where: {
@@ -419,7 +434,8 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
       []
     ),
 
-    safeQuery(
+    timedQuery(
+      "buses",
       () =>
         prisma.busTimetable.findMany({
           where: {
@@ -434,6 +450,8 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
 
   ]);
 
+  console.log(`[PERF] discovery batch=${Math.round(performance.now() - tBatch)}ms`);
+
   // Data governance: audit missing vendor names (never blocks feed)
   await Promise.all([
     ...vendors.map(v => auditMissingVendorName(v)),
@@ -443,6 +461,7 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
     ...doctors.map(d => auditMissingVendorName(d?.vendor)),
   ]);
 
+  const tMeta = performance.now();
   // Entity Hydration Layer v2: cast thin DB data into rich sovereign metadata contracts
   const [vendorMetaPairs, hospitalMetaPairs, doctorMetaPairs] = await Promise.all([
     Promise.all(vendors.map(async v => {
@@ -452,6 +471,7 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
     Promise.all(hospitals.map(async h => [h.id, await hydrateHospitalMetadata(h)] as const)),
     Promise.all(doctors.map(async d => [d.id, await hydrateDoctorMetadata({ doctor: d, vendor: d.vendor })] as const)),
   ]);
+  console.log(`[PERF] metadata-batch=${Math.round(performance.now() - tMeta)}ms`);
 
   const vendorMetadataById = new Map<number, any>(vendorMetaPairs as any);
   const hospitalMetadataById = new Map<number, any>(hospitalMetaPairs as any);

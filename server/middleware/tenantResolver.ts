@@ -89,7 +89,9 @@ export const tenantResolver = async (req: Request, res: Response, next: NextFunc
       });
     }
 
+    const t0 = performance.now();
     const district = await findDistrictBySlug(String(slug));
+    console.log(`[PERF] tenant-lookup=${Math.round(performance.now() - t0)}ms`);
 
     if (!district || !district.isActive) {
       return res.status(404).json({

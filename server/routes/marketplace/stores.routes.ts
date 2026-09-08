@@ -147,10 +147,13 @@ router.get("/", (req: Request, res: Response) => {
 
 // --- HOME SNAPSHOT (PSR FRONT PAGE FEED) ---
 router.get("/home-snapshot", safe(async (req: Request, res: Response) => {
+  const t0 = performance.now();
   const districtId = req.ctx?.districtId || 1; // Default to Shahdol (id: 1) when tenant resolution bypassed
 
   const feed = await getTopDiscoveryPicks(districtId, 42);
   const adapted = adaptDiscoveryHomePayload(feed);
+
+  console.log(`[PERF] home-snapshot handler=${Math.round(performance.now() - t0)}ms`);
 
   return success(res, adapted, {
     source: "PSR_DISCOVERY_ENGINE",

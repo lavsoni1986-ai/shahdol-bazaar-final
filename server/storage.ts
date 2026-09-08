@@ -192,7 +192,12 @@ const extendedPrisma = prismaRaw.$extends({
           }
         }
 
+        const t0 = performance.now();
         const result = await query(args);
+        const queryDuration = performance.now() - t0;
+        if (queryDuration > 100) {
+          console.log(`[PERF] prisma-slow model=${model} operation=${operation} duration=${Math.round(queryDuration)}ms`);
+        }
 
         // Background audit logging for write operations (non-blocking)
         if (writeOperations.includes(operation) && !shouldSkipAudit(model)) {
