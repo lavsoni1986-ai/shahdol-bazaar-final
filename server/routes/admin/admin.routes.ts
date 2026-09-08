@@ -5,6 +5,7 @@ import { requireAuth, requireRole, requireSuperAdmin, requireCityAdmin } from ".
 import { storage, prisma } from "../../storage";
 import { success, failure, unauthorized, notFound, forbidden, serverError, validationError } from "../../lib/apiResponse";
 import { SystemLockdown } from "../../services/system.health";
+import { buildVendorSearchText } from "../../../shared/cognition/entity-search-indexing";
 
 const router = express.Router();
 
@@ -273,6 +274,177 @@ router.get("/vendors", requireAuth, requireCityAdmin, async (req: Request, res: 
   } catch (e) {
     console.error("Vendors fetch error", e);
     return res.status(500).json({ success: false, error: "Failed to fetch vendors" });
+  }
+});
+
+// --- CREATE NEW VENDOR ---
+router.post("/vendors", requireAuth, requireCityAdmin, adminActionLimiter, async (req: Request, res: Response) => {
+  try {
+    if (!req.ctx?.userId) {
+      return res.status(401).json(unauthorized("Authentication required"));
+    }
+
+    const rawName = typeof req.body.name === "string" ? req.body.name.trim() : "";
+    if (!rawName || rawName.length < 2 || rawName.length > 100) {
+      return res.status(400).json(validationError([{
+        field: "name",
+        message: "Vendor name is required and must be between 2 and 100 characters",
+        code: "INVALID_NAME"
+      }]));
+    }
+
+    const rawCategory = typeof req.body.category === "string" ? req.body.category.trim().toUpperCase() : "GROCERY";
+    const category = rawCategory.length > 0 ? rawCategory : "GROCERY";
+
+    // DSSL Score: frontend sends 0-10 scale (step 0.1, default 5.0) -> map to internal 0-100 integer scale
+    let dsslScore = 50;
+    if (req.body.initialScore !== undefined && req.body.initialScore !== null) {
+      const parsed = Number(req.body.initialScore);
+      if (isNaN(parsed) || parsed < 0) {
+        return res.status(400).json(validationError([{
+          field: "initialScore",
+          message: "Initial score must be a non-negative number",
+          code: "INVALID_SCORE"
+        }]));
+      }
+      if (parsed <= 10) {
+        dsslScore = Math.round(parsed * 10);
+      } else if (parsed <= 100) {
+        dsslScore = Math.round(parsed);
+      } else {
+        return res.status(400).json(validationError([{
+          field: "initialScore",
+          message: "Initial score must not exceed 100 (or 10.0 on 0-10 scale)",
+          code: "SCORE_OUT_OF_RANGE"
+        }]));
+      }
+    }
+    dsslScore = Math.max(0, Math.min(100, dsslScore));
+
+    // District Authorization Semantics:
+    // SUPER_ADMIN selected-district: req.ctx.districtId exists -> use it
+    // SUPER_ADMIN global mode: req.ctx.districtId is null/undefined -> target district MUST be explicitly provided in req.body.districtId
+    // CITY_ADMIN: strictly locked to req.ctx.districtId; ignores any req.body.districtId
+    const isSuperAdmin = req.ctx?.role === "SUPER_ADMIN";
+    let targetDistrictId: number | null = null;
+
+    if (isSuperAdmin) {
+      if (req.ctx?.districtId !== null && req.ctx?.districtId !== undefined) {
+        targetDistrictId = Number(req.ctx.districtId);
+      } else if (req.body.districtId !== null && req.body.districtId !== undefined) {
+        const parsed = Number(req.body.districtId);
+        if (!isNaN(parsed) && parsed > 0) {
+          targetDistrictId = parsed;
+        }
+      }
+
+      if (!targetDistrictId) {
+        return res.status(400).json({
+          success: false,
+          error: "Target district is required for vendor creation in global mode"
+        });
+      }
+    } else {
+      if (!req.ctx?.districtId) {
+        return res.status(403).json({
+          success: false,
+          error: "District assignment required for city admin"
+        });
+      }
+      targetDistrictId = Number(req.ctx.districtId);
+    }
+
+    // Validate target district exists and is active
+    const district = await prisma.district.findUnique({
+      where: { id: targetDistrictId },
+      select: { id: true, name: true, slug: true, isActive: true }
+    });
+
+    if (!district || !district.isActive) {
+      return res.status(400).json({
+        success: false,
+        error: "Target district not found or inactive"
+      });
+    }
+
+    // Safe slug generation with Unicode / Hindi name support and collision handling
+    let baseSlug = rawName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+
+    if (!baseSlug || baseSlug.length < 2) {
+      baseSlug = `vendor-${Date.now().toString(36)}`;
+    }
+
+    let slug = baseSlug;
+    let counter = 1;
+    while (true) {
+      const existing = await prisma.vendor.findFirst({
+        where: {
+          districtId: targetDistrictId,
+          slug
+        },
+        select: { id: true }
+      });
+      if (!existing) {
+        break;
+      }
+      counter++;
+      slug = `${baseSlug}-${counter}`;
+    }
+
+    // Search text generation
+    const searchText = buildVendorSearchText({
+      name: rawName,
+      category,
+      businessType: "RETAIL",
+      districtId: targetDistrictId
+    });
+
+    const newVendor = await prisma.vendor.create({
+      data: {
+        name: rawName,
+        slug,
+        category,
+        businessType: "RETAIL",
+        status: "APPROVED",
+        isShadowBanned: false,
+        dsslScore,
+        districtId: targetDistrictId,
+        images: [],
+        specialties: [],
+        safetyBadges: ["new-vendor"],
+        searchText
+      }
+    });
+
+    // Audit log — defensive try/catch ensures audit failure does not crash response
+    try {
+      await prisma.adminActionLog.create({
+        data: {
+          adminId: req.ctx.userId,
+          action: "VENDOR_CREATED",
+          details: {
+            targetId: newVendor.id,
+            targetType: "vendor",
+            decision: "CREATED",
+            reason: `Admin created vendor "${newVendor.name}"`,
+            districtId: targetDistrictId
+          }
+        }
+      });
+    } catch (auditErr) {
+      console.error("[AUDIT_FAIL] VENDOR_CREATED:", auditErr);
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: newVendor
+    });
+  } catch (e) {
+    console.error("Vendor creation error", e);
+    return res.status(500).json(serverError("Failed to create vendor"));
   }
 });
 

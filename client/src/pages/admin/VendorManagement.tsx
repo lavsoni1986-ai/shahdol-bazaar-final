@@ -178,7 +178,8 @@ export default function VendorManagement() {
                 createVendorMutation.mutate({
                   name: vendorName,
                   category,
-                  initialScore
+                  initialScore,
+                  districtId
                 });
               }}
               className="space-y-4"
