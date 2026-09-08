@@ -154,16 +154,25 @@ router.get("/activity-feed", requireAuth, requireSuperAdmin, async (req: Request
       where: districtFilter,
       take: 10,
       orderBy: { id: 'desc' },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        customerName: true,
+        totalAmountPaisa: true,
+        createdAt: true,
         items: {
           take: 1,
-          include: {
+          select: {
             product: {
               select: {
                 id: true,
                 title: true,
-                vendorId: true,
-                vendor: { select: { id: true, name: true } }
+                vendor: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
               }
             }
           }
