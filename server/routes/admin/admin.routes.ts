@@ -294,6 +294,7 @@ router.patch("/vendors/:id/status", requireAuth, requireCityAdmin, async (req: R
       return res.status(400).json(validationError([{ field: "status", message: "Invalid status", code: "INVALID_STATUS" }]));
     }
 
+    const isSuperAdmin = req.ctx?.role === "SUPER_ADMIN";
     const districtId = req.ctx?.districtId;
     const existingVendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
 
@@ -301,9 +302,19 @@ router.patch("/vendors/:id/status", requireAuth, requireCityAdmin, async (req: R
       return res.status(404).json(notFound("Vendor"));
     }
 
-    // Ensure vendor belongs to user's district
-    if (existingVendor.districtId !== districtId) {
-      return res.status(403).json(forbidden("Access denied - vendor not in your district"));
+    // District authorization semantics:
+    // SUPER_ADMIN: global if districtId is null/undefined; district-scoped if districtId is provided
+    // CITY_ADMIN: strictly requires matching districtId
+    if (isSuperAdmin) {
+      if (districtId !== null && districtId !== undefined) {
+        if (existingVendor.districtId !== districtId) {
+          return res.status(403).json(forbidden("Access denied - vendor not in your district"));
+        }
+      }
+    } else {
+      if (!districtId || existingVendor.districtId !== districtId) {
+        return res.status(403).json(forbidden("Access denied - vendor not in your district"));
+      }
     }
 
     const vendor = await prisma.vendor.update({
@@ -327,7 +338,7 @@ router.patch("/vendors/:id/status", requireAuth, requireCityAdmin, async (req: R
             afterValue: status,
             decision: status,
             reason: `Status changed from ${existingVendor.status} to ${status}`,
-            districtId: districtId
+            districtId: existingVendor.districtId ?? districtId ?? null
           }
         }
       });

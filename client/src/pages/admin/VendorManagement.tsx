@@ -27,6 +27,7 @@ export default function VendorManagement() {
   const [vendorName, setVendorName] = useState("");
   const [category, setCategory] = useState("");
   const [initialScore, setInitialScore] = useState(5.0);
+  const [vendorToSuspend, setVendorToSuspend] = useState<any | null>(null);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number, status: string }) => {
@@ -132,7 +133,13 @@ export default function VendorManagement() {
                   </button>
                 </td>
                 <td className="p-4 text-right">
-                  <button className="text-gray-400 hover:text-white mr-3">Edit</button>
+                  <button
+                    disabled
+                    title="Vendor editing coming soon"
+                    className="text-gray-600 cursor-not-allowed mr-3"
+                  >
+                    Edit
+                  </button>
 
                   {v.status === 'REJECTED' ? (
                     /* 🛡️ BHARAT-OS: Restore Button for Suspended Vendors */
@@ -145,7 +152,7 @@ export default function VendorManagement() {
                   ) : (
                     /* 🛑 Sovereign Suspend Button */
                     <button
-                      onClick={() => updateStatusMutation.mutate({ id: v.id, status: 'REJECTED' })}
+                      onClick={() => setVendorToSuspend(v)}
                       className="text-red-500 hover:text-red-400"
                     >
                       Suspend
@@ -225,6 +232,44 @@ export default function VendorManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Suspend Confirmation Modal */}
+      {vendorToSuspend && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#111] border border-red-500/30 p-6 rounded-2xl w-full max-w-md">
+            <h3 className="text-xl font-bold mb-3 text-white">Suspend Vendor</h3>
+            <p className="text-gray-300 mb-6 text-sm leading-relaxed">
+              Are you sure you want to suspend <span className="font-semibold text-white">"{vendorToSuspend.name}"</span>?
+              This will reject the vendor and immediately shadow-ban them from the active marketplace.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                disabled={updateStatusMutation.isPending}
+                onClick={() => setVendorToSuspend(null)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={updateStatusMutation.isPending}
+                onClick={() => {
+                  updateStatusMutation.mutate(
+                    { id: vendorToSuspend.id, status: 'REJECTED' },
+                    {
+                      onSettled: () => setVendorToSuspend(null)
+                    }
+                  );
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-sm transition-colors disabled:opacity-50"
+              >
+                {updateStatusMutation.isPending ? "Suspending..." : "Confirm Suspend"}
+              </button>
+            </div>
           </div>
         </div>
       )}
