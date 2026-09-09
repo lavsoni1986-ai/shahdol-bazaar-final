@@ -448,6 +448,314 @@ router.post("/vendors", requireAuth, requireCityAdmin, adminActionLimiter, async
   }
 });
 
+// --- UPDATE VENDOR PROFILE ---
+router.patch("/vendors/:id", requireAuth, requireCityAdmin, adminActionLimiter, async (req: Request, res: Response) => {
+  try {
+    if (!req.ctx?.userId) {
+      return res.status(401).json(unauthorized("Authentication required"));
+    }
+
+    const vendorId = parseInt(req.params.id);
+    if (isNaN(vendorId)) {
+      return res.status(400).json(validationError([{ field: "id", message: "Invalid vendor ID", code: "INVALID_ID" }]));
+    }
+
+    // 1. Fetch target vendor with explicit select
+    const existingVendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: {
+        id: true,
+        name: true,
+        districtId: true,
+        category: true,
+        businessType: true,
+        description: true,
+        address: true,
+        phone: true,
+        mobile: true,
+        serviceArea: true,
+        serviceHours: true,
+        specialties: true,
+        dsslScore: true
+      }
+    });
+
+    if (!existingVendor) {
+      return res.status(404).json(notFound("Vendor"));
+    }
+
+    // 2. Tenant & Multi-District Authorization
+    // SUPER_ADMIN:
+    //   - req.ctx.districtId == null: GLOBAL mode -> can edit vendor in any district
+    //   - req.ctx.districtId != null: SELECTED-DISTRICT mode -> vendor districtId MUST match
+    // CITY_ADMIN:
+    //   - Must have req.ctx.districtId matching vendor.districtId
+    const isSuperAdmin = req.ctx?.role === "SUPER_ADMIN";
+    const contextDistrictId = req.ctx?.districtId;
+
+    if (isSuperAdmin) {
+      if (contextDistrictId !== null && contextDistrictId !== undefined) {
+        if (existingVendor.districtId !== contextDistrictId) {
+          return res.status(403).json(forbidden("Access denied - vendor not in selected district"));
+        }
+      }
+    } else {
+      if (!contextDistrictId || existingVendor.districtId !== contextDistrictId) {
+        return res.status(403).json(forbidden("Access denied - vendor not in your district"));
+      }
+    }
+
+    // 3. Permitted field whitelist & validation
+    const {
+      name,
+      category,
+      businessType,
+      description,
+      address,
+      phone,
+      mobile,
+      serviceArea,
+      serviceHours,
+      specialties,
+      dsslScore
+    } = req.body;
+
+    const updateData: any = {};
+    const previousValues: Record<string, any> = {};
+    const newValues: Record<string, any> = {};
+
+    // name: required string when supplied, cannot be empty
+    if (name !== undefined) {
+      if (typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json(validationError([{
+          field: "name",
+          message: "Vendor name cannot be empty",
+          code: "INVALID_NAME"
+        }]));
+      }
+      const trimmedName = name.trim();
+      if (trimmedName !== existingVendor.name) {
+        updateData.name = trimmedName;
+        previousValues.name = existingVendor.name;
+        newValues.name = trimmedName;
+      }
+    }
+
+    // category: string, trimmed
+    if (category !== undefined) {
+      if (typeof category !== "string" || category.trim().length === 0) {
+        return res.status(400).json(validationError([{
+          field: "category",
+          message: "Category cannot be empty",
+          code: "INVALID_CATEGORY"
+        }]));
+      }
+      const trimmedCategory = category.trim().toUpperCase();
+      if (trimmedCategory !== existingVendor.category) {
+        updateData.category = trimmedCategory;
+        previousValues.category = existingVendor.category;
+        newValues.category = trimmedCategory;
+      }
+    }
+
+    // businessType: string, must be valid BusinessType enum
+    if (businessType !== undefined) {
+      const validBusinessTypes = ["PRODUCT", "SERVICE", "HEALTHCARE", "SCHOOL", "RETAIL", "EDUCATION"];
+      if (typeof businessType !== "string" || !validBusinessTypes.includes(businessType.trim().toUpperCase())) {
+        return res.status(400).json(validationError([{
+          field: "businessType",
+          message: `Invalid business type. Must be one of: ${validBusinessTypes.join(", ")}`,
+          code: "INVALID_BUSINESS_TYPE"
+        }]));
+      }
+      const normalizedBusinessType = businessType.trim().toUpperCase();
+      if (normalizedBusinessType !== existingVendor.businessType) {
+        updateData.businessType = normalizedBusinessType;
+        previousValues.businessType = existingVendor.businessType;
+        newValues.businessType = normalizedBusinessType;
+      }
+    }
+
+    // description: nullable/optional string
+    if (description !== undefined) {
+      const val = description === null ? null : typeof description === "string" ? description.trim() : null;
+      if (val !== existingVendor.description) {
+        updateData.description = val;
+        previousValues.description = existingVendor.description;
+        newValues.description = val;
+      }
+    }
+
+    // address: nullable/optional string
+    if (address !== undefined) {
+      const val = address === null ? null : typeof address === "string" ? address.trim() : null;
+      if (val !== existingVendor.address) {
+        updateData.address = val;
+        previousValues.address = existingVendor.address;
+        newValues.address = val;
+      }
+    }
+
+    // phone: nullable/optional string
+    if (phone !== undefined) {
+      const val = phone === null ? null : typeof phone === "string" ? phone.trim() : null;
+      if (val !== existingVendor.phone) {
+        updateData.phone = val;
+        previousValues.phone = existingVendor.phone;
+        newValues.phone = val;
+      }
+    }
+
+    // mobile: nullable/optional string
+    if (mobile !== undefined) {
+      const val = mobile === null ? null : typeof mobile === "string" ? mobile.trim() : null;
+      if (val !== existingVendor.mobile) {
+        updateData.mobile = val;
+        previousValues.mobile = existingVendor.mobile;
+        newValues.mobile = val;
+      }
+    }
+
+    // serviceArea: nullable/optional string
+    if (serviceArea !== undefined) {
+      const val = serviceArea === null ? null : typeof serviceArea === "string" ? serviceArea.trim() : null;
+      if (val !== existingVendor.serviceArea) {
+        updateData.serviceArea = val;
+        previousValues.serviceArea = existingVendor.serviceArea;
+        newValues.serviceArea = val;
+      }
+    }
+
+    // serviceHours: nullable/optional string
+    if (serviceHours !== undefined) {
+      const val = serviceHours === null ? null : typeof serviceHours === "string" ? serviceHours.trim() : null;
+      if (val !== existingVendor.serviceHours) {
+        updateData.serviceHours = val;
+        previousValues.serviceHours = existingVendor.serviceHours;
+        newValues.serviceHours = val;
+      }
+    }
+
+    // specialties: accept string array, normalize each item to trimmed string
+    if (specialties !== undefined) {
+      if (!Array.isArray(specialties)) {
+        return res.status(400).json(validationError([{
+          field: "specialties",
+          message: "Specialties must be an array of strings",
+          code: "INVALID_SPECIALTIES"
+        }]));
+      }
+      const normalizedSpecialties = specialties
+        .filter(s => typeof s === "string" && s.trim().length > 0)
+        .map(s => (s as string).trim());
+      updateData.specialties = normalizedSpecialties;
+      previousValues.specialties = existingVendor.specialties;
+      newValues.specialties = normalizedSpecialties;
+    }
+
+    // dsslScore: frontend contract 0-100 (or 0-10), database stores integer 0-100 (Vendor.dsslScore: Int)
+    // Validate range, prevent NaN/Infinity, normalize exactly once to 0-100 integer
+    if (dsslScore !== undefined && dsslScore !== null) {
+      const parsed = Number(dsslScore);
+      if (isNaN(parsed) || !isFinite(parsed) || parsed < 0) {
+        return res.status(400).json(validationError([{
+          field: "dsslScore",
+          message: "DSSL score must be a valid non-negative number",
+          code: "INVALID_DSSL_SCORE"
+        }]));
+      }
+      let finalScore: number;
+      if (parsed <= 10 && parsed > 0 && Number.isInteger(parsed * 10) && parsed !== 10) {
+        // If passed on a 0-10 decimal scale (e.g. 8.5 -> 85)
+        finalScore = Math.round(parsed * 10);
+      } else if (parsed <= 100) {
+        finalScore = Math.round(parsed);
+      } else {
+        return res.status(400).json(validationError([{
+          field: "dsslScore",
+          message: "DSSL score must not exceed 100",
+          code: "SCORE_OUT_OF_RANGE"
+        }]));
+      }
+      finalScore = Math.max(0, Math.min(100, finalScore));
+      if (finalScore !== existingVendor.dsslScore) {
+        updateData.dsslScore = finalScore;
+        previousValues.dsslScore = existingVendor.dsslScore;
+        newValues.dsslScore = finalScore;
+      }
+    }
+
+    const changedFields = Object.keys(updateData);
+
+    // If nothing changed, return existing vendor directly
+    if (changedFields.length === 0) {
+      return res.json({
+        success: true,
+        data: existingVendor
+      });
+    }
+
+    // 4. Synchronize search index if searchable fields changed
+    const searchableFieldChanged =
+      updateData.name !== undefined ||
+      updateData.category !== undefined ||
+      updateData.businessType !== undefined ||
+      updateData.address !== undefined ||
+      updateData.description !== undefined;
+
+    if (searchableFieldChanged) {
+      const effectiveName = updateData.name !== undefined ? updateData.name : existingVendor.name;
+      const effectiveCategory = updateData.category !== undefined ? updateData.category : (existingVendor.category || "");
+      const effectiveBusinessType = updateData.businessType !== undefined ? updateData.businessType : (existingVendor.businessType || "RETAIL");
+      const effectiveAddress = updateData.address !== undefined ? (updateData.address || "") : (existingVendor.address || "");
+      const effectiveDescription = updateData.description !== undefined ? (updateData.description || "") : (existingVendor.description || "");
+
+      updateData.searchText = buildVendorSearchText({
+        name: effectiveName,
+        category: effectiveCategory,
+        businessType: effectiveBusinessType,
+        address: effectiveAddress,
+        description: effectiveDescription,
+        districtId: existingVendor.districtId ?? undefined
+      });
+    }
+
+    // 5. Update vendor record
+    const updatedVendor = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: updateData
+    });
+
+    // 6. Audit Log — defensive try/catch ensures audit failure does not crash governance routes
+    try {
+      await prisma.adminActionLog.create({
+        data: {
+          adminId: req.ctx.userId,
+          action: "VENDOR_PROFILE_UPDATED",
+          details: {
+            vendorId,
+            vendorName: updatedVendor.name,
+            changedFields,
+            previousValues,
+            newValues,
+            districtId: existingVendor.districtId ?? contextDistrictId ?? null
+          }
+        }
+      });
+    } catch (auditErr) {
+      console.error("[AUDIT_FAIL] VENDOR_PROFILE_UPDATED:", auditErr);
+    }
+
+    return res.json({
+      success: true,
+      data: updatedVendor
+    });
+  } catch (e) {
+    console.error("Vendor profile update error", e);
+    return res.status(500).json(serverError("Failed to update vendor profile"));
+  }
+});
+
 // --- UPDATE VENDOR STATUS ---
 router.patch("/vendors/:id/status", requireAuth, requireCityAdmin, async (req: Request, res: Response) => {
   try {

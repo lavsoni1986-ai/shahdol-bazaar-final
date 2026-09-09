@@ -11,6 +11,14 @@ interface Vendor {
   id: number;
   name: string;
   category?: string;
+  businessType?: string;
+  description?: string;
+  address?: string;
+  phone?: string;
+  mobile?: string;
+  serviceArea?: string;
+  serviceHours?: string;
+  specialties?: string[];
   dsslScore?: number;
   aiConfidence?: number;
   isSponsored?: boolean;
@@ -22,12 +30,29 @@ export default function VendorManagement() {
   const { currentDistrict } = useDistrict();
   const districtId = currentDistrict?.id;
 
-  // Modal and form state
+  // Onboarding Modal and form state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [vendorName, setVendorName] = useState("");
   const [category, setCategory] = useState("");
   const [initialScore, setInitialScore] = useState(5.0);
   const [vendorToSuspend, setVendorToSuspend] = useState<any | null>(null);
+
+  // Edit Modal and form state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    category: "",
+    businessType: "RETAIL",
+    phone: "",
+    mobile: "",
+    address: "",
+    serviceArea: "",
+    serviceHours: "",
+    description: "",
+    specialties: "",
+    dsslScore: 50
+  });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number, status: string }) => {
@@ -56,6 +81,23 @@ export default function VendorManagement() {
      }
    });
 
+  const updateVendorMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const response = await apiRequest("PATCH", `/admin/vendors/${id}`, data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-vendors", districtId] });
+      toast.success("Vendor profile updated");
+      setIsEditModalOpen(false);
+      setEditingVendorId(null);
+    },
+    onError: (err: any) => {
+      const errorMsg = err?.message || "Failed to update vendor profile";
+      toast.error(errorMsg);
+    }
+  });
+
   const toggleSponsorshipMutation = useMutation({
     mutationFn: async ({ id, sponsored }: { id: number, sponsored: boolean }) => {
       const response = await apiRequest("PATCH", `/admin/vendors/${id}/sponsorship`, { isSponsored: sponsored });
@@ -65,6 +107,24 @@ export default function VendorManagement() {
       queryClient.invalidateQueries({ queryKey: ["admin-vendors", districtId] });
     }
   });
+
+  const handleOpenEdit = (v: any) => {
+    setEditingVendorId(v.id);
+    setEditForm({
+      name: v.name || "",
+      category: v.category || "",
+      businessType: v.businessType || "RETAIL",
+      phone: v.phone || "",
+      mobile: v.mobile || "",
+      address: v.address || "",
+      serviceArea: v.serviceArea || "",
+      serviceHours: v.serviceHours || "",
+      description: v.description || "",
+      specialties: Array.isArray(v.specialties) ? v.specialties.join(", ") : "",
+      dsslScore: v.dsslScore !== undefined ? v.dsslScore : 50
+    });
+    setIsEditModalOpen(true);
+  };
 
   const { data: vendors, isLoading } = useQuery({
     queryKey: ["admin-vendors", districtId],
@@ -134,9 +194,8 @@ export default function VendorManagement() {
                 </td>
                 <td className="p-4 text-right">
                   <button
-                    disabled
-                    title="Vendor editing coming soon"
-                    className="text-gray-600 cursor-not-allowed mr-3"
+                    onClick={() => handleOpenEdit(v)}
+                    className="text-indigo-400 hover:text-indigo-300 font-medium mr-3 transition-colors"
                   >
                     Edit
                   </button>
@@ -271,6 +330,195 @@ export default function VendorManagement() {
                 {updateStatusMutation.isPending ? "Suspending..." : "Confirm Suspend"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Vendor Modal */}
+      {isEditModalOpen && editingVendorId && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-[#111] border border-orange-500/30 p-6 sm:p-8 rounded-2xl w-full max-w-2xl my-8 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-6 text-white text-center">Edit Vendor Profile</h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!editingVendorId) return;
+
+                const payload: any = {
+                  name: editForm.name.trim(),
+                  category: editForm.category.trim(),
+                  businessType: editForm.businessType,
+                  phone: editForm.phone.trim() || null,
+                  mobile: editForm.mobile.trim() || null,
+                  address: editForm.address.trim() || null,
+                  serviceArea: editForm.serviceArea.trim() || null,
+                  serviceHours: editForm.serviceHours.trim() || null,
+                  description: editForm.description.trim() || null,
+                  specialties: editForm.specialties
+                    ? editForm.specialties.split(",").map(s => s.trim()).filter(Boolean)
+                    : [],
+                  dsslScore: Number(editForm.dsslScore)
+                };
+
+                updateVendorMutation.mutate({
+                  id: editingVendorId,
+                  data: payload
+                });
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold block mb-1">Business Name *</label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold block mb-1">Category *</label>
+                  <input
+                    type="text"
+                    value={editForm.category}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
+                    placeholder="e.g. GROCERY, ELECTRONICS"
+                    className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold block mb-1">Business Type</label>
+                  <select
+                    value={editForm.businessType}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, businessType: e.target.value }))}
+                    className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="PRODUCT">PRODUCT</option>
+                    <option value="SERVICE">SERVICE</option>
+                    <option value="HEALTHCARE">HEALTHCARE</option>
+                    <option value="SCHOOL">SCHOOL</option>
+                    <option value="RETAIL">RETAIL</option>
+                    <option value="EDUCATION">EDUCATION</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold block mb-1">DSSL Score (0–100)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editForm.dsslScore}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, dsslScore: Number(e.target.value) }))}
+                    className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold block mb-1">Phone</label>
+                  <input
+                    type="text"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Landline or primary phone"
+                    className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold block mb-1">Mobile</label>
+                  <input
+                    type="text"
+                    value={editForm.mobile}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, mobile: e.target.value }))}
+                    placeholder="Mobile number"
+                    className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 font-semibold block mb-1">Address</label>
+                <input
+                  type="text"
+                  value={editForm.address}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Shop number, street, landmark"
+                  className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold block mb-1">Service Area</label>
+                  <input
+                    type="text"
+                    value={editForm.serviceArea}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, serviceArea: e.target.value }))}
+                    placeholder="e.g. Shahdol, Burhar, Amlai"
+                    className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold block mb-1">Service Hours</label>
+                  <input
+                    type="text"
+                    value={editForm.serviceHours}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, serviceHours: e.target.value }))}
+                    placeholder="e.g. 9:00 AM - 9:00 PM"
+                    className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 font-semibold block mb-1">Specialties (comma-separated)</label>
+                <input
+                  type="text"
+                  value={editForm.specialties}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, specialties: e.target.value }))}
+                  placeholder="e.g. Fresh Dairy, Fast Delivery, Wholesale Prices"
+                  className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 font-semibold block mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={editForm.description}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Brief overview of the vendor's products or services..."
+                  className="w-full bg-[#1a1a1a] border border-gray-800 p-2.5 rounded-lg text-white text-sm focus:border-orange-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={updateVendorMutation.isPending}
+                  className="flex-1 bg-orange-500 hover:bg-orange-400 text-black py-2.5 px-4 rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
+                >
+                  {updateVendorMutation.isPending ? "Saving Changes..." : "Save Changes"}
+                </button>
+                <button
+                  type="button"
+                  disabled={updateVendorMutation.isPending}
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingVendorId(null);
+                  }}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2.5 px-4 rounded-lg text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
