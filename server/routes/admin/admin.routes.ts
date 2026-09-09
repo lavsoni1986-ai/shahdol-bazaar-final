@@ -1665,4 +1665,313 @@ router.get("/orders", requireAuth, requireCityAdmin, async (req: Request, res: R
   }
 });
 
+// ============================================
+// 🏷️ ADMIN: GLOBAL CATEGORY GOVERNANCE
+// Category is a GLOBAL platform taxonomy (no districtId).
+// Viewable by CITY_ADMIN / SUPER_ADMIN.
+// Mutations restricted strictly to SUPER_ADMIN.
+// ============================================
+
+// --- GET ALL CATEGORIES ---
+router.get("/categories", requireAuth, requireCityAdmin, async (req: Request, res: Response) => {
+  try {
+    const categories = await prisma.category.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        imageUrl: true,
+        isActive: true,
+        createdAt: true,
+        _count: {
+          select: { products: true }
+        }
+      }
+    });
+
+    const data = categories.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description,
+      imageUrl: cat.imageUrl,
+      isActive: cat.isActive,
+      createdAt: cat.createdAt,
+      productCount: cat._count.products
+    }));
+
+    return res.json({
+      success: true,
+      data
+    });
+  } catch (e) {
+    console.error("Admin categories fetch error:", e);
+    return res.status(500).json({ success: false, error: "Failed to fetch categories" });
+  }
+});
+
+// --- CREATE GLOBAL CATEGORY ---
+router.post("/categories", requireAuth, requireSuperAdmin, adminActionLimiter, async (req: Request, res: Response) => {
+  try {
+    if (!req.ctx?.userId) {
+      return res.status(401).json(unauthorized("Authentication required"));
+    }
+
+    const rawName = typeof req.body.name === "string" ? req.body.name.trim() : "";
+    if (!rawName || rawName.length < 2 || rawName.length > 100) {
+      return res.status(400).json(validationError([{
+        field: "name",
+        message: "Category name is required and must be between 2 and 100 characters",
+        code: "INVALID_NAME"
+      }]));
+    }
+
+    const description = typeof req.body.description === "string" ? req.body.description.trim() || null : null;
+    const imageUrl = typeof req.body.imageUrl === "string" ? req.body.imageUrl.trim() || null : null;
+
+    // Safe globally unique slug generation with Unicode/Hindi fallback and collision resolution
+    let baseSlug = rawName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+
+    if (!baseSlug || baseSlug.length < 2) {
+      baseSlug = `cat-${Date.now().toString(36)}`;
+    }
+
+    let slug = baseSlug;
+    let counter = 1;
+    while (true) {
+      const existing = await prisma.category.findUnique({
+        where: { slug },
+        select: { id: true }
+      });
+      if (!existing) {
+        break;
+      }
+      counter++;
+      slug = `${baseSlug}-${counter}`;
+    }
+
+    const newCategory = await prisma.category.create({
+      data: {
+        name: rawName,
+        slug,
+        description,
+        imageUrl,
+        isActive: true
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        imageUrl: true,
+        isActive: true,
+        createdAt: true
+      }
+    });
+
+    // Audit Log — defensive try/catch ensures audit failure does not crash governance routes
+    try {
+      await prisma.adminActionLog.create({
+        data: {
+          adminId: req.ctx.userId,
+          action: "CATEGORY_CREATED",
+          details: {
+            categoryId: newCategory.id,
+            categoryName: newCategory.name,
+            slug: newCategory.slug,
+            decision: "CREATED",
+            reason: `Admin created global category "${newCategory.name}"`
+          }
+        }
+      });
+    } catch (auditErr) {
+      console.error("[AUDIT_FAIL] CATEGORY_CREATED:", auditErr);
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        ...newCategory,
+        productCount: 0
+      }
+    });
+  } catch (e) {
+    console.error("Admin category creation error:", e);
+    return res.status(500).json(serverError("Failed to create category"));
+  }
+});
+
+// --- UPDATE GLOBAL CATEGORY ---
+router.patch("/categories/:id", requireAuth, requireSuperAdmin, adminActionLimiter, async (req: Request, res: Response) => {
+  try {
+    if (!req.ctx?.userId) {
+      return res.status(401).json(unauthorized("Authentication required"));
+    }
+
+    const categoryId = parseInt(req.params.id);
+    if (isNaN(categoryId)) {
+      return res.status(400).json(validationError([{ field: "id", message: "Invalid category ID", code: "INVALID_ID" }]));
+    }
+
+    const existingCategory = await prisma.category.findUnique({
+      where: { id: categoryId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        imageUrl: true,
+        isActive: true,
+        _count: {
+          select: { products: true }
+        }
+      }
+    });
+
+    if (!existingCategory) {
+      return res.status(404).json(notFound("Category"));
+    }
+
+    const { name, description, imageUrl, isActive } = req.body;
+    const updateData: any = {};
+    const previousValues: Record<string, any> = {};
+    const newValues: Record<string, any> = {};
+
+    // name: string, cannot be empty when supplied
+    if (name !== undefined) {
+      if (typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json(validationError([{
+          field: "name",
+          message: "Category name cannot be empty",
+          code: "INVALID_NAME"
+        }]));
+      }
+      const trimmedName = name.trim();
+      if (trimmedName !== existingCategory.name) {
+        updateData.name = trimmedName;
+        previousValues.name = existingCategory.name;
+        newValues.name = trimmedName;
+      }
+    }
+
+    // description: nullable string
+    if (description !== undefined) {
+      const val = description === null ? null : typeof description === "string" ? description.trim() : null;
+      if (val !== existingCategory.description) {
+        updateData.description = val;
+        previousValues.description = existingCategory.description;
+        newValues.description = val;
+      }
+    }
+
+    // imageUrl: nullable string
+    if (imageUrl !== undefined) {
+      const val = imageUrl === null ? null : typeof imageUrl === "string" ? imageUrl.trim() : null;
+      if (val !== existingCategory.imageUrl) {
+        updateData.imageUrl = val;
+        previousValues.imageUrl = existingCategory.imageUrl;
+        newValues.imageUrl = val;
+      }
+    }
+
+    // isActive: boolean toggle
+    if (isActive !== undefined) {
+      const boolVal = Boolean(isActive);
+      if (boolVal !== existingCategory.isActive) {
+        updateData.isActive = boolVal;
+        previousValues.isActive = existingCategory.isActive;
+        newValues.isActive = boolVal;
+      }
+    }
+
+    const changedFields = Object.keys(updateData);
+
+    // If nothing changed, return existing category directly
+    if (changedFields.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          id: existingCategory.id,
+          name: existingCategory.name,
+          slug: existingCategory.slug,
+          description: existingCategory.description,
+          imageUrl: existingCategory.imageUrl,
+          isActive: existingCategory.isActive,
+          productCount: existingCategory._count.products
+        }
+      });
+    }
+
+    const updatedCategory = await prisma.category.update({
+      where: { id: categoryId },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        imageUrl: true,
+        isActive: true,
+        createdAt: true,
+        _count: {
+          select: { products: true }
+        }
+      }
+    });
+
+    // Audit Log: Action discriminator based on whether only isActive changed
+    const isStatusOnlyToggle = changedFields.length === 1 && changedFields[0] === "isActive";
+    const auditAction = isStatusOnlyToggle ? "CATEGORY_STATUS_TOGGLED" : "CATEGORY_UPDATED";
+
+    try {
+      await prisma.adminActionLog.create({
+        data: {
+          adminId: req.ctx.userId,
+          action: auditAction,
+          details: isStatusOnlyToggle
+            ? {
+                categoryId,
+                categoryName: updatedCategory.name,
+                previousIsActive: previousValues.isActive,
+                newIsActive: newValues.isActive,
+                decision: newValues.isActive ? "ACTIVATED" : "DEACTIVATED",
+                reason: `Category ${newValues.isActive ? "activated" : "deactivated"} by admin`
+              }
+            : {
+                categoryId,
+                categoryName: updatedCategory.name,
+                changedFields,
+                previousValues,
+                newValues
+              }
+        }
+      });
+    } catch (auditErr) {
+      console.error(`[AUDIT_FAIL] ${auditAction}:`, auditErr);
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        id: updatedCategory.id,
+        name: updatedCategory.name,
+        slug: updatedCategory.slug,
+        description: updatedCategory.description,
+        imageUrl: updatedCategory.imageUrl,
+        isActive: updatedCategory.isActive,
+        createdAt: updatedCategory.createdAt,
+        productCount: updatedCategory._count.products
+      }
+    });
+  } catch (e) {
+    console.error("Admin category update error:", e);
+    return res.status(500).json(serverError("Failed to update category"));
+  }
+});
+
 export default router;
