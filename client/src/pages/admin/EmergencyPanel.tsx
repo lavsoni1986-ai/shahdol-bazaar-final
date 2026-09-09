@@ -9,11 +9,18 @@ import { toast } from "react-hot-toast";
 export default function EmergencyPanel() {
   const lockdownMutation = useMutation({
     mutationFn: async (enable: boolean) => {
-      const response = await apiRequest("POST", `/admin/system-lockdown`, { enable });
+      const payload = {
+        action: enable ? "enable" : "disable",
+        reason: enable ? "Emergency lockdown enabled via Admin Panel" : "Lockdown disabled via Admin Panel"
+      };
+      const response = await apiRequest("POST", `/admin/system-lockdown`, payload);
       return response;
     },
-    onSuccess: (data) => {
-      toast.success(data.message);
+    onSuccess: (_, enable) => {
+      toast.success(enable ? "System lockdown enabled" : "System lockdown disabled");
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to update system lockdown state");
     },
   });
 

@@ -73,16 +73,6 @@ export default function ProductsPanel() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this product?")) return;
-    try {
-      await apiRequest("DELETE", `/admin/products/${id}`);
-      loadProducts();
-    } catch (err) {
-      console.error("Failed to delete:", err);
-    }
-  };
-
   // No client-side filtering needed since API handles it
   const filteredProducts = products;
   const getCategoryLabel = (category: Product["category"]) => {
@@ -176,12 +166,6 @@ export default function ProductsPanel() {
             </button>
           </>
         )}
-        <button
-          onClick={() => handleDelete(product.id)}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600"
-        >
-          DELETE
-        </button>
       </div>
     </div>
     );

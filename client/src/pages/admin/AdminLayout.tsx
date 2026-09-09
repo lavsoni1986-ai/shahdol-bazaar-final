@@ -54,7 +54,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const switchDistrict = (slug: string) => {
     localStorage.setItem('districtSlug', slug);
-    setLocation(`/${slug}/admin/dashboard`);
+    setLocation('/admin/dashboard');
   };
 
   const currentDistrict = localStorage.getItem('districtSlug') || (districts[0]?.slug || 'shahdol');
