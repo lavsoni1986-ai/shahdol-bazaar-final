@@ -32,7 +32,7 @@ export default function FraudCenter() {
     return JSON.stringify(reason);
   };
 
-  const { data: fraudAlerts, isLoading } = useQuery({
+  const { data: fraudAlerts, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["fraud-alerts", districtId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/admin/fraud-alerts`);
@@ -57,6 +57,32 @@ export default function FraudCenter() {
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (isError) {
+    return (
+      <AdminLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Fraud Center</h1>
+            <p className="text-gray-400 mt-1">Real-time fraud detection and response</p>
+          </div>
+          <div className="glass-card-sovereign p-8 text-center border-l-4 border-red-500">
+            <AlertTriangle className="text-red-500 mx-auto mb-4" size={48} />
+            <h3 className="text-xl font-semibold text-white mb-2">Failed to load fraud alerts</h3>
+            <p className="text-gray-400 mb-6">
+              {(error as any)?.message || "Unable to communicate with fraud intelligence service."}
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </AdminLayout>
     );

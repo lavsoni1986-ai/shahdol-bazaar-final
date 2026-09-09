@@ -105,6 +105,233 @@ router.get("/fraud-summary", requireAuth, requireSuperAdmin, async (req: Request
   }
 });
 
+// --- SOVEREIGN FRAUD ALERTS ---
+router.get("/fraud-alerts", requireAuth, requireCityAdmin, async (req: Request, res: Response) => {
+  try {
+    const isSuperAdmin = req.ctx?.role === "SUPER_ADMIN";
+    const districtId = req.ctx?.districtId as number;
+
+    if (!isSuperAdmin && !districtId) {
+      return res.status(403).json({ success: false, error: "District assignment required" });
+    }
+
+    let districtWhere: any = {};
+    if (!isSuperAdmin) {
+      const [districtVendors, districtUsers] = await Promise.all([
+        prisma.vendor.findMany({
+          where: { districtId },
+          select: { id: true }
+        }),
+        prisma.user.findMany({
+          where: { districtId },
+          select: { id: true }
+        })
+      ]);
+
+      const vendorIds = districtVendors.map(v => v.id);
+      const userIds = districtUsers.map(u => u.id);
+
+      districtWhere = {
+        OR: [
+          { vendorId: { in: vendorIds } },
+          { userId: { in: userIds } }
+        ]
+      };
+    }
+
+    const records = await prisma.fraudHistory.findMany({
+      where: districtWhere,
+      orderBy: { createdAt: "desc" },
+      take: 50
+    });
+
+    const vendorIdsToFetch = Array.from(new Set(records.map(r => r.vendorId).filter((id): id is number => typeof id === "number")));
+    const userIdsToFetch = Array.from(new Set(records.map(r => r.userId).filter((id): id is number => typeof id === "number")));
+
+    const [vendors, users] = await Promise.all([
+      vendorIdsToFetch.length > 0
+        ? prisma.vendor.findMany({
+            where: { id: { in: vendorIdsToFetch } },
+            select: { id: true, name: true, phone: true, status: true, districtId: true }
+          })
+        : [],
+      userIdsToFetch.length > 0
+        ? prisma.user.findMany({
+            where: { id: { in: userIdsToFetch } },
+            select: { id: true, username: true, shopName: true, districtId: true }
+          })
+        : []
+    ]);
+
+    const vendorMap = new Map(vendors.map(v => [v.id, v]));
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    const alerts = records.map((record) => {
+      const details = (record.details as any) || {};
+      const score = Math.round(record.riskScore || 0);
+
+      const severity =
+        score >= 85 ? "CRITICAL" :
+        score >= 70 ? "HIGH" :
+        score >= 45 ? "MEDIUM" :
+        "LOW";
+
+      const linkedVendor = record.vendorId ? vendorMap.get(record.vendorId) : undefined;
+      const linkedUser = record.userId ? userMap.get(record.userId) : undefined;
+
+      let entityType: "VENDOR" | "USER" | "ORDER" | "TRANSACTION" = "VENDOR";
+      let entityId = String(record.vendorId || "");
+      let entityName = linkedVendor?.name || "";
+
+      if (!record.vendorId && record.userId) {
+        entityType = "USER";
+        entityId = String(record.userId);
+        entityName = linkedUser?.shopName || linkedUser?.username || `User #${record.userId}`;
+      } else if (!record.vendorId && !record.userId) {
+        entityType = "TRANSACTION";
+        entityId = String(record.id);
+      }
+
+      const formattedTitle =
+        details.title ||
+        (record.eventType
+          ? `${record.eventType.replace(/_/g, " ")}${entityName ? ` - ${entityName}` : ""}`
+          : `Fraud Flag - ${entityName || entityId}`);
+
+      const formattedDescription =
+        details.description ||
+        details.message ||
+        `Suspicious activity detected with risk score ${score}/100.`;
+
+      const reasons: string[] = Array.isArray(details.reasons) && details.reasons.length > 0
+        ? details.reasons
+        : Array.isArray(details.flags) && details.flags.length > 0
+        ? details.flags
+        : [details.message || record.eventType || "Anomaly detected by fraud engine"];
+
+      const recommendations: string =
+        details.recommendation ||
+        details.recommendations ||
+        (severity === "CRITICAL"
+          ? "Immediately review account activity and consider suspension."
+          : severity === "HIGH"
+          ? "Investigate recent transactions and contact the entity for verification."
+          : "Monitor ongoing activities for further anomalies.");
+
+      return {
+        id: String(record.id),
+        type: record.eventType || "SUSPICIOUS_ACTIVITY",
+        severity,
+        title: formattedTitle,
+        description: formattedDescription,
+        entityType,
+        entityId,
+        fraudScore: score,
+        confidence: details.confidence ? Math.round(details.confidence) : Math.min(99, Math.max(50, score + 10)),
+        createdAt: record.createdAt.toISOString(),
+        reasons,
+        recommendations,
+        status: details.status || (details.resolved ? "RESOLVED" : "OPEN")
+      };
+    });
+
+    return res.json({ success: true, data: alerts });
+  } catch (e) {
+    console.error("Fraud alerts fetch error", e);
+    return res.status(500).json({ success: false, error: "Failed to fetch fraud alerts" });
+  }
+});
+
+// --- SOVEREIGN FRAUD ALERT RESOLUTION ---
+router.patch("/fraud-alerts/:id/resolve", requireAuth, requireCityAdmin, adminActionLimiter, async (req: Request, res: Response) => {
+  try {
+    const alertId = parseInt(req.params.id);
+    if (isNaN(alertId)) {
+      return res.status(400).json({ success: false, error: "Invalid alert ID" });
+    }
+
+    const { action } = req.body;
+    const validActions = ["INVESTIGATE", "CONFIRM", "DISMISS"];
+    if (!action || !validActions.includes(action)) {
+      return res.status(400).json({ success: false, error: "Invalid action. Must be INVESTIGATE, CONFIRM, or DISMISS" });
+    }
+
+    const isSuperAdmin = req.ctx?.role === "SUPER_ADMIN";
+    const districtId = req.ctx?.districtId as number;
+
+    const existingAlert = await prisma.fraudHistory.findUnique({
+      where: { id: alertId }
+    });
+
+    if (!existingAlert) {
+      return res.status(404).json({ success: false, error: "Fraud alert not found" });
+    }
+
+    // Tenancy check for City Admins
+    let alertDistrictId: number | null = null;
+    if (existingAlert.vendorId) {
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: existingAlert.vendorId },
+        select: { districtId: true }
+      });
+      alertDistrictId = vendor?.districtId || null;
+    } else if (existingAlert.userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: existingAlert.userId },
+        select: { districtId: true }
+      });
+      alertDistrictId = user?.districtId || null;
+    }
+
+    if (!isSuperAdmin && alertDistrictId && alertDistrictId !== districtId) {
+      return res.status(403).json({ success: false, error: "Access denied: Alert belongs to another district" });
+    }
+
+    const existingDetails = (existingAlert.details as Record<string, any>) || {};
+    const updatedDetails = {
+      ...existingDetails,
+      status: action === "DISMISS" ? "DISMISSED" : action === "CONFIRM" ? "CONFIRMED" : "INVESTIGATING",
+      resolved: action === "DISMISS" || action === "CONFIRM",
+      resolvedAt: new Date().toISOString(),
+      resolvedBy: req.ctx?.userId || null,
+      resolutionAction: action
+    };
+
+    await prisma.fraudHistory.update({
+      where: { id: alertId },
+      data: { details: updatedDetails }
+    });
+
+    // Defensive adminActionLog audit write
+    try {
+      await prisma.adminActionLog.create({
+        data: {
+          adminId: req.ctx?.userId || null,
+          action: `FRAUD_ALERT_${action}`,
+          details: {
+            alertId,
+            action,
+            targetVendorId: existingAlert.vendorId,
+            targetUserId: existingAlert.userId,
+            districtId: alertDistrictId || districtId || null,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+    } catch (auditErr) {
+      console.warn("[AUDIT_WARN] Failed to write fraud alert resolution log:", auditErr);
+    }
+
+    return res.json({
+      success: true,
+      message: `Fraud alert ${alertId} updated with action ${action}`
+    });
+  } catch (e) {
+    console.error("Fraud alert resolve error", e);
+    return res.status(500).json({ success: false, error: "Failed to resolve fraud alert" });
+  }
+});
+
 // --- USER INTELLIGENCE SUMMARY ---
 router.get("/user-intelligence-summary", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
   try {
