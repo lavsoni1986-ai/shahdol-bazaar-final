@@ -388,20 +388,50 @@ router.get("/vendors/id/:id", async (req: Request, res: Response) => {
 router.get("/shops/:id", async (req: Request, res: Response) => {
   try {
     const shopId = parseInt(req.params.id);
-    const districtId = req.ctx?.districtId;
+    const districtId = req.ctx?.districtId || (req as any).districtId;
 
     // 🔴 Guard: District context required
     if (!districtId) {
       return res.status(400).json({ success: false, error: "District context missing" });
     }
 
-    const shop = await prisma.shop.findUnique({
-      where: { id: shopId }
+    if (isNaN(shopId)) {
+      return res.status(400).json({ success: false, error: "Invalid shop ID" });
+    }
+
+    const vendor = await prisma.vendor.findFirst({
+      where: {
+        OR: [
+          { legacyShopId: shopId },
+          { id: shopId }
+        ],
+        districtId,
+        status: "APPROVED",
+        isShadowBanned: false
+      }
     });
 
-    if (!shop) {
+    if (!vendor) {
       return res.status(404).json({ success: false, error: "Shop not found" });
     }
+
+    const shop = {
+      id: vendor.legacyShopId ?? vendor.id,
+      name: vendor.name,
+      slug: vendor.slug,
+      description: vendor.description,
+      image: vendor.logo || (vendor.images?.[0] ?? null),
+      address: vendor.address,
+      phone: vendor.phone,
+      mobile: vendor.mobile,
+      category: vendor.category,
+      isVerified: vendor.isVerified,
+      avgRating: vendor.rating,
+      approved: vendor.status === "APPROVED",
+      ownerId: vendor.userId,
+      createdAt: vendor.createdAt,
+      updatedAt: vendor.updatedAt
+    };
 
     return res.json({ success: true, data: shop });
   } catch (e) {

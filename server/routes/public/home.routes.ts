@@ -13,10 +13,10 @@ const failure = (res: any, code: string, message: string, status = 400, details:
 // --- HOME DATA AGGREGATOR ---
 router.get("/home-data", async (req: Request, res: Response) => {
   try {
-    if (!(req as any).districtId) {
+    const districtId = ((req as any).districtId || req.ctx?.districtId) as number;
+    if (!districtId) {
       return failure(res, "DISTRICT_REQUIRED", "District context required", 400);
     }
-    const districtId = (req as any).districtId as number;
 
     const districts = await prisma.district
       .findMany({
@@ -28,8 +28,14 @@ router.get("/home-data", async (req: Request, res: Response) => {
     const products = await prisma.product
       .findMany({
         where: {
+          districtId,
           approved: true,
-          status: { in: ["APPROVED", "approved", "ACTIVE", "active"] }
+          status: { in: ["APPROVED", "approved", "ACTIVE", "active"] },
+          vendor: {
+            districtId,
+            status: "APPROVED",
+            isShadowBanned: false
+          }
         },
         take: 10,
         select: {
