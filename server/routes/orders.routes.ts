@@ -90,23 +90,18 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
         });
 
       } catch (sovereignError) {
-        logMigrationError('Sovereign engine failed, falling back to legacy', sovereignError);
-
-        // P0 FIX: Graceful fallback — do NOT return error, fall through to legacy engine
-        // Prevents catastrophic order outage if sovereign engine is unavailable
-        logMigrationWarning('Sovereign fallback activated — routing to legacy engine', {
-          userId,
-          districtId,
-          error: sovereignError instanceof Error ? sovereignError.message : 'Unknown error'
-        });
+        logMigrationError('Sovereign engine failed', sovereignError);
+        return sendError(
+          res,
+          400,
+          ErrorCode.BAD_REQUEST,
+          sovereignError instanceof Error ? sovereignError.message : "Failed to create order"
+        );
       }
-      // No return in catch → execution falls through to legacy engine below
     }
 
-    // 📦 LEGACY ORDER ENGINE (DEPRECATED — used as sovereign fallback)
-    // P0 FIX: Removed `else` block — legacy now runs as fallback if sovereign fails or if sovereign is inactive
-    if (!MIGRATION_FLAGS.SOVEREIGN_ENGINE_ACTIVE || MIGRATION_FLAGS.FORCE_LEGACY_MODE || true) {
-      // This always runs: either as primary path (sovereign inactive) or fallback (sovereign failed)
+    // 📦 LEGACY ORDER ENGINE (DEPRECATED — used when sovereign is inactive or forced legacy)
+    if (!MIGRATION_FLAGS.SOVEREIGN_ENGINE_ACTIVE || MIGRATION_FLAGS.FORCE_LEGACY_MODE) {
       logMigrationWarning('Routing to Legacy Order Engine (deprecated)', {
         userId,
         districtId,
@@ -114,7 +109,7 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
       });
 
       // ============================================
-      // LEGACY ORDER PROCESSING (TO BE REMOVED)
+      // LEGACY ORDER PROCESSING (ATOMIC TRANSACTION)
       // ============================================
 
       const strictDistrictId = Number(districtId);
@@ -123,83 +118,98 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
         return sendError(res, 400, ErrorCode.BAD_REQUEST, "Order items required");
       }
 
-      const createdOrders = [];
+      let createdOrders;
+      try {
+        createdOrders = await prisma.$transaction(async (tx) => {
+          const orders = [];
 
-      for (const item of items) {
-        // BLOCK NEGATIVE/INVALID QUANTITIES
-        if (item.quantity <= 0 || item.quantity > 20) {
-          return sendError(res, 400, ErrorCode.BAD_REQUEST, "Invalid quantity");
-        }
-
-        // FETCH PRODUCT (LEGACY VALIDATION) — include vendor status for server-side verification
-        const product = await prisma.product.findFirst({
-          where: { id: item.productId },
-          include: {
-            vendor: {
-              select: {
-                id: true,
-                name: true,
-                status: true,
-                districtId: true
-              }
+          for (const item of items) {
+            // BLOCK NEGATIVE/INVALID QUANTITIES
+            if (item.quantity <= 0 || item.quantity > 20) {
+              throw new Error("Invalid quantity");
             }
+
+            // FETCH PRODUCT (LEGACY VALIDATION) — include vendor status for server-side verification
+            const product = await tx.product.findFirst({
+              where: { id: item.productId },
+              include: {
+                vendor: {
+                  select: {
+                    id: true,
+                    name: true,
+                    status: true,
+                    districtId: true
+                  }
+                }
+              }
+            });
+
+            // Validate product exists
+            if (!product) {
+              throw new Error("Product not found");
+            }
+
+            // SERVER-SIDE VENDOR VERIFICATION (P0: hardened trust boundary — never trust client-supplied vendorId)
+            const resolvedVendorId = product.vendorId;
+            const vendorData = product.vendor as any;
+
+            // Validate vendor exists and is not null (safety check for orphaned FKs)
+            if (!vendorData) {
+              throw new Error("Vendor record not found for this product");
+            }
+
+            // Validate vendor belongs to correct district
+            // DOMAIN TRUTH: Product has NO districtId — district ownership is via Vendor → districtId
+            if (vendorData.districtId !== strictDistrictId) {
+              throw new Error("Product not available in your district");
+            }
+
+            // Validate vendor is approved for selling
+            if (vendorData.status !== "APPROVED") {
+              throw new Error("Vendor not approved");
+            }
+
+            // LEGACY PRICING (uses server-resolved price)
+            const totalPrice = Number(product.price ?? 0) * item.quantity;
+
+            // CREATE LEGACY ORDER — uses server-resolved vendorId, NOT client-supplied
+            const order = await tx.order.create({
+              data: {
+                userId,
+                productId: item.productId,
+                vendorId: resolvedVendorId,
+                districtId: strictDistrictId,
+                quantity: item.quantity,
+                totalPrice,
+                customerName,
+                customerPhone,
+                customerAddress,
+                deliveryAddressSnapshot,
+                paymentMethod,
+                status: "pending"
+              }
+            });
+
+            orders.push(order);
+
+            // LEGACY INTELLIGENCE UPDATES — uses server-resolved vendorId
+            await tx.vendor.update({
+              where: { id: resolvedVendorId },
+              data: {
+                aiRankScore: { increment: 1.2 }
+              }
+            });
           }
+
+          return orders;
         });
-
-        // Validate product exists
-        if (!product) {
-          return sendError(res, 400, ErrorCode.BAD_REQUEST, "Product not found");
-        }
-
-        // SERVER-SIDE VENDOR VERIFICATION (P0: hardened trust boundary — never trust client-supplied vendorId)
-        const resolvedVendorId = product.vendorId;
-        const vendorData = product.vendor as any;
-
-        // Validate vendor exists and is not null (safety check for orphaned FKs)
-        if (!vendorData) {
-          return sendError(res, 400, ErrorCode.BAD_REQUEST, "Vendor record not found for this product");
-        }
-
-        // Validate vendor belongs to correct district
-        // DOMAIN TRUTH: Product has NO districtId — district ownership is via Vendor → districtId
-        if (vendorData.districtId !== strictDistrictId) {
-          return sendError(res, 400, ErrorCode.BAD_REQUEST, "Product not available in your district");
-        }
-
-        // Validate vendor is approved for selling
-        if (vendorData.status !== "APPROVED") {
-          return sendError(res, 400, ErrorCode.BAD_REQUEST, "Vendor not approved");
-        }
-
-        // LEGACY PRICING (uses server-resolved price)
-        const totalPrice = Number(product.price ?? 0) * item.quantity;
-        const platformCommission = totalPrice * 0.05;
-
-        // CREATE LEGACY ORDER — uses server-resolved vendorId, NOT client-supplied
-        const order = await createOrder({
-          userId,
-          productId: item.productId,
-          vendorId: resolvedVendorId, // FIXED: server-resolved, not client-supplied
-          districtId: strictDistrictId,
-          quantity: item.quantity,
-          totalPrice,
-          customerName,
-          customerPhone,
-          customerAddress,
-          deliveryAddressSnapshot,
-          paymentMethod,
-          status: "pending"
-        });
-
-        createdOrders.push(order);
-
-        // LEGACY INTELLIGENCE UPDATES — uses server-resolved vendorId
-        await prisma.vendor.update({
-          where: { id: resolvedVendorId },
-          data: {
-            aiRankScore: { increment: 1.2 }
-          }
-        });
+      } catch (txError: any) {
+        return sendError(
+          res,
+          400,
+          ErrorCode.BAD_REQUEST,
+          txError?.message || "Order failed"
+        );
       }
 
       return sendSuccess(res, createdOrders);
