@@ -22,7 +22,8 @@ const createOrderSchema = z.object({
   customerPhone: z.string().regex(/^\+?[\d\s\-\(\)]{10,15}$/),
   customerAddress: z.string().min(10).max(500),
   paymentMethod: z.enum(["cod", "cash", "online", "card"]),
-  deliveryAddressSnapshot: z.any().optional()
+  deliveryAddressSnapshot: z.any().optional(),
+  idempotencyKey: z.string().max(128).optional()
 });
 
 const router = express.Router();
@@ -39,7 +40,7 @@ const router = express.Router();
 // --- CREATE ORDER (LEGACY/SOVEREIGN ROUTING) ---
 router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: Request, res: Response) => {
   try {
-    const { items, customerName, customerPhone, customerAddress, paymentMethod, deliveryAddressSnapshot } = req.body;
+    const { items, customerName, customerPhone, customerAddress, paymentMethod, deliveryAddressSnapshot, idempotencyKey } = req.body;
     const userId = req.ctx?.userId!;
     const districtId = req.ctx?.districtId;
 
@@ -73,7 +74,8 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
           customerPhone,
           customerAddress,
           paymentMethod: paymentMethod.toUpperCase(),
-          deliveryAddressSnapshot
+          deliveryAddressSnapshot,
+          idempotencyKey
         });
 
         logMigrationEvent('Sovereign order created successfully', {
@@ -121,7 +123,34 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
       let createdOrders;
       try {
         createdOrders = await prisma.$transaction(async (tx) => {
+          // 🛡️ IDEMPOTENCY PROTECTION (CONCURRENCY-SERIALIZED ADVISORY LOCK + JSONB LOOKUP)
+          if (idempotencyKey && userId) {
+            const lockKey = `ord_${userId}_${idempotencyKey}`;
+            // Transaction-scoped lock automatically releases on COMMIT or ROLLBACK
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+            // Check if this logical checkout request was already committed
+            const existingOrders = await tx.order.findMany({
+              where: {
+                userId,
+                deliveryAddressSnapshot: {
+                  path: ['clientOrderId'],
+                  equals: idempotencyKey
+                }
+              }
+            });
+
+            if (existingOrders.length > 0) {
+              return existingOrders;
+            }
+          }
+
           const orders = [];
+
+          // Preserve clientOrderId across all order rows created from this logical checkout
+          const enrichedSnapshot = deliveryAddressSnapshot && typeof deliveryAddressSnapshot === 'object'
+            ? { ...deliveryAddressSnapshot, clientOrderId: idempotencyKey || null }
+            : (idempotencyKey ? { clientOrderId: idempotencyKey } : deliveryAddressSnapshot);
 
           for (const item of items) {
             // BLOCK NEGATIVE/INVALID QUANTITIES
@@ -184,7 +213,7 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
                 customerName,
                 customerPhone,
                 customerAddress,
-                deliveryAddressSnapshot,
+                deliveryAddressSnapshot: enrichedSnapshot,
                 paymentMethod,
                 status: "pending"
               }

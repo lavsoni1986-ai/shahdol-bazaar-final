@@ -60,6 +60,13 @@ export default function CheckoutPage() {
   const mountedRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
 
+  // SOVEREIGN: Session-stable idempotency key across retries of the same order
+  const orderRequestIdRef = useRef<string>(
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `ord_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  );
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -347,7 +354,9 @@ export default function CheckoutPage() {
         };
       });
 
-      // Prepare snapshot
+      const clientOrderId = orderRequestIdRef.current;
+
+      // Prepare snapshot and embed clientOrderId correlation token
       let deliveryAddressSnapshotObj: any = null;
 
       if (selectedAddressId === "new") {
@@ -363,7 +372,8 @@ export default function CheckoutPage() {
           city: newAddressForm.city || null,
           districtName: newAddressForm.districtName || null,
           state: newAddressForm.state || null,
-          postalCode: newAddressForm.postalCode || null
+          postalCode: newAddressForm.postalCode || null,
+          clientOrderId
         };
 
         if (newAddressForm.saveForFuture) {
@@ -388,8 +398,11 @@ export default function CheckoutPage() {
             city: selectedAddr.city || null,
             districtName: selectedAddr.districtName || null,
             state: selectedAddr.state || null,
-            postalCode: selectedAddr.postalCode || null
+            postalCode: selectedAddr.postalCode || null,
+            clientOrderId
           };
+        } else {
+          deliveryAddressSnapshotObj = { clientOrderId };
         }
       }
 
@@ -400,7 +413,8 @@ export default function CheckoutPage() {
         customerAddress: customerData.address,
         paymentMethod,
         districtId: currentDistrict?.id,
-        deliveryAddressSnapshot: deliveryAddressSnapshotObj
+        deliveryAddressSnapshot: deliveryAddressSnapshotObj,
+        idempotencyKey: clientOrderId
       });
 
       if (!mountedRef.current || controller.signal.aborted) return;
@@ -411,6 +425,10 @@ export default function CheckoutPage() {
       if (paymentMethod === "cod") {
         clearCart();
         setCheckoutState("completed");
+        // SOVEREIGN: Generate fresh idempotency key only after successful completion
+        orderRequestIdRef.current = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `ord_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         toast({
           title: "ऑर्डर सफल!",
           description: "आपका COD ऑर्डर स्वीकार कर लिया गया है।",
@@ -418,6 +436,10 @@ export default function CheckoutPage() {
         setLocation(`/order-success?id=${orderId}`);
       } else {
         if (result.paymentLink) {
+          // Reset key before external redirect so returning to cart gets a new key
+          orderRequestIdRef.current = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `ord_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
           window.location.href = result.paymentLink;
         } else {
           throw new Error("Payment link not generated");
