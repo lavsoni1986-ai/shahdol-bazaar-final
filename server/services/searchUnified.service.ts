@@ -572,6 +572,16 @@ async function semanticSearch(expandedTerms: string[], districtId: number): Prom
     where: {
       categoryName: {
         in: categoriesToSearch
+      },
+      districtId,
+      approved: true,
+      status: {
+        in: ["APPROVED", "approved", "ACTIVE", "active"]
+      },
+      vendor: {
+        districtId,
+        status: "APPROVED",
+        isShadowBanned: false
       }
     },
     select: {
