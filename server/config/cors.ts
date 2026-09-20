@@ -10,7 +10,7 @@ declare global {
 const ALLOWED_ORIGIN_REGEXES = [
   /^https:\/\/shahdolbazaar\.com$/,
   /^https:\/\/www\.shahdolbazaar\.com$/,
-  /^https:\/\/[a-z0-9-]+\.vercel\.app$/i,
+  /^https:\/\/shahdol-bazaar-final[a-z0-9-]*\.vercel\.app$/i,
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/.*\.bharatos\.in$/
 ];
