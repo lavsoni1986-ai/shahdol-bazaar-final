@@ -375,13 +375,127 @@ router.delete("/merchant/products/:productId/images/:imageId", requireAuth, requ
 router.put("/merchant/products/:id", requireAuth, requireMerchant, async (req: Request, res: Response) => {
   try {
     const productId = Number(req.params.id);
+    if (!Number.isInteger(productId) || productId <= 0) {
+      return failure(res, "BAD_REQUEST", "Invalid product id", 400);
+    }
+
     const merchantId = req.ctx?.userId!;
     const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
-    const updates = req.body;
 
     const existing = await findMerchantProductById(productId, vendor.id);
     if (!existing) {
       return failure(res, "NOT_FOUND", "Product not found", 404);
+    }
+
+    const rawBody = req.body;
+    if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+      return failure(res, "BAD_REQUEST", "Invalid request body", 400);
+    }
+
+    // 🛡️ STRICT SERVER-SIDE ALLOWLIST: Only legitimate merchant fields may reach Prisma
+    const updates: Record<string, any> = {};
+
+    // 1. title / name: string, trim, non-empty, max 200 chars
+    const rawTitle = rawBody.title !== undefined ? rawBody.title : rawBody.name;
+    if (rawTitle !== undefined) {
+      if (typeof rawTitle !== "string" || !rawTitle.trim() || rawTitle.trim().length > 200) {
+        return failure(res, "BAD_REQUEST", "Title must be a non-empty string up to 200 characters", 400);
+      }
+      updates.title = rawTitle.trim();
+    }
+
+    // 2. description: string or null, trimmed
+    if (rawBody.description !== undefined) {
+      if (rawBody.description === null) {
+        updates.description = null;
+      } else if (typeof rawBody.description === "string") {
+        updates.description = rawBody.description.trim();
+      } else {
+        return failure(res, "BAD_REQUEST", "Description must be a string or null", 400);
+      }
+    }
+
+    // 3. price: number >= 0
+    if (rawBody.price !== undefined) {
+      if (typeof rawBody.price !== "number" || !Number.isFinite(rawBody.price) || rawBody.price < 0) {
+        return failure(res, "BAD_REQUEST", "Price must be a valid non-negative number", 400);
+      }
+      updates.price = rawBody.price;
+    }
+
+    // 4. mrp: number >= 0 or null
+    if (rawBody.mrp !== undefined) {
+      if (rawBody.mrp === null) {
+        updates.mrp = null;
+      } else if (typeof rawBody.mrp === "number" && Number.isFinite(rawBody.mrp) && rawBody.mrp >= 0) {
+        updates.mrp = rawBody.mrp;
+      } else {
+        return failure(res, "BAD_REQUEST", "MRP must be a valid non-negative number or null", 400);
+      }
+    }
+
+    // 5. stock: integer >= 0
+    if (rawBody.stock !== undefined) {
+      if (typeof rawBody.stock !== "number" || !Number.isFinite(rawBody.stock) || !Number.isInteger(rawBody.stock) || rawBody.stock < 0) {
+        return failure(res, "BAD_REQUEST", "Stock must be a non-negative integer", 400);
+      }
+      updates.stock = rawBody.stock;
+    }
+
+    // 6. imageUrl: string URL or null
+    if (rawBody.imageUrl !== undefined) {
+      if (rawBody.imageUrl === null) {
+        updates.imageUrl = null;
+      } else if (typeof rawBody.imageUrl === "string") {
+        updates.imageUrl = rawBody.imageUrl.trim();
+      } else {
+        return failure(res, "BAD_REQUEST", "Image URL must be a string or null", 400);
+      }
+    }
+
+    // 7. virtualTryOn: boolean
+    if (rawBody.virtualTryOn !== undefined) {
+      if (typeof rawBody.virtualTryOn !== "boolean") {
+        return failure(res, "BAD_REQUEST", "virtualTryOn must be a boolean", 400);
+      }
+      updates.virtualTryOn = rawBody.virtualTryOn;
+    }
+
+    // 8. categoryId / category: preserve existing category behavior from POST route
+    if (rawBody.categoryId !== undefined) {
+      if (typeof rawBody.categoryId !== "number" || !Number.isFinite(rawBody.categoryId) || !Number.isInteger(rawBody.categoryId) || rawBody.categoryId <= 0) {
+        return failure(res, "BAD_REQUEST", "Invalid categoryId", 400);
+      }
+      updates.categoryId = rawBody.categoryId;
+    } else if (rawBody.category !== undefined) {
+      if (typeof rawBody.category === "string" && rawBody.category.trim()) {
+        const cleanCategory = rawBody.category.trim();
+        let matchedCategory = await prisma.category.findFirst({
+          where: {
+            name: { equals: cleanCategory, mode: "insensitive" }
+          }
+        });
+
+        // Dynamic merchant category seed (matches POST /merchant/products M-22B)
+        if (!matchedCategory) {
+          matchedCategory = await prisma.category.create({
+            data: {
+              name: cleanCategory,
+              slug: cleanCategory.toLowerCase().replace(/\s+/g, "-"),
+              isActive: true
+            }
+          });
+          console.log("✅ [DYNAMIC CATEGORY CREATED]", matchedCategory.name, matchedCategory.id);
+        }
+
+        updates.categoryId = matchedCategory.id;
+        updates.categoryName = matchedCategory.name;
+      }
+    }
+
+    // If request contains only protected or empty fields, reject with 400
+    if (Object.keys(updates).length === 0) {
+      return failure(res, "BAD_REQUEST", "No valid editable product fields provided", 400);
     }
 
     const updated = await updateMerchantProduct(productId, vendor.id, updates);
