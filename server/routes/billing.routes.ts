@@ -17,39 +17,14 @@ const SUBSCRIPTION_PLANS = {
   GOLD: { productLimit: 200, monthlyPrice: 999 }
 } as const;
 
-// 💰 BUSINESS MODEL: Subscription Upgrade API
-router.post("/billing/upgrade", requireAuth, async (req, res) => {
-  try {
-    const { plan } = req.body;
-    if (!(req as any).user) return failure(res, "AUTH_ERROR", "Unauthorized");
-
-    if (!["SILVER", "GOLD"].includes(plan)) {
-      return failure(res, "VALIDATION_ERROR", "Invalid plan. Choose SILVER or GOLD");
-    }
-
-    const planConfig = SUBSCRIPTION_PLANS[plan as keyof typeof SUBSCRIPTION_PLANS];
-    const expiryDate = new Date();
-    expiryDate.setMonth(expiryDate.getMonth() + 1); // 1 month subscription
-
-    await prisma.user.update({
-      where: { id: (req as any).ctx?.userId! },
-      data: {
-        subscriptionPlan: plan,
-        subscriptionStatus: "active",
-        subscriptionEndsAt: expiryDate
-      }
-    });
-
-    return success(res, {
-      plan,
-      productLimit: planConfig.productLimit,
-      monthlyPrice: planConfig.monthlyPrice,
-      expiresAt: expiryDate
-    });
-  } catch (err) {
-    console.error("Subscription upgrade error:", err);
-    return failure(res, "SERVER_ERROR", "Failed to upgrade subscription");
-  }
+// 💰 BUSINESS MODEL: Subscription Upgrade API (Disabled pending real payment integration)
+router.post("/billing/upgrade", requireAuth, async (_req, res) => {
+  return failure(
+    res,
+    "PAYMENT_DISABLED",
+    "Online subscription payment is currently disabled. Please contact administration for tier upgrades.",
+    403
+  );
 });
 
 // 💰 BUSINESS MODEL: Get User Plan
