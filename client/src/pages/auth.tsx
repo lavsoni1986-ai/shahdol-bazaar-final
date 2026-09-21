@@ -77,11 +77,15 @@ export default function AuthPage() {
   // Use constant default - initialize from URL in useEffect
   const [activeTab, setActiveTab] = useState<string>("login");
   
-  // Initialize tab from URL on mount only
+  // Initialize tab and role from URL on mount only
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("mode") === "register") {
       setActiveTab("register");
+    }
+    const roleParam = params.get("role");
+    if (roleParam === "partner" || roleParam === "vendor") {
+      setSelectedRole("merchant");
     }
   }, []);
   const [loading, setLoading] = useState(false);
@@ -97,6 +101,11 @@ export default function AuthPage() {
   // /auth?role=partner      → partner mode ALWAYS
   // localStorage is NOT read — eliminates portal context contamination.
   const [authMode] = useState<string>(() => getAuthMode());
+
+  // Explicit role selection on registration tab (defaults to URL param, but user UI choice is authoritative)
+  const [selectedRole, setSelectedRole] = useState<"customer" | "merchant">(() => {
+    return getAuthMode() === "partner" ? "merchant" : "customer";
+  });
 
 
 
@@ -175,17 +184,18 @@ export default function AuthPage() {
     
     try {
       const endpoint = `${activeTab === "login" ? "auth/login" : "auth/register"}`;
-      const isMerchantPortal =
-        authMode === "partner" ||
-        window.location.pathname.includes("partner") ||
-        document.referrer.includes("partner");
-
-      const userRole = isMerchantPortal ? "merchant" : "customer";
+      // On registration tab, explicit user UI selection (selectedRole) is authoritative.
+      // Fall back to partner portal context if not registering.
+      const userRole = activeTab === "register"
+        ? selectedRole
+        : (authMode === "partner" || window.location.pathname.includes("partner") || document.referrer.includes("partner")
+            ? "merchant"
+            : "customer");
 
       console.log("🛡️ [AUTH ROLE RESOLVE]", {
         authMode,
-        pathname: window.location.pathname,
-        referrer: document.referrer,
+        selectedRole,
+        activeTab,
         resolvedRole: userRole
       });
 
@@ -326,12 +336,47 @@ console.log("🔍 [AUTH] Login Result:", result);
               <CardHeader>
                 <CardTitle>Create Account</CardTitle>
                 <CardDescription>
-                  {isPartnerMode ? "अपना स्टोर बनाएं और बिक्री शुरू करें" : "Join Shahdol Bazaar today"}
+                  {selectedRole === "merchant"
+                    ? "अपना स्टोर बनाएं और बिक्री शुरू करें"
+                    : "Join Shahdol Bazaar today"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...registerForm}>
                   <form onSubmit={registerForm.handleSubmit(onSubmit)} className="space-y-4">
+                    {/* 🛡️ ACCOUNT TYPE SELECTOR */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block">
+                        Account Type / खाता प्रकार
+                      </label>
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-white/5 border border-white/10 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRole("customer")}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+                            selectedRole === "customer"
+                              ? "bg-white/20 text-white shadow-sm border border-white/20"
+                              : "text-gray-400 hover:text-white hover:bg-white/5"
+                          }`}
+                        >
+                          <span>Customer / ग्राहक</span>
+                          <span className="text-[10px] font-normal opacity-70">खरीदारी के लिए</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRole("merchant")}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+                            selectedRole === "merchant"
+                              ? "bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-md shadow-orange-900/30 border border-orange-500/50"
+                              : "text-gray-400 hover:text-white hover:bg-white/5"
+                          }`}
+                        >
+                          <span>Merchant / दुकानदार</span>
+                          <span className="text-[10px] font-normal opacity-70">दुकान / बिक्री के लिए</span>
+                        </button>
+                      </div>
+                    </div>
+
                     <FormField
                       control={registerForm.control}
                       name="districtId"
@@ -384,7 +429,13 @@ console.log("🔍 [AUTH] Login Result:", result);
                       )}
                     />
                     <Button type="submit" className="w-full btn-neon-primary" disabled={loading}>
-                      {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> कृपया प्रतीक्षा करें...</> : "Create Account"}
+                      {loading ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> कृपया प्रतीक्षा करें...</>
+                      ) : selectedRole === "merchant" ? (
+                        "Create Seller Account / खाता बनाएं"
+                      ) : (
+                        "Create Account / खाता बनाएं"
+                      )}
                     </Button>
                   </form>
                 </Form>
