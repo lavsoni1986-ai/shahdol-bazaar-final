@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { prisma } from "../../storage";
 import { ErrorCode, sendError, sendSuccess } from "../../middleware/errorHandler";
 import { recomputeTrustScore } from "../../services/dssl.service";
+import { requireAuth } from "../../auth/middleware";
 
 const router = Router();
 
@@ -40,13 +41,24 @@ router.get("/:productId", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const districtId = Number((req as any).ctx?.districtId);
-    const userId = Number((req as any).userId) || undefined;
+    const userId = Number(
+      (req as any).user?.userId || (req as any).ctx?.userId
+    );
     const productId = Number(req.body?.productId);
     const rating = Number(req.body?.rating);
     const comment = typeof req.body?.comment === "string" ? req.body.comment.trim() : null;
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return sendError(
+        res,
+        401,
+        ErrorCode.AUTH_REQUIRED,
+        "Authentication required"
+      );
+    }
 
     if (!Number.isInteger(districtId) || districtId <= 0) {
       return sendError(res, 400, ErrorCode.DISTRICT_REQUIRED, "District context missing");
