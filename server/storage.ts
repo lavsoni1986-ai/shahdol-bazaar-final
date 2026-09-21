@@ -129,7 +129,7 @@ const extendedPrisma = prismaRaw.$extends({
         ) {
           const modelName = model.toLowerCase();
 
-          const globalModels = ['district', 'districtsettings', 'globalconfig', 'systemconfig'];
+          const globalModels = ['district', 'districtsettings', 'globalconfig', 'systemconfig', 'category'];
           if (globalModels.includes(modelName)) {
             return query(args);
           }
@@ -144,7 +144,6 @@ const extendedPrisma = prismaRaw.$extends({
               'product',
               'order',
               'offer',
-              'category',
               'shop',
               'banner',
               'auditlog',
