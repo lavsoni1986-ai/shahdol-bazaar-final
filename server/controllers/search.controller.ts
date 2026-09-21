@@ -9,8 +9,7 @@ import { success, error } from "../utils/response";
 export async function searchController(req: Request, res: Response) {
   try {
     const q = String(req.query.q || "").trim();
-    // Allow districtId from query param for testing, fallback to req.districtId
-    const districtId = req.query.districtId ? parseInt(String(req.query.districtId)) : req.districtId;
+    const districtId = req.districtId || (req as any).ctx?.districtId;
 
     if (!q) {
       return res.status(400).json(error("Query parameter 'q' is required"));
