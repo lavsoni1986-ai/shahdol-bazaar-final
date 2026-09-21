@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Vendor" ADD COLUMN     "completedOrders" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "disputes" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "repeatCustomers" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "responseTimeMs" INTEGER,
+ADD COLUMN     "totalOrders" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "trustScore" DOUBLE PRECISION,
+ADD COLUMN     "trustUpdatedAt" TIMESTAMP(3);

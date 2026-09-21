@@ -13,7 +13,7 @@ coverage/
 .cursor/
 terminals/
 agent-tools/
-migrations/
+/migrations/
 .local/
 scripts/*.js
 !scripts/build.ts
