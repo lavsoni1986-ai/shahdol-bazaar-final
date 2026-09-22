@@ -366,6 +366,7 @@ export const registerSovereignRoutes = async (app: RouteHost) => {
   app.use("", statsRoutes); // Stats: categories, hospitals, etc.
   app.use("/local", localRoutes); // Local: schools, bus, etc.
   app.use("", merchantRoutes); // Merchant: products
+  app.use("", vendorDashboardRoutes); // Vendor Dashboard: /vendor/stats, /vendor/orders, etc.
   app.use("/upload", uploadRoutes); // Upload: Cloudinary images
   app.use("/marketplace", storesRoutes); // Marketplace: stores
   app.use("/marketplace", productsRoutes); // Marketplace: products

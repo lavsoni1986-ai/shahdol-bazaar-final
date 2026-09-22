@@ -80,7 +80,9 @@ router.get("/products", async (req: Request, res: Response) => {
           status: { in: ["approved", "APPROVED", "active", "ACTIVE"] },
           vendor: {
             status: "APPROVED",
-            isShadowBanned: false
+            isShadowBanned: false,
+            businessType: { notIn: ["SERVICE", "HEALTHCARE", "SCHOOL", "EDUCATION"] },
+            category: { notIn: ["SERVICE", "HEALTHCARE", "HOSPITAL", "SCHOOL", "EDUCATION", "DOCTOR", "CLINIC", "service", "healthcare", "hospital", "school", "education", "doctor", "clinic"] }
           }
         },
         include: {
@@ -101,7 +103,9 @@ router.get("/products", async (req: Request, res: Response) => {
           status: { in: ["approved", "APPROVED", "active", "ACTIVE"] },
           vendor: {
             status: "APPROVED",
-            isShadowBanned: false
+            isShadowBanned: false,
+            businessType: { notIn: ["SERVICE", "HEALTHCARE", "SCHOOL", "EDUCATION"] },
+            category: { notIn: ["SERVICE", "HEALTHCARE", "HOSPITAL", "SCHOOL", "EDUCATION", "DOCTOR", "CLINIC", "service", "healthcare", "hospital", "school", "education", "doctor", "clinic"] }
           }
         },
         include: {
@@ -231,6 +235,23 @@ router.post("/merchant/products", requireAuth, requireMerchant, async (req: Requ
 
     const merchantId = req.ctx?.userId!;
     const vendor = await resolveMerchantVendorOrThrow(merchantId, req.ctx?.districtId ?? undefined);
+
+    // 🛡️ BHARATOS NON-RETAIL PRODUCT CREATION GUARD
+    const nonRetailBusinessTypes = ["SERVICE", "HEALTHCARE", "SCHOOL", "EDUCATION"];
+    const nonRetailCategories = ["SERVICE", "HEALTHCARE", "HOSPITAL", "SCHOOL", "EDUCATION", "DOCTOR", "CLINIC"];
+
+    const bType = (vendor.businessType || "").toString().toUpperCase().trim();
+    const cat = (vendor.category || "").toString().toUpperCase().trim();
+
+    if (nonRetailBusinessTypes.includes(bType) || nonRetailCategories.includes(cat)) {
+      console.warn(`⛔ [PRODUCT_CREATION_BLOCKED] Vendor #${vendor.id} (${vendor.name}) with businessType='${vendor.businessType}' category='${vendor.category}' attempted to create a retail product.`);
+      return failure(
+        res,
+        "SERVICE_VENDOR_CANNOT_CREATE_RETAIL_PRODUCT",
+        "Service, healthcare, and educational institutions cannot create retail products. Please manage your offerings through your service dashboard.",
+        403
+      );
+    }
 
     const {
       title,
