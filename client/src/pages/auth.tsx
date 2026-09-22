@@ -68,6 +68,23 @@ const getInitialTab = (): string => {
   }
 };
 
+const getReturnUrl = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const ret = params.get("return") || params.get("redirect") || params.get("returnUrl");
+    if (!ret) return null;
+    const trimmed = ret.trim();
+    // Must start with / and not //, and must not contain : to prevent javascript:, data:, or protocol schemes
+    if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !trimmed.includes(":")) {
+      return trimmed;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
+
 export default function AuthPage() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
@@ -158,8 +175,11 @@ export default function AuthPage() {
     // Only rely on isAuthenticated from AuthContext - don't check localStorage!
     if (isAuthenticated && user) {
       hasCheckedAuth.current = true;
-      // ✅ Use utility function for role-based redirect
-      const target = getClientRoleRedirectPath(user);
+      const returnUrl = getReturnUrl();
+      const target =
+        user?.role?.toUpperCase?.().trim?.() === "CUSTOMER" && returnUrl
+          ? returnUrl
+          : getClientRoleRedirectPath(user);
       console.log("🛠️ [DEBUG] Login Redirect Target:", target);
       setLocation(target);
     }
@@ -223,8 +243,12 @@ console.log("🔍 [AUTH] Login Result:", result);
       // ✅ Reset login attempts on successful login
       setLoginAttempts(0);
 
-      // ✅ Role-based redirect: trust backend user payload (no synthetic flags)
-      const target = getClientRoleRedirectPath(userData);
+      // ✅ Role-based redirect with customer return destination override
+      const returnUrl = getReturnUrl();
+      const target =
+        userData?.role?.toUpperCase?.().trim?.() === "CUSTOMER" && returnUrl
+          ? returnUrl
+          : getClientRoleRedirectPath(userData);
       console.log("🛠️ [DEBUG] Login Redirect Target:", target);
       
       // Wait for browser to receive cookies before redirect
