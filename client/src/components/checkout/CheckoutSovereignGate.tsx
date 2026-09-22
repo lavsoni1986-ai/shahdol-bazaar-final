@@ -171,7 +171,7 @@ export function CheckoutSovereignGate({ children, skeleton }: CheckoutSovereignG
     }
 
     // SOVEREIGN: Auth initialized and user is a guest — show login prompt (not infinite skeleton)
-    if (!gate.authReady && initialized && authState === "guest") {
+    if (initialized && authState === "guest") {
         return <AuthRequiredGate />;
     }
 

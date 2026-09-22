@@ -544,7 +544,7 @@ export default function CheckoutPage() {
                       <Input
                         disabled
                         value={customerData.name}
-                        className="bg-slate-950/60 border-slate-800 text-slate-400 cursor-not-allowed text-xs h-9"
+                        className="bg-slate-950/80 border-slate-800 text-slate-300 disabled:opacity-80 cursor-not-allowed text-xs h-9"
                       />
                     </div>
                     <div className="space-y-1">
@@ -552,7 +552,7 @@ export default function CheckoutPage() {
                       <Input
                         disabled
                         value={customerData.phone}
-                        className="bg-slate-950/60 border-slate-800 text-slate-400 cursor-not-allowed text-xs h-9"
+                        className="bg-slate-950/80 border-slate-800 text-slate-300 disabled:opacity-80 cursor-not-allowed text-xs h-9"
                       />
                     </div>
                   </div>
@@ -600,7 +600,7 @@ export default function CheckoutPage() {
                           placeholder="मकान नंबर, गली, मोहल्ला, ज़िला"
                           value={newAddressForm.streetAddress}
                           onChange={(e) => handleNewAddressChange("streetAddress", e.target.value)}
-                          className="bg-slate-955 border-slate-700 h-16 text-xs"
+                          className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] h-16 text-xs"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -610,7 +610,7 @@ export default function CheckoutPage() {
                             placeholder="उदा. 42B"
                             value={newAddressForm.houseNumber}
                             onChange={(e) => handleNewAddressChange("houseNumber", e.target.value)}
-                            className="bg-slate-955 border-slate-700 text-xs h-8"
+                            className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] text-xs h-8"
                           />
                         </div>
                         <div className="space-y-1">
@@ -619,7 +619,7 @@ export default function CheckoutPage() {
                             placeholder="उदा. मंदिर के पास"
                             value={newAddressForm.landmark}
                             onChange={(e) => handleNewAddressChange("landmark", e.target.value)}
-                            className="bg-slate-955 border-slate-700 text-xs h-8"
+                            className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] text-xs h-8"
                           />
                         </div>
                       </div>
@@ -630,7 +630,7 @@ export default function CheckoutPage() {
                             placeholder="गाँव"
                             value={newAddressForm.village}
                             onChange={(e) => handleNewAddressChange("village", e.target.value)}
-                            className="bg-slate-955 border-slate-700 text-xs h-8"
+                            className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] text-xs h-8"
                           />
                         </div>
                         <div className="space-y-1">
@@ -639,7 +639,7 @@ export default function CheckoutPage() {
                             placeholder="वार्ड"
                             value={newAddressForm.ward}
                             onChange={(e) => handleNewAddressChange("ward", e.target.value)}
-                            className="bg-slate-955 border-slate-700 text-xs h-8"
+                            className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] text-xs h-8"
                           />
                         </div>
                         <div className="space-y-1">
@@ -648,7 +648,7 @@ export default function CheckoutPage() {
                             placeholder="शहर"
                             value={newAddressForm.city}
                             onChange={(e) => handleNewAddressChange("city", e.target.value)}
-                            className="bg-slate-955 border-slate-700 text-xs h-8"
+                            className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] text-xs h-8"
                           />
                         </div>
                       </div>
@@ -659,7 +659,7 @@ export default function CheckoutPage() {
                             placeholder="जिला"
                             value={newAddressForm.districtName}
                             onChange={(e) => handleNewAddressChange("districtName", e.target.value)}
-                            className="bg-slate-955 border-slate-700 text-xs h-8"
+                            className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] text-xs h-8"
                           />
                         </div>
                         <div className="space-y-1">
@@ -668,7 +668,7 @@ export default function CheckoutPage() {
                             placeholder="राज्य"
                             value={newAddressForm.state}
                             onChange={(e) => handleNewAddressChange("state", e.target.value)}
-                            className="bg-slate-955 border-slate-700 text-xs h-8"
+                            className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] text-xs h-8"
                           />
                         </div>
                         <div className="space-y-1">
@@ -677,7 +677,7 @@ export default function CheckoutPage() {
                             placeholder="पिन कोड"
                             value={newAddressForm.postalCode}
                             onChange={(e) => handleNewAddressChange("postalCode", e.target.value)}
-                            className="bg-slate-955 border-slate-700 text-xs h-8"
+                            className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] text-xs h-8"
                           />
                         </div>
                       </div>

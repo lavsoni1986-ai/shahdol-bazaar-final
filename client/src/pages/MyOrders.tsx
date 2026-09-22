@@ -96,22 +96,22 @@ export default function MyOrders() {
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+        return 'bg-yellow-950/60 text-yellow-400 border-yellow-800/50';
       case 'accepted':
       case 'confirmed':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
+        return 'bg-blue-950/60 text-blue-400 border-blue-800/50';
       case 'preparing':
-        return 'bg-amber-100 text-amber-700 border-amber-200';
+        return 'bg-amber-950/60 text-amber-400 border-amber-800/50';
       case 'ready':
-        return 'bg-teal-100 text-teal-700 border-teal-200';
+        return 'bg-teal-950/60 text-teal-400 border-teal-800/50';
       case 'completed':
       case 'delivered':
-        return 'bg-green-100 text-green-700 border-green-200';
+        return 'bg-green-950/60 text-green-400 border-green-800/50';
       case 'rejected':
       case 'cancelled':
-        return 'bg-red-100 text-red-700 border-red-200';
+        return 'bg-red-950/60 text-red-400 border-red-800/50';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'bg-slate-800 text-slate-300 border-slate-700';
     }
   };
 
@@ -145,7 +145,7 @@ export default function MyOrders() {
   const completedOrders = orders.filter(o => ['completed', 'delivered', 'cancelled', 'rejected'].includes(o.status));
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#030005] text-white">
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6">
         <div className="max-w-4xl mx-auto">
@@ -170,15 +170,15 @@ export default function MyOrders() {
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-4" />
-            <p className="text-slate-500">Loading your orders...</p>
+            <p className="text-slate-400">Loading your orders...</p>
           </div>
         ) : orders.length === 0 ? (
-          <Card>
+          <Card className="bg-slate-900 border-slate-800 text-white">
             <CardContent className="py-12 text-center">
-              <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">No orders yet</h3>
-              <p className="text-slate-500 mb-6">Start shopping to see your orders here</p>
-              <Button onClick={() => setLocation('/marketplace')} className="bg-orange-500">
+              <Package className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-200 mb-2">No orders yet</h3>
+              <p className="text-slate-400 mb-6">Start shopping to see your orders here</p>
+              <Button onClick={() => setLocation('/marketplace')} className="bg-orange-500 hover:bg-orange-600 text-white font-bold">
                 Browse Marketplace
               </Button>
             </CardContent>
@@ -188,15 +188,15 @@ export default function MyOrders() {
             {/* Pending Orders */}
             {pendingOrders.length > 0 && (
               <div>
-                <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
                   <Clock className="w-5 h-5 text-yellow-500" />
                   Pending ({pendingOrders.length})
                 </h2>
                 <div className="space-y-4">
                   {pendingOrders.map(order => (
-                    <Card key={order.id} className="border-yellow-200 overflow-hidden">
+                    <Card key={order.id} className="bg-slate-900 border-slate-800 overflow-hidden text-white">
                       {/* Order Details Header */}
-                      <div className="bg-gradient-to-r from-yellow-50 to-white p-4 border-b border-yellow-100">
+                      <div className="bg-slate-950/80 p-4 border-b border-slate-800">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             {/* Product Image */}
@@ -204,20 +204,20 @@ export default function MyOrders() {
                               <img
                                 src={order.product.imageUrl}
                                 alt={order.product.name}
-                                className="w-16 h-16 rounded-lg object-cover border"
+                                className="w-16 h-16 rounded-lg object-cover border border-slate-700"
                               />
                             ) : (
-                              <div className="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center">
+                              <div className="w-16 h-16 bg-slate-800 rounded-lg flex items-center justify-center">
                                 <Package className="w-8 h-8 text-slate-400" />
                               </div>
                             )}
                             <div>
-                              <p className="font-semibold text-slate-800">{order.product?.name || `Product #${order.productId}`}</p>
-                              <p className="text-sm text-slate-500">Qty: {order.quantity} • {new Date(order.createdAt).toLocaleDateString()}</p>
+                              <p className="font-semibold text-white">{order.product?.name || `Product #${order.productId}`}</p>
+                              <p className="text-sm text-slate-400">Qty: {order.quantity} • {new Date(order.createdAt).toLocaleDateString()}</p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-xl font-bold text-orange-600">₹{Number(order.totalPrice).toLocaleString()}</p>
+                            <p className="text-xl font-bold text-orange-400">₹{Number(order.totalPrice).toLocaleString()}</p>
                             <Badge className={`mt-1 ${getStatusColor(order.status)}`}>
                               {order.status}
                             </Badge>
@@ -229,12 +229,12 @@ export default function MyOrders() {
                       <CardContent className="p-4">
                         {/* Vendor with Trust Badge */}
                         {order.vendor && (
-                          <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100">
+                          <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-800">
                             <div className="flex items-center gap-2">
-                              <Store className="w-4 h-4 text-slate-500" />
-                              <span className="font-medium text-slate-700">{order.vendor.name}</span>
+                              <Store className="w-4 h-4 text-slate-400" />
+                              <span className="font-medium text-slate-200">{order.vendor.name}</span>
                               {order.vendor.isVerified && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/40 text-xs font-medium">
                                   <ShieldCheck className="w-3 h-3" />
                                   DSSL Verified
                                 </span>
@@ -244,7 +244,7 @@ export default function MyOrders() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-green-600 border-green-200 hover:bg-green-50"
+                                className="text-green-400 border-green-800/40 hover:bg-green-950/30"
                                 onClick={() => window.open(`https://wa.me/91${order.vendor?.phone?.replace(/\D/g, '')}`, '_blank')}
                               >
                                 <Phone className="w-4 h-4 mr-1" />
@@ -261,9 +261,9 @@ export default function MyOrders() {
 
                         {/* Delivery Address */}
                         {order.customerAddress && (
-                          <div className="flex items-start gap-2 mt-4 pt-4 border-t border-slate-100">
+                          <div className="flex items-start gap-2 mt-4 pt-4 border-t border-slate-800">
                             <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
-                            <span className="text-sm text-slate-600">{order.customerAddress}</span>
+                            <span className="text-sm text-slate-300">{order.customerAddress}</span>
                           </div>
                         )}
                       </CardContent>
@@ -276,15 +276,15 @@ export default function MyOrders() {
             {/* Active Orders */}
             {activeOrders.length > 0 && (
               <div>
-                <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-blue-500" />
                   In Progress ({activeOrders.length})
                 </h2>
                 <div className="space-y-4">
                   {activeOrders.map(order => (
-                    <Card key={order.id} className="border-blue-200 overflow-hidden">
+                    <Card key={order.id} className="bg-slate-900 border-slate-800 overflow-hidden text-white">
                       {/* Order Details Header */}
-                      <div className="bg-gradient-to-r from-blue-50 to-white p-4 border-b border-blue-100">
+                      <div className="bg-slate-950/80 p-4 border-b border-slate-800">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             {/* Product Image */}
@@ -292,20 +292,20 @@ export default function MyOrders() {
                               <img
                                 src={order.product.imageUrl}
                                 alt={order.product.name}
-                                className="w-16 h-16 rounded-lg object-cover border"
+                                className="w-16 h-16 rounded-lg object-cover border border-slate-700"
                               />
                             ) : (
-                              <div className="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center">
+                              <div className="w-16 h-16 bg-slate-800 rounded-lg flex items-center justify-center">
                                 <Package className="w-8 h-8 text-slate-400" />
                               </div>
                             )}
                             <div>
-                              <p className="font-semibold text-slate-800">{order.product?.name || `Product #${order.productId}`}</p>
-                              <p className="text-sm text-slate-500">Qty: {order.quantity} • {new Date(order.createdAt).toLocaleDateString()}</p>
+                              <p className="font-semibold text-white">{order.product?.name || `Product #${order.productId}`}</p>
+                              <p className="text-sm text-slate-400">Qty: {order.quantity} • {new Date(order.createdAt).toLocaleDateString()}</p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-xl font-bold text-orange-600">₹{Number(order.totalPrice).toLocaleString()}</p>
+                            <p className="text-xl font-bold text-orange-400">₹{Number(order.totalPrice).toLocaleString()}</p>
                             <Badge className={`mt-1 ${getStatusColor(order.status)}`}>
                               {order.status}
                             </Badge>
@@ -317,12 +317,12 @@ export default function MyOrders() {
                       <CardContent className="p-4">
                         {/* Vendor with Trust Badge */}
                         {order.vendor && (
-                          <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100">
+                          <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-800">
                             <div className="flex items-center gap-2">
-                              <Store className="w-4 h-4 text-slate-500" />
-                              <span className="font-medium text-slate-700">{order.vendor.name}</span>
+                              <Store className="w-4 h-4 text-slate-400" />
+                              <span className="font-medium text-slate-200">{order.vendor.name}</span>
                               {order.vendor.isVerified && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/40 text-xs font-medium">
                                   <ShieldCheck className="w-3 h-3" />
                                   DSSL Verified
                                 </span>
@@ -332,7 +332,7 @@ export default function MyOrders() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-green-600 border-green-200 hover:bg-green-50"
+                                className="text-green-400 border-green-800/40 hover:bg-green-950/30"
                                 onClick={() => window.open(`https://wa.me/91${order.vendor?.phone?.replace(/\D/g, '')}`, '_blank')}
                               >
                                 <Phone className="w-4 h-4 mr-1" />
@@ -349,9 +349,9 @@ export default function MyOrders() {
 
                         {/* Delivery Address */}
                         {order.customerAddress && (
-                          <div className="flex items-start gap-2 mt-4 pt-4 border-t border-slate-100">
+                          <div className="flex items-start gap-2 mt-4 pt-4 border-t border-slate-800">
                             <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
-                            <span className="text-sm text-slate-600">{order.customerAddress}</span>
+                            <span className="text-sm text-slate-300">{order.customerAddress}</span>
                           </div>
                         )}
                       </CardContent>
@@ -364,36 +364,36 @@ export default function MyOrders() {
             {/* Completed Orders */}
             {completedOrders.length > 0 && (
               <div>
-                <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-500" />
                   Completed ({completedOrders.length})
                 </h2>
                 <div className="space-y-4">
                   {completedOrders.map(order => (
-                    <Card key={order.id} className="border-green-200">
+                    <Card key={order.id} className="bg-slate-900 border-slate-800 overflow-hidden text-white">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                <Package className="w-5 h-5 text-green-600" />
+                              <div className="w-10 h-10 bg-green-950/60 border border-green-800/40 rounded-lg flex items-center justify-center">
+                                <Package className="w-5 h-5 text-green-400" />
                               </div>
                               <div>
-                                <p className="font-medium text-slate-800">Order #{order.id}</p>
-                                <p className="text-sm text-slate-500">
+                                <p className="font-medium text-white">Order #{order.id}</p>
+                                <p className="text-sm text-slate-400">
                                   {new Date(order.createdAt).toLocaleDateString()}
                                 </p>
                               </div>
                             </div>
                             {order.vendor && (
-                              <div className="flex items-center gap-2 text-sm text-slate-600 mt-2">
-                                <Store className="w-4 h-4" />
+                              <div className="flex items-center gap-2 text-sm text-slate-300 mt-2">
+                                <Store className="w-4 h-4 text-slate-400" />
                                 <span>{order.vendor.name}</span>
                               </div>
                             )}
                           </div>
                           <div className="text-right">
-                            <p className="text-lg font-bold text-orange-600">₹{order.totalPrice}</p>
+                            <p className="text-lg font-bold text-orange-400">₹{order.totalPrice}</p>
                             <Badge className={`mt-2 ${getStatusColor(order.status)}`}>
                               {getStatusIcon(order.status)}
                               <span className="ml-1">{order.status}</span>
@@ -402,7 +402,7 @@ export default function MyOrders() {
                         </div>
 
                         {/* Status Timeline */}
-                        <div className="mt-4 pt-4 border-t border-slate-100">
+                        <div className="mt-4 pt-4 border-t border-slate-800">
                           <OrderTimeline order={order} />
                         </div>
                       </CardContent>
