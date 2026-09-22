@@ -353,6 +353,8 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
               districtId,
               status: "APPROVED" as any,
               isShadowBanned: false,
+              businessType: { notIn: ["SERVICE", "HEALTHCARE", "SCHOOL", "EDUCATION"] },
+              category: { notIn: ["SERVICE", "HEALTHCARE", "HOSPITAL", "SCHOOL", "EDUCATION", "DOCTOR", "CLINIC", "service", "healthcare", "hospital", "school", "education", "doctor", "clinic"] }
             },
           },
           include: {
