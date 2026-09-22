@@ -175,14 +175,23 @@ export default function ShopDetail() {
   const [, vendorParams] = useRoute("/vendor/:slug");
   const [, partnerParams] = useRoute("/:district/partner/:slug");
   const [, marketplaceStoreParams] = useRoute("/marketplace/stores/:slug");
+  const [, healthcareParams] = useRoute("/healthcare/:slug");
+  const [, districtHealthcareParams] = useRoute("/:district/healthcare/:slug");
 
   const routeShopParams = shopParams as { id?: string } | null;
   const routeVendorParams = vendorParams as { slug?: string } | null;
   const routePartnerParams = partnerParams as { slug?: string } | null;
   const routeMarketplaceParams = marketplaceStoreParams as { slug?: string } | null;
+  const routeHealthcareParams = healthcareParams as { slug?: string } | null;
+  const routeDistrictHealthcareParams = districtHealthcareParams as { slug?: string } | null;
 
   const vendorId = routeShopParams?.id;
-  const slug = routeVendorParams?.slug || routePartnerParams?.slug || routeMarketplaceParams?.slug;
+  const slug =
+    routeVendorParams?.slug ||
+    routePartnerParams?.slug ||
+    routeMarketplaceParams?.slug ||
+    routeHealthcareParams?.slug ||
+    routeDistrictHealthcareParams?.slug;
 
   const [imageError, setImageError] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);

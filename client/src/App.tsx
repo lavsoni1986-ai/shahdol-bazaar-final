@@ -263,6 +263,8 @@ const Router = () => {
         <Route path="/marketplace" component={Marketplace} />
         <Route path="/marketplace/stores/:slug" component={ShopDetail} />
         <Route path="/marketplace/products/:id" component={ProductDetail} />
+        <Route path="/healthcare/:slug" component={ShopDetail} />
+        <Route path="/:district/healthcare/:slug" component={ShopDetail} />
         <Route path="/:district/partner/:slug" component={ShopDetail} />
         <Route path="/:district/product/:slug" component={ProductDetail} />
         <Route path="/:district/service/:slug" component={ServiceDetail} />
