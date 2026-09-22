@@ -68,18 +68,62 @@ type Product = {
  * Resolve entity kind from vendor data fields.
  * Uses canonical governance resolvers — NO hardcoded category branching.
  */
-function resolveVendorKind(vendor: Record<string, any>): string {
+function resolveVendorKind(vendor: Record<string, any>, isHealthcareRoute?: boolean): string {
+  // 1. Canonical business and entity types (from DTO)
+  const businessType = (vendor.businessType || vendor.meta?.businessType || "").toString().toLowerCase();
+  const entityType = (vendor.entityType || vendor.type || "").toString().toLowerCase();
+
+  if (
+    businessType === "healthcare" ||
+    entityType === "hospital" ||
+    entityType === "healthcare"
+  ) {
+    return "healthcare";
+  }
+
+  if (
+    businessType === "service" ||
+    entityType === "service"
+  ) {
+    return "service";
+  }
+
+  if (
+    businessType === "education" ||
+    businessType === "school" ||
+    entityType === "school"
+  ) {
+    return "service";
+  }
+
+  // Explicit retail / commerce protection: never let retail vendors be overridden
+  if (
+    businessType === "product" ||
+    businessType === "retail" ||
+    entityType === "product" ||
+    entityType === "vendor"
+  ) {
+    return "marketplace";
+  }
+
+  // 2. Category matching
   const fromCategory = resolveKindFromCategory(vendor.category || "");
   if (fromCategory) return fromCategory;
 
+  // 3. Tag matching
   const fromTags = vendor.tags?.length ? resolveKindFromTags(vendor.tags) : undefined;
   if (fromTags) return fromTags;
 
-  const type = (vendor.type || "").toLowerCase();
+  // 4. Existing type fallback
+  const type = (vendor.type || "").toString().toLowerCase();
   if (type === "hospital" || type === "healthcare") return "healthcare";
   if (type === "service" || type === "school") return "service";
   if (type === "shop" || type === "store" || type === "vendor") return "marketplace";
 
+  // 5. Healthcare route context ONLY as a fallback when canonical classification is unavailable
+  if (isHealthcareRoute) return "healthcare";
+
+  // 6. Default fallback
   return "marketplace";
 }
 
@@ -208,12 +252,15 @@ export default function ShopDetail() {
   });
 
   // ─── GOVERNANCE RESOLUTION ─────────────────────────────
-  const entityKind = vendor ? resolveVendorKind(vendor as Record<string, any>) : "marketplace";
+  const isHealthcareRoute = !!(healthcareParams || districtHealthcareParams);
+  const entityKind = vendor
+    ? resolveVendorKind(vendor as Record<string, any>, isHealthcareRoute)
+    : (isHealthcareRoute ? "healthcare" : "marketplace");
   const experience = vendor ? resolveEntityExperience({
     entityKind,
     category: (vendor as any).category,
     tags: (vendor as any).tags || [],
-    vendorType: (vendor as any).type,
+    vendorType: (vendor as any).type || (vendor as any).entityType || (vendor as any).businessType,
   }) : null;
   const ctas = vendor ? resolveEntityCTAs({
     kind: entityKind as any,
