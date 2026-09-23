@@ -264,7 +264,9 @@ router.post("/merchant/products", requireAuth, requireMerchant, async (req: Requ
       stock,
       isTrending = false,
       virtualTryOn = false,
-      imageUrl
+      imageUrl,
+      images,
+      imageUrls
     } = req.body;
 
     // M-15A: Normalize frontend-friendly payload aliases
@@ -317,9 +319,19 @@ router.post("/merchant/products", requireAuth, requireMerchant, async (req: Requ
       districtId: vendor.districtId
     });
 
-    // M-15C: Auto image attach after product create - single modal workflow
-    if (imageUrl) {
-      await createMerchantProductImage(product.id, imageUrl);
+    // M-15C: Auto image attach after product create - single modal workflow (supports single or multi-image)
+    const attachedImages: string[] = Array.isArray(images)
+      ? images
+      : Array.isArray(imageUrls)
+        ? imageUrls
+        : imageUrl
+          ? [imageUrl]
+          : [];
+
+    for (const imgUrl of attachedImages.slice(0, 4)) {
+      if (typeof imgUrl === "string" && imgUrl.trim()) {
+        await createMerchantProductImage(product.id, imgUrl.trim());
+      }
     }
 
     res.status(201);

@@ -453,6 +453,13 @@ export async function resolveProductById(
                     },
                 },
                 images: true,
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    },
+                },
             },
         });
 
@@ -637,6 +644,13 @@ export async function resolveProductBySlug(
             include: {
                 vendor: true,
                 images: true,
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                    },
+                },
             },
         });
 

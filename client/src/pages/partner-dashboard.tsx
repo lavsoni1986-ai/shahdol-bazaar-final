@@ -29,7 +29,7 @@ export default function PartnerDashboard() {
 
   // Product Modal State
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newProduct, setNewProduct] = useState({ name: "", price: "", category: "", description: "", imageUrl: "" });
+  const [newProduct, setNewProduct] = useState({ name: "", price: "", mrp: "", category: "", description: "", imageUrl: "", images: [] as string[] });
   const [uploading, setUploading] = useState(false);
 
   // Doctor Modal State
@@ -168,17 +168,23 @@ export default function PartnerDashboard() {
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!newProduct.imageUrl) {
-      toast.error("कृपया प्रोडक्ट की फोटो अपलोड करें!");
+    const primaryImg = newProduct.imageUrl || (newProduct.images && newProduct.images[0]);
+    if (!primaryImg) {
+      toast.error("कृपया प्रोडक्ट की कम से कम एक फोटो अपलोड करें!");
       return;
     }
 
     try {
-      const payload = {
+      const payload: any = {
         ...newProduct,
         price: parseFloat(newProduct.price),
+        mrp: newProduct.mrp ? parseFloat(newProduct.mrp) : undefined,
+        imageUrl: primaryImg,
+        images: newProduct.images?.length ? newProduct.images : [primaryImg],
         status: "PENDING"
       };
+      if (!payload.mrp) delete payload.mrp;
+      if (!payload.description) delete payload.description;
 
       console.log("🚀 [PRODUCT CREATE PAYLOAD]", payload);
 
@@ -187,7 +193,7 @@ export default function PartnerDashboard() {
       console.log("🟢 [PARTNER] Product create result:", res);
       toast.success("प्रोडक्ट रिव्यु के लिए भेज दिया गया है! 🚀");
       setShowAddModal(false);
-      setNewProduct({ name: "", price: "", category: "", description: "", imageUrl: "" });
+      setNewProduct({ name: "", price: "", mrp: "", category: "", description: "", imageUrl: "", images: [] });
       loadVendorData();
     } catch (err: any) {
       console.error("🔴 [PARTNER] API error:", err);
@@ -263,24 +269,50 @@ export default function PartnerDashboard() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
+    const existingImages = newProduct.images || (newProduct.imageUrl ? [newProduct.imageUrl] : []);
+    const remainingSlots = 4 - existingImages.length;
+    if (remainingSlots <= 0) {
+      toast.error("अधिकतम 4 फोटो ही अपलोड की जा सकती हैं!");
+      return;
+    }
+
+    const fileList = Array.from(files).slice(0, remainingSlots);
     const formData = new FormData();
-    formData.append("images", file);
+    for (const file of fileList) {
+      formData.append("images", file);
+    }
 
     setUploading(true);
     try {
       const result = await apiRequest("POST", "/upload", formData);
-      if (result?.urls && result.urls[0]) {
-        setNewProduct({ ...newProduct, imageUrl: result.urls[0] });
-        toast.success("फोटो अपलोड हो गई! 📸");
+      if (result?.urls && result.urls.length > 0) {
+        const uploadedUrls: string[] = result.urls;
+        const combined = Array.from(new Set([...existingImages, ...uploadedUrls])).slice(0, 4);
+        setNewProduct({
+          ...newProduct,
+          imageUrl: combined[0] || "",
+          images: combined
+        });
+        toast.success(`${uploadedUrls.length} फोटो अपलोड हो गई! 📸`);
       }
     } catch (err) {
       toast.error("Cloudinary Sync Failed!");
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    const existing = newProduct.images || (newProduct.imageUrl ? [newProduct.imageUrl] : []);
+    const updated = existing.filter((_, idx) => idx !== indexToRemove);
+    setNewProduct({
+      ...newProduct,
+      imageUrl: updated[0] || "",
+      images: updated
+    });
   };
 
   const handleDeleteProduct = async (id: number) => {
@@ -898,28 +930,45 @@ export default function PartnerDashboard() {
               <button type="button" onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><XCircle className="w-6 h-6" /></button>
               <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-6">Add New Product</h3>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Product Name</label>
-                  <input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 px-3 text-sm text-white" />
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Product Name *</label>
+                  <input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white" />
                 </div>
-                <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Price (₹)</label>
-                  <input required type="number" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 px-3 text-sm text-white" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Category</label>
-                  <input required type="text" value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 px-3 text-sm text-white" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Product Photo</label>
-                  <div className="flex gap-4 items-center mt-2">
-                    {newProduct.imageUrl && <img src={newProduct.imageUrl} className="w-16 h-16 rounded-lg object-cover border border-orange-500/50" />}
-                    <input type="file" onChange={handleImageUpload} accept="image/*" className="text-xs text-gray-400 file:bg-orange-600 file:text-black file:rounded-lg file:border-0 file:px-4 file:py-2" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Selling Price (₹) *</label>
+                    <input required type="number" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white" />
                   </div>
-                  {uploading && <p className="text-[10px] text-orange-500 animate-pulse mt-2">Processing in Cloudinary...</p>}
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">MRP / Original (₹)</label>
+                    <input type="number" placeholder="Optional" value={newProduct.mrp} onChange={e => setNewProduct({...newProduct, mrp: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white" />
+                  </div>
                 </div>
-                <button type="submit" className="w-full bg-orange-600 text-black py-3 rounded-xl font-black text-sm uppercase mt-4 hover:scale-[1.02] transition-transform">
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Category *</label>
+                  <input required type="text" value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Product Description</label>
+                  <textarea rows={3} placeholder="Describe product details, condition, warranty..." value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white resize-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Product Photos (Up to 4)</label>
+                  {((newProduct.images && newProduct.images.length > 0) || newProduct.imageUrl) && (
+                    <div className="flex gap-2 mb-2 flex-wrap">
+                      {(newProduct.images?.length ? newProduct.images : [newProduct.imageUrl]).map((img, idx) => (
+                        <div key={idx} className="relative group">
+                          <img src={img} className="w-12 h-12 rounded-lg object-cover border border-orange-500/50" />
+                          <button type="button" onClick={() => handleRemoveImage(idx)} className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <input type="file" multiple onChange={handleImageUpload} accept="image/*" className="text-xs text-gray-400 file:bg-orange-600 file:text-black file:rounded-lg file:border-0 file:px-4 file:py-1.5" />
+                  {uploading && <p className="text-[10px] text-orange-500 animate-pulse mt-1.5">Processing in Cloudinary...</p>}
+                </div>
+                <button type="submit" className="w-full bg-orange-600 text-black py-2.5 rounded-xl font-black text-sm uppercase mt-3 hover:scale-[1.02] transition-transform">
                   Submit for Approval
                 </button>
               </div>

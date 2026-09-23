@@ -383,6 +383,7 @@ interface SellerInfoCardProps {
     dsslScore?: number | null;
     onViewMap?: () => void;
     entityKind?: string;
+    storeSlug?: string | null;
 }
 
 export function SellerInfoCard({
@@ -394,6 +395,7 @@ export function SellerInfoCard({
     dsslScore,
     onViewMap,
     entityKind,
+    storeSlug,
 }: SellerInfoCardProps) {
     const handleMap = () => {
         if (onViewMap) {
@@ -423,7 +425,19 @@ export function SellerInfoCard({
                 </div>
             )}
 
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
+                {storeSlug && (
+                    <Link href={`/marketplace/stores/${storeSlug}`}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-orange-500/30 text-orange-400 hover:text-white hover:bg-orange-500/10 text-xs rounded-xl"
+                        >
+                            <Store className="w-3.5 h-3.5 mr-1.5" />
+                            Visit Store
+                        </Button>
+                    </Link>
+                )}
                 {(address || mapsLink) && (
                     <Button
                         variant="outline"

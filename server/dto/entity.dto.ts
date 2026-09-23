@@ -137,6 +137,7 @@ export const productEntitySchema = canonicalEntitySchema.extend({
     vendorId: z.number(),
     vendorName: z.string().optional(),
     vendor: vendorEntitySchema.optional(),
+    category: z.string().optional(),
 
     meta: z.object({
         price: z.number().optional(),
@@ -401,7 +402,7 @@ export async function mapProductToDTO(product: any, vendor?: any): Promise<Produ
 
     const productImages: string[] =
         product.images?.length
-            ? product.images.map((img: any) => img.url)
+            ? product.images.map((img: any) => img.imageUrl || img.url || (typeof img === 'string' ? img : '')).filter(Boolean)
             : product.imageUrl
                 ? [product.imageUrl]
                 : [];
@@ -412,6 +413,7 @@ export async function mapProductToDTO(product: any, vendor?: any): Promise<Produ
         name: product.title || "Local Product",
         slug: product.slug || String(product.id),
         description: product.description,
+        category: product.category?.name || product.categoryName || undefined,
         districtId: vendor?.districtId || 1,
         address: vendor?.address,
         phone: vendor?.phone || vendor?.mobile,

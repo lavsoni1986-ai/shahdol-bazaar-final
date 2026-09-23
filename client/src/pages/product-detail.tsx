@@ -64,6 +64,7 @@ type Product = {
   vendorName?: string;
   vendor?: {
     name?: string;
+    slug?: string;
     address?: string;
     phone?: string;
     mobile?: string;
@@ -128,6 +129,7 @@ export default function ProductDetail() {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   // Fetch product
   const {
@@ -161,6 +163,26 @@ export default function ProductDetail() {
     retry: false,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+  });
+
+  // Fetch related products (same vendor or district)
+  const { data: relatedProducts } = useQuery({
+    queryKey: ["related-products", product?.vendorId, districtId],
+    queryFn: async () => {
+      if (!product?.id) return [];
+      try {
+        const queryParam = product.vendorId ? `?vendorId=${product.vendorId}` : "";
+        const res = await apiRequest("GET", `/marketplace/products${queryParam}`);
+        const items = (res as any)?.data ?? res ?? [];
+        return Array.isArray(items)
+          ? items.filter((p: any) => String(p.id) !== String(product.id)).slice(0, 4)
+          : [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!product?.id,
+    staleTime: 5 * 60 * 1000,
   });
 
   const addReviewMutation = useMutation({
@@ -261,7 +283,23 @@ export default function ProductDetail() {
       ? Math.round((1 - priceNum / originalPrice) * 100)
       : 0;
   const sameDay = true;
-  const primaryImage = toAbsolute(product.images?.[0] || product.imageUrls?.[0] || product.imageUrl || defaultImage);
+  const rawImages: any[] = Array.isArray(product.images) && product.images.length > 0
+    ? product.images
+    : Array.isArray((product as any).imageUrls) && (product as any).imageUrls.length > 0
+      ? (product as any).imageUrls
+      : product.imageUrl
+        ? [product.imageUrl]
+        : [];
+
+  const productImages: string[] = rawImages
+    .map((img: any) => toAbsolute(typeof img === 'string' ? img : img?.url || img?.imageUrl || ''))
+    .filter(Boolean);
+
+  if (productImages.length === 0) {
+    productImages.push(defaultImage);
+  }
+
+  const primaryImage = productImages[activeImageIndex] || productImages[0] || defaultImage;
   const sellerName = product.vendorName || product.vendor?.name || product.shopName || "Local Seller";
   const sellerAddress = product.vendor?.address || product.shopAddress || null;
   const sellerPhoneVal =
@@ -290,7 +328,7 @@ export default function ProductDetail() {
       */}
 
       {/* ─── MAIN CONTENT ─── */}
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-8">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-8 pb-28 md:pb-12 space-y-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
           {/* ── LEFT: PRODUCT MEDIA ── */}
           <div className="space-y-4">
@@ -301,11 +339,22 @@ export default function ProductDetail() {
               priority
             />
 
-            {primaryImage && primaryImage !== defaultImage && (
+            {productImages.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-orange-500/50 bg-zinc-800 shrink-0">
-                  <img src={primaryImage} alt="" className="w-full h-full object-contain" />
-                </div>
+                {productImages.map((imgUrl, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveImageIndex(idx)}
+                    className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all shrink-0 bg-zinc-800 p-0.5 ${
+                      activeImageIndex === idx
+                        ? "border-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]"
+                        : "border-white/10 hover:border-white/30 opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <img src={imgUrl} alt={`${product.name} - photo ${idx + 1}`} className="w-full h-full object-cover rounded-lg" />
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -384,6 +433,7 @@ export default function ProductDetail() {
                 phone={sellerPhoneVal}
                 mapsLink={sellerMaps}
                 trustLevel={trustLevel}
+                storeSlug={product.vendor?.slug || (product as any)?.shopSlug || null}
               />
             )}
 
@@ -418,6 +468,16 @@ export default function ProductDetail() {
             </DetailSection>
           </div>
         </div>
+
+        {/* ─── RELATED PRODUCTS (MORE FROM SELLER) ─── */}
+        {relatedProducts && relatedProducts.length > 0 && (
+          <div className="pt-6 border-t border-white/5">
+            <RelatedProducts
+              products={relatedProducts}
+              title="More from this Seller"
+            />
+          </div>
+        )}
       </div>
 
       {/* ─── STICKY MOBILE CTA ─── */}
