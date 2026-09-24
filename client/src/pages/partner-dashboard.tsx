@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { apiRequest } from "@/lib/api-client";
 import {
   Store, Package, ShoppingBag, Settings,
-  Plus, TrendingUp, Clock, Menu, X, LogOut, Trash2, XCircle,
+  Plus, TrendingUp, Clock, Menu, X, LogOut, Trash2, XCircle, Pencil,
   Stethoscope, UserPlus, Briefcase, GraduationCap, Calendar, Phone, MessageSquare
 } from "lucide-react";
 
@@ -31,6 +31,19 @@ export default function PartnerDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: "", price: "", mrp: "", category: "", description: "", imageUrl: "", images: [] as string[] });
   const [uploading, setUploading] = useState(false);
+
+  // Edit Product Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    price: "",
+    mrp: "",
+    category: "",
+    description: "",
+    stock: "100"
+  });
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Doctor Modal State
   const [showDoctorModal, setShowDoctorModal] = useState(false);
@@ -327,6 +340,78 @@ export default function PartnerDashboard() {
     }
   };
 
+  const handleOpenEditModal = (product: any) => {
+    setEditingProduct(product);
+    setEditForm({
+      name: product.name || product.title || "",
+      price: product.price !== undefined && product.price !== null ? String(product.price) : "",
+      mrp: product.mrp !== undefined && product.mrp !== null ? String(product.mrp) : "",
+      category: product.category?.name || product.categoryName || product.category || "",
+      description: product.description || "",
+      stock: product.stock !== undefined && product.stock !== null ? String(product.stock) : "100"
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    if (!editForm.name.trim()) {
+      toast.error("Product name is required");
+      return;
+    }
+
+    const parsedPrice = parseFloat(editForm.price);
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      toast.error("Valid selling price is required");
+      return;
+    }
+
+    const payload: Record<string, any> = {
+      name: editForm.name.trim(),
+      price: parsedPrice,
+      description: editForm.description.trim() || null,
+    };
+
+    if (editForm.mrp !== undefined && editForm.mrp !== "") {
+      const parsedMrp = parseFloat(editForm.mrp);
+      if (!isNaN(parsedMrp) && parsedMrp >= 0) {
+        payload.mrp = parsedMrp;
+      } else {
+        toast.error("MRP must be a valid number");
+        return;
+      }
+    } else {
+      payload.mrp = null;
+    }
+
+    if (editForm.category && editForm.category.trim()) {
+      payload.category = editForm.category.trim();
+    }
+
+    if (editForm.stock !== undefined && editForm.stock !== "") {
+      const parsedStock = parseInt(editForm.stock, 10);
+      if (!isNaN(parsedStock) && parsedStock >= 0) {
+        payload.stock = parsedStock;
+      }
+    }
+
+    setIsSubmittingEdit(true);
+    try {
+      await apiRequest("PUT", `/merchant/products/${editingProduct.id}`, payload);
+      toast.success("प्रोडक्ट सफलतापूर्वक अपडेट हो गया! ✅");
+      setShowEditModal(false);
+      setEditingProduct(null);
+      await loadVendorData();
+    } catch (err: any) {
+      console.error("🔴 [PARTNER] Product update error:", err);
+      toast.error(err.message || "Failed to update product");
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -594,7 +679,22 @@ export default function PartnerDashboard() {
                           </span>
                         </td>
                         <td className="py-4 md:py-5 px-4 md:px-6 text-right">
-                          <button onClick={() => handleDeleteProduct(p.id)} className="p-2 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleOpenEditModal(p)}
+                              title="Edit Product"
+                              className="p-2 hover:bg-orange-500/10 rounded-lg transition-all text-orange-400 hover:text-orange-300"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProduct(p.id)}
+                              title="Delete Product"
+                              className="p-2 hover:bg-red-500/10 rounded-lg transition-all text-red-500 hover:text-red-400"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -976,7 +1076,107 @@ export default function PartnerDashboard() {
           </div>
         )}
 
-        {/* ===================== ADD DOCTOR MODAL (HEALTHCARE ONLY) ===================== */}
+        {/* ===================== EDIT PRODUCT MODAL (RETAIL ONLY) ===================== */}
+        {showEditModal && editingProduct && isRetail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+            <form onSubmit={handleUpdateProduct} className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => { setShowEditModal(false); setEditingProduct(null); }}
+                className="absolute top-4 right-4 text-gray-500 hover:text-white"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+              <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-1">Edit Product</h3>
+              <p className="text-xs text-gray-400 mb-6 font-mono">#{editingProduct.id} • {editingProduct.name || editingProduct.title}</p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Product Name *</label>
+                  <input
+                    required
+                    type="text"
+                    value={editForm.name}
+                    onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Selling Price (₹) *</label>
+                    <input
+                      required
+                      type="number"
+                      step="any"
+                      value={editForm.price}
+                      onChange={e => setEditForm({ ...editForm, price: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">MRP / Original (₹)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="Optional"
+                      value={editForm.mrp}
+                      onChange={e => setEditForm({ ...editForm, mrp: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Category</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Electronics"
+                      value={editForm.category}
+                      onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Stock</label>
+                    <input
+                      type="number"
+                      value={editForm.stock}
+                      onChange={e => setEditForm({ ...editForm, stock: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Product Description</label>
+                  <textarea
+                    rows={4}
+                    placeholder="Describe product details, condition, warranty..."
+                    value={editForm.description}
+                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white resize-none focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowEditModal(false); setEditingProduct(null); }}
+                    className="w-1/3 bg-white/5 hover:bg-white/10 text-gray-300 py-2.5 rounded-xl font-black text-sm uppercase transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingEdit}
+                    className="w-2/3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-black py-2.5 rounded-xl font-black text-sm uppercase transition-transform hover:scale-[1.01]"
+                  >
+                    {isSubmittingEdit ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        )}
         {showDoctorModal && isHealthcare && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
             <form onSubmit={handleAddDoctor} className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
