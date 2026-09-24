@@ -437,6 +437,17 @@ console.log("🔍 [AUTH] Login Result:", result);
                         </FormItem>
                       )}
                     />
+
+                    <div className="flex justify-end -mt-1 mb-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsHelpOpen(true)}
+                        className="text-xs text-orange-400 hover:text-orange-300 transition-colors inline-flex items-center gap-1.5 font-medium py-1 px-1 rounded focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5 text-orange-400" />
+                        Need help logging in? / पासवर्ड सहायता
+                      </button>
+                    </div>
                     
                     {isRateLimited && rateLimitRemaining !== null && (
                       <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4 text-center backdrop-blur-md">
