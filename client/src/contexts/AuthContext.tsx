@@ -48,6 +48,7 @@ interface User {
   phone?: string | null;
   name?: string | null;
   address?: string | null;
+  mustChangePassword?: boolean;
 }
 
 interface AuthContextType {

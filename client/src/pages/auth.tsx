@@ -24,7 +24,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Loader2, ShoppingBag } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Store, Loader2, ShoppingBag, HelpCircle, KeyRound, ShieldAlert, CheckCircle2 } from "lucide-react";
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, "Username required"),
@@ -88,7 +95,22 @@ const getReturnUrl = (): string | null => {
 export default function AuthPage() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { isAuthenticated, user, loading: authLoading } = useAuth();
+  const { isAuthenticated, user, loading: authLoading, setUserData, logout } = useAuth();
+
+  // 🔐 Phase 1 Recovery & Forced Password Change State
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isForceChangeOpen, setIsForceChangeOpen] = useState(false);
+  const [forceChangeCurrent, setForceChangeCurrent] = useState("");
+  const [forceChangeNew, setForceChangeNew] = useState("");
+  const [forceChangeConfirm, setForceChangeConfirm] = useState("");
+  const [forceChangeLoading, setForceChangeLoading] = useState(false);
+  const [forceChangeError, setForceChangeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.mustChangePassword) {
+      setIsForceChangeOpen(true);
+    }
+  }, [user?.mustChangePassword]);
   
   // Track active tab only for knowing which API to hit, NOT for controlling the Tabs component!
   // Use constant default - initialize from URL in useEffect
@@ -185,6 +207,76 @@ export default function AuthPage() {
     }
   }, [location, isAuthenticated, user, authLoading, setLocation]);
 
+  const handleForceChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForceChangeError(null);
+
+    if (!forceChangeCurrent) {
+      setForceChangeError("Current/Temporary password is required");
+      return;
+    }
+    if (forceChangeNew.length < 8) {
+      setForceChangeError("Password must be at least 8 characters long");
+      return;
+    }
+    if (!/[A-Z]/.test(forceChangeNew)) {
+      setForceChangeError("Password must contain at least one uppercase letter (A-Z)");
+      return;
+    }
+    if (!/[a-z]/.test(forceChangeNew)) {
+      setForceChangeError("Password must contain at least one lowercase letter (a-z)");
+      return;
+    }
+    if (!/[0-9]/.test(forceChangeNew)) {
+      setForceChangeError("Password must contain at least one number (0-9)");
+      return;
+    }
+    if (forceChangeNew !== forceChangeConfirm) {
+      setForceChangeError("New passwords do not match");
+      return;
+    }
+    if (forceChangeCurrent === forceChangeNew) {
+      setForceChangeError("New password must be different from current temporary password");
+      return;
+    }
+
+    setForceChangeLoading(true);
+    try {
+      const res = await apiRequest("POST", "/auth/change-password", {
+        currentPassword: forceChangeCurrent,
+        newPassword: forceChangeNew,
+        confirmPassword: forceChangeConfirm,
+      });
+
+      const updatedUser = res?.data?.user;
+      if (!updatedUser) {
+        throw new Error("Password change response missing user data");
+      }
+
+      toast({
+        title: "पासवर्ड अपडेट हुआ / Password Updated",
+        description: "Your permanent password has been set. Welcome to ShahdolBazaar!",
+      });
+
+      setIsForceChangeOpen(false);
+      setUserData(updatedUser);
+
+      const returnUrl = getReturnUrl();
+      const target =
+        updatedUser?.role?.toUpperCase?.().trim?.() === "CUSTOMER" && returnUrl
+          ? returnUrl
+          : getClientRoleRedirectPath(updatedUser);
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      window.location.href = target;
+    } catch (err: any) {
+      console.error("Force change password error:", err);
+      setForceChangeError(err.message || "Failed to update password. Please check your current password.");
+    } finally {
+      setForceChangeLoading(false);
+    }
+  };
+
   const onSubmit = async (data: any) => {
     console.log("🔵 [AUTH] [SUBMIT] Form submitted for:", activeTab);
     
@@ -242,6 +334,15 @@ console.log("🔍 [AUTH] Login Result:", result);
 
       // ✅ Reset login attempts on successful login
       setLoginAttempts(0);
+
+      // 🔒 Phase 1: Force immediate password change if flag is set
+      if (userData?.mustChangePassword) {
+        setForceChangeCurrent(data.password);
+        setIsForceChangeOpen(true);
+        setLoading(false);
+        isSubmittingRef.current = false;
+        return;
+      }
 
       // ✅ Role-based redirect with customer return destination override
       const returnUrl = getReturnUrl();
@@ -468,6 +569,149 @@ console.log("🔍 [AUTH] Login Result:", result);
           </TabsContent>
         </Tabs>
         
+        {/* 🛡️ DIALOG 1: ADMIN-ASSISTED RECOVERY HELP DIALOG */}
+        <Dialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
+          <DialogContent className="bg-slate-900 border border-slate-700 text-white max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-2 mb-1">
+                <HelpCircle className="w-5 h-5 text-orange-400" />
+                <DialogTitle className="text-lg font-bold">Account Access Assistance</DialogTitle>
+              </div>
+              <DialogDescription className="text-slate-400 text-xs">
+                खाता सहायता एवं पासवर्ड रिकवरी
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 text-sm text-slate-300 py-2">
+              <div className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-2">
+                <p className="font-semibold text-white text-xs uppercase tracking-wider text-orange-400">
+                  Regional Pilot Security Notice
+                </p>
+                <p className="text-xs leading-relaxed text-slate-300">
+                  ShahdolBazaar enforces strict identity protection for local merchants and customers. Automated SMS/OTP recovery is currently not active in this pilot phase.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="font-medium text-white text-sm">How to recover your account:</p>
+                <ol className="list-decimal pl-4 space-y-1.5 text-xs text-slate-300">
+                  <li>Contact the <strong>ShahdolBazaar Administration & Support Desk</strong>.</li>
+                  <li>Verify your store or customer identity with the authorized administrator.</li>
+                  <li>The administrator will issue an audited, one-time temporary recovery password.</li>
+                  <li>Log in with that temporary password. You will be required to set your new permanent password immediately upon login.</li>
+                </ol>
+              </div>
+
+              <div className="p-3 bg-orange-950/30 border border-orange-500/20 rounded-xl text-xs text-orange-300">
+                Support Desk: Please contact your regional district coordinator or visit the local district commerce desk for verified identity reset.
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsHelpOpen(false)}
+                className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              >
+                Close / बंद करें
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* 🔒 DIALOG 2: FORCED PASSWORD CHANGE DIALOG */}
+        <Dialog open={isForceChangeOpen} onOpenChange={() => {}}>
+          <DialogContent className="bg-slate-900 border border-orange-500/40 text-white max-w-md [&>button]:hidden">
+            <DialogHeader>
+              <div className="flex items-center gap-2 mb-1">
+                <KeyRound className="w-5 h-5 text-orange-500" />
+                <DialogTitle className="text-lg font-bold">New Password Required</DialogTitle>
+              </div>
+              <DialogDescription className="text-slate-400 text-xs">
+                पासवर्ड बदलना अनिवार्य है
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="p-3 bg-orange-950/40 border border-orange-500/30 rounded-xl text-xs text-orange-200 mb-2">
+              You logged in using an administrator-issued temporary password. For your account security, you must choose a new permanent password before proceeding.
+            </div>
+
+            {forceChangeError && (
+              <div className="p-3 bg-red-950/50 border border-red-500/40 rounded-xl text-xs text-red-200 flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <span>{forceChangeError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleForceChangePassword} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Current / Temporary Password</label>
+                <Input
+                  type="password"
+                  value={forceChangeCurrent}
+                  onChange={(e) => setForceChangeCurrent(e.target.value)}
+                  placeholder="Enter current/temporary password"
+                  className="bg-white/5 border-white/10 text-white text-sm"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">New Password</label>
+                <Input
+                  type="password"
+                  value={forceChangeNew}
+                  onChange={(e) => setForceChangeNew(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                  className="bg-white/5 border-white/10 text-white text-sm"
+                  required
+                />
+                <p className="text-[11px] text-slate-400">
+                  Must contain 8+ characters, uppercase, lowercase, and a number.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Confirm New Password</label>
+                <Input
+                  type="password"
+                  value={forceChangeConfirm}
+                  onChange={(e) => setForceChangeConfirm(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="bg-white/5 border-white/10 text-white text-sm"
+                  required
+                />
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsForceChangeOpen(false);
+                    logout(true);
+                  }}
+                  className="w-1/3 border-slate-700 text-slate-400 hover:bg-slate-800"
+                >
+                  Logout
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={forceChangeLoading}
+                  className="w-2/3 bg-orange-600 hover:bg-orange-500 text-white font-bold"
+                >
+                  {forceChangeLoading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...</>
+                  ) : (
+                    "Save & Continue"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         <div className="text-center mt-6 text-sm text-slate-500">
           <p>By continuing, you agree to our</p>
           <div className="flex justify-center gap-2 mt-1">

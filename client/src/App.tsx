@@ -120,6 +120,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     if (authState === "loading" || !isAuthPage || redirectSentRef.current) return;
 
     if (authState === "authenticated" && user) {
+      if (user.mustChangePassword) {
+        return; // Stay on /auth to complete forced password change
+      }
       redirectSentRef.current = true;
       const target = getClientRoleRedirectPath(user);
       setLocation(target);
@@ -127,7 +130,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [authState, user, setLocation, isAuthPage]);
 
   if (authState === "loading") return <PageLoader />;
-  if (authState === "authenticated" && isAuthPage) return <PageLoader />;
+  if (authState === "authenticated" && isAuthPage && !user?.mustChangePassword) return <PageLoader />;
 
   return <>{children}</>;
 }
@@ -145,6 +148,10 @@ function ProtectedRouteGuard({
 
   // Lightweight auth guard observability
   console.log('🔐 [ROUTE GUARD] authState=', authState, 'user=', user?.username, 'role=', user?.role, 'requiredRole=', requiredRole);
+
+  if (user?.mustChangePassword) {
+    return <Redirect to="/auth" />;
+  }
 
   const isSuperAdmin =
     (user?.role || '').toString().toUpperCase() === "SUPER_ADMIN" ||

@@ -2,6 +2,8 @@ import * as express from "express";
 import type { Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import { requireAuth, requireRole, requireSuperAdmin, requireCityAdmin } from "../../auth/middleware";
+import { generateSecurePassword, hashPassword } from "../../auth/password";
+import { normalizeRole, UserRole } from "../../../shared/roles";
 import { storage, prisma } from "../../storage";
 import { success, failure, unauthorized, notFound, forbidden, serverError, validationError } from "../../lib/apiResponse";
 import { SystemLockdown } from "../../services/system.health";
@@ -1308,6 +1310,95 @@ router.patch("/users/:id/quarantine", requireAuth, requireSuperAdmin, async (req
   } catch (e) {
     console.error("Failed to quarantine user", e);
     return res.status(500).json({ success: false, error: "Failed to quarantine user" });
+  }
+});
+
+// --- ADMIN: RESET USER PASSWORD (ADMIN-ASSISTED RECOVERY) ---
+router.post("/users/:id/reset-password", requireAuth, requireRole([UserRole.SUPER_ADMIN, UserRole.CITY_ADMIN]), async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json(validationError([{ field: "id", message: "Invalid user ID", code: "INVALID_ID" }]));
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser) {
+      return res.status(404).json(notFound("User"));
+    }
+
+    const callerRole = normalizeRole(req.ctx?.role);
+    const targetUserRole = normalizeRole(targetUser.role);
+
+    // Security check 1: Only SUPER_ADMIN can reset an admin or super admin
+    if ((targetUserRole === UserRole.SUPER_ADMIN || targetUserRole === UserRole.CITY_ADMIN) && callerRole !== UserRole.SUPER_ADMIN) {
+      return res.status(403).json(forbidden("Only Super Admins can reset administrative accounts"));
+    }
+
+    // Security check 2: CITY_ADMIN can only reset users in their assigned district
+    if (callerRole === UserRole.CITY_ADMIN) {
+      const adminDistrictId = req.ctx?.districtId;
+      if (!adminDistrictId || targetUser.districtId !== adminDistrictId) {
+        return res.status(403).json(forbidden("City Admins can only reset accounts within their assigned district"));
+      }
+    }
+
+    // Generate temporary password server-side using secure generator
+    const tempPassword = generateSecurePassword(12);
+    const hashedPassword = hashPassword(tempPassword);
+
+    // Atomically update password, set mustChangePassword = true, and increment tokenVersion
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+        mustChangePassword: true,
+        tokenVersion: { increment: 1 },
+      },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        districtId: true,
+        mustChangePassword: true,
+        tokenVersion: true,
+      },
+    });
+
+    // Write audit log entry (CRITICAL: never store temporary password or hash in audit log)
+    await prisma.adminActionLog.create({
+      data: {
+        adminId: req.ctx?.userId!,
+        action: "ADMIN_PASSWORD_RESET",
+        details: {
+          targetId: userId,
+          targetType: "user",
+          targetUsername: targetUser.username,
+          targetRole: targetUser.role,
+          districtId: targetUser.districtId ?? req.ctx?.districtId ?? null,
+          mustChangePasswordSet: true,
+          tokenVersionIncremented: true,
+          decision: "PASSWORD_RESET_EXECUTED",
+        },
+      },
+    });
+
+    // Return temporary password ONCE to authorized admin (never logged to server console)
+    return res.json({
+      success: true,
+      data: {
+        message: "Temporary password generated successfully. It must be provided to the user who will be forced to change it on login.",
+        temporaryPassword: tempPassword,
+        targetUser: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          role: updatedUser.role,
+          mustChangePassword: updatedUser.mustChangePassword,
+        },
+      },
+    });
+  } catch (e) {
+    console.error("Failed to reset user password", e);
+    return res.status(500).json(serverError("Failed to reset user password"));
   }
 });
 

@@ -1,5 +1,5 @@
 import express, { type Request, type Response } from "express";
-import { hashPassword, verifyPassword } from "../auth/password";
+import { hashPassword, verifyPassword, validatePasswordStrength } from "../auth/password";
 import { generateTokenPair, verifyRefreshToken } from "../auth/jwt";
 import { loginDTO, registerDTO, refreshTokenDTO } from "../dto/auth.dto";
 import { normalizeRole } from "../../shared/roles";
@@ -50,14 +50,15 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, error: "Invalid credentials" });
     }
 
-    // 🔐 Generate tokens with current version
+    // 🔐 Generate tokens with current version from DB
     console.log("[LOGIN] generating tokens");
+    const userTokenVersion = typeof (user as any).tokenVersion === "number" ? (user as any).tokenVersion : 1;
     const tokens = generateTokenPair({
       userId: user.id,
       username: user.username,
       role: normalizeRole(user.role),
       districtId: user.districtId,
-      tokenVersion: 1,
+      tokenVersion: userTokenVersion,
     });
 
     if (process.env.NODE_ENV !== "production") {
@@ -104,6 +105,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
           role: normalizeRole(user.role),
           isAdmin: user.isAdmin,
           districtId: user.districtId,
+          mustChangePassword: (user as any).mustChangePassword ?? false,
           name: profile?.fullName || user.username,
           phone: profile?.phone || null,
         }
@@ -416,6 +418,7 @@ router.get("/verify", optionalAuth, async (req: any, res) => {
     });
 
     console.log("✅ [VERIFY] Verification successful, returning user data");
+    const userMustChangePassword = (user as any).mustChangePassword ?? req.user.mustChangePassword ?? false;
     return res.json({
       success: true,
       data: {
@@ -425,6 +428,7 @@ router.get("/verify", optionalAuth, async (req: any, res) => {
           role: req.user.role,
           isAdmin: req.user.isAdmin,
           districtId: req.user.districtId,
+          mustChangePassword: userMustChangePassword,
           name: profile?.fullName || req.user.username,
           phone: profile?.phone || null,
         }
@@ -435,6 +439,7 @@ router.get("/verify", optionalAuth, async (req: any, res) => {
         role: req.user.role,
         isAdmin: req.user.isAdmin,
         districtId: req.user.districtId,
+        mustChangePassword: userMustChangePassword,
         name: profile?.fullName || req.user.username,
         phone: profile?.phone || null,
       }
@@ -442,6 +447,154 @@ router.get("/verify", optionalAuth, async (req: any, res) => {
   } catch (err) {
     console.error("[VERIFY ERROR]", err);
     return res.status(500).json({ success: false });
+  }
+});
+
+// ============================================
+// 🔐 FORCED & SELF-SERVICE PASSWORD CHANGE
+// ============================================
+router.post("/change-password", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body || {};
+
+    if (!currentPassword || typeof currentPassword !== "string") {
+      return res.status(400).json({ success: false, error: "Current password is required" });
+    }
+    if (!newPassword || typeof newPassword !== "string") {
+      return res.status(400).json({ success: false, error: "New password is required" });
+    }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, error: "New passwords do not match" });
+    }
+
+    // Validate strength using standard policy
+    const strengthResult = validatePasswordStrength(newPassword);
+    if (!strengthResult.valid) {
+      return res.status(400).json({
+        success: false,
+        error: strengthResult.errors[0] || "Password does not meet strength requirements",
+        details: strengthResult.errors,
+      });
+    }
+
+    const userId = req.ctx?.userId ?? req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Authentication required" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    const isCurrentValid = verifyPassword(currentPassword, user.password);
+    if (!isCurrentValid) {
+      return res.status(401).json({ success: false, error: "Current password is incorrect" });
+    }
+
+    // Ensure new password is not identical to current password
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: "New password must be different from current temporary password",
+      });
+    }
+
+    const hashedPassword = hashPassword(newPassword);
+
+    // Atomically update password, clear forced change flag, and increment tokenVersion
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        mustChangePassword: false,
+        tokenVersion: { increment: 1 },
+      },
+    });
+
+    // Issue fresh tokens with the incremented tokenVersion
+    const tokens = generateTokenPair({
+      userId: updated.id,
+      username: updated.username,
+      role: normalizeRole(updated.role),
+      districtId: updated.districtId,
+      tokenVersion: updated.tokenVersion,
+    });
+
+    const isProd = process.env.NODE_ENV === "production";
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? ("none" as const) : ("lax" as const),
+      path: "/",
+    };
+
+    res.cookie("accessToken", tokens.accessToken, {
+      ...cookieOptions,
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie("refreshToken", tokens.refreshToken, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    // Audit log (never log password or hash)
+    try {
+      await prisma.auditLog.create({
+        data: {
+          action: "USER_PASSWORD_CHANGE",
+          entityType: "USER",
+          entityId: updated.id,
+          targetId: updated.id,
+          targetType: "USER",
+          userId: updated.id,
+          districtId: updated.districtId ?? 1,
+          details: {
+            status: "SUCCESS",
+            message: "User successfully updated password and cleared mustChangePassword flag",
+          },
+          metadata: {
+            userId: updated.id,
+            username: updated.username,
+            role: updated.role,
+            timestamp: new Date().toISOString(),
+          },
+          ipAddress: req.ip || "unknown",
+          userAgent: req.get("User-Agent") || "unknown",
+          hash: crypto.createHash("sha256").update(`PASSWORD_CHANGE:${updated.id}:${updated.tokenVersion}`).digest("hex"),
+        },
+      });
+    } catch (auditErr) {
+      console.warn("Audit log for password change failed safely:", auditErr);
+    }
+
+    const profile = await prisma.customerProfile.findUnique({
+      where: { userId: updated.id },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        message: "Password changed successfully",
+        user: {
+          id: updated.id,
+          username: updated.username,
+          role: normalizeRole(updated.role),
+          isAdmin: updated.isAdmin,
+          districtId: updated.districtId,
+          mustChangePassword: false,
+          name: profile?.fullName || updated.username,
+          phone: profile?.phone || null,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("[CHANGE PASSWORD ERROR]", error);
+    return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
 

@@ -9,6 +9,8 @@ type RequestCtx = {
   userId?: number;
   role?: string;
   isAdmin?: boolean;
+  tokenVersion?: number;
+  mustChangePassword?: boolean;
   requestId?: string;
 };
 
@@ -16,7 +18,7 @@ declare global {
   namespace Express {
     interface Request {
       ctx?: RequestCtx;
-      user?: JWTPayload;
+      user?: JWTPayload & { mustChangePassword?: boolean };
       districtId?: number | null;
       districtSlug?: string | null;
       requestId?: string;
@@ -51,6 +53,7 @@ type AuthUserRecord = {
   role: string;
   districtId: number | null;
   tokenVersion: number;
+  mustChangePassword?: boolean;
   isAdmin?: boolean | null;
 };
 
@@ -88,6 +91,7 @@ function normalizeAuthUserRecord(value: unknown): AuthUserRecord | null {
   if (!(districtId === null || typeof districtId === "number")) return null;
 
   const tokenVersion = toSafeNumber(v.tokenVersion) ?? 1;
+  const mustChangePassword = typeof v.mustChangePassword === "boolean" ? v.mustChangePassword : false;
 
   return {
     id: v.id,
@@ -95,6 +99,7 @@ function normalizeAuthUserRecord(value: unknown): AuthUserRecord | null {
     role: v.role,
     districtId,
     tokenVersion,
+    mustChangePassword,
     isAdmin: typeof v.isAdmin === "boolean" ? v.isAdmin : null,
   };
 }
@@ -169,12 +174,20 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       role: true,
       districtId: true,
       isAdmin: true,
+      tokenVersion: true,
+      mustChangePassword: true,
     });
     const dbUser = normalizeAuthUserRecord(dbUserRaw);
 
-    // Token version is optional in this deployment (schema may not have tokenVersion)
     if (!dbUser) {
       return sendError(res, 401, ErrorCode.TOKEN_EXPIRED, "Token expired");
+    }
+
+    // ✅ CRITICAL: Validate tokenVersion matches DB (invalidates revoked tokens upon reset)
+    const tokenVersionInToken = typeof decoded.tokenVersion === "number" ? decoded.tokenVersion : 1;
+    if (tokenVersionInToken !== dbUser.tokenVersion) {
+      console.warn(`🔒 [AUTH] Token version mismatch for user ${dbUser.id}: token=${tokenVersionInToken}, db=${dbUser.tokenVersion}`);
+      return sendError(res, 401, ErrorCode.INVALID_TOKEN, "Session expired, please login again");
     }
 
     // ✅ CRITICAL: Validate districtId matches DB
@@ -194,8 +207,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       role: dbUser.role as any,
       districtId: dbUser.districtId,
       districtSlug: decoded.districtSlug || null,
-      tokenVersion: typeof decoded.tokenVersion === "number" ? decoded.tokenVersion : dbUser.tokenVersion
-    } as JWTPayload;
+      tokenVersion: dbUser.tokenVersion,
+      mustChangePassword: dbUser.mustChangePassword ?? false,
+    } as JWTPayload & { mustChangePassword?: boolean };
 
     req.ctx = {
       ...(req.ctx || {}),
@@ -204,10 +218,31 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       userId: dbUser.id,
       role: dbUser.role,
       isAdmin: !!dbUser.isAdmin,
+      tokenVersion: dbUser.tokenVersion,
+      mustChangePassword: dbUser.mustChangePassword ?? false,
       requestId: req.requestId,
     };
 
     req.districtId = req.ctx.districtId;
+
+    // 🔒 SOVEREIGN SECURITY: Enforce password change before accessing non-auth routes
+    const reqUrl = req.originalUrl || req.url || '';
+    const isAuthRecoveryPath =
+      reqUrl.includes('/auth/change-password') ||
+      reqUrl.includes('/auth/verify') ||
+      reqUrl.includes('/auth/logout') ||
+      reqUrl.includes('/auth/csrf-token') ||
+      reqUrl.includes('/api/auth/change-password') ||
+      reqUrl.includes('/api/auth/verify') ||
+      reqUrl.includes('/api/auth/logout') ||
+      reqUrl.includes('/api/auth/csrf-token');
+
+    if (dbUser.mustChangePassword && !isAuthRecoveryPath) {
+      return sendError(res, 403, ErrorCode.FORBIDDEN, "Password change required before accessing the application", {
+        code: "PASSWORD_CHANGE_REQUIRED",
+        mustChangePassword: true,
+      });
+    }
 
     // ✅ Synchronize verified district and user authority into ALS
     const store = tenantContext.getStore();

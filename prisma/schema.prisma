@@ -374,6 +374,8 @@ model User {
   districtId           Int?             @map("district_id")
   consentAt            DateTime?        @map("consent_at")
   consentGiven         Boolean          @default(false) @map("consent_given")
+  mustChangePassword   Boolean          @default(false) @map("must_change_password")
+  tokenVersion         Int              @default(1) @map("token_version")
   adminProfile         Admin?
   hospitals            Hospital[]
   offers               Offer[]
