@@ -460,59 +460,64 @@ export default function ShopDetail() {
 
   // Governance-driven media
   const heroMediaGovernance = MEDIA_GOVERNANCE[resolvedMediaType];
+  const hasHeroMedia = !imageError && Boolean(displayVendor.image || displayVendor.logo);
 
   return (
     <>
-      <div className="bg-black" data-testid="shop-detail-page">
-        {/* 🏛️ Hero — governance-driven mediaMode */}
-        <div className={`relative w-full overflow-hidden ${heroMediaGovernance.aspectClass}`}>
-          {!imageError && (displayVendor.image || displayVendor.logo) ? (
-            <>
-              <img
-                src={displayVendor.image || displayVendor.logo}
-                alt={displayVendor.name}
-                className={`w-full h-full ${heroMediaGovernance.containStrategy === "contain" ? "object-contain" : "object-cover"} bg-zinc-900/70`}
-                loading="lazy"
-                onError={() => setImageError(true)}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-            </>
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-zinc-900 via-black to-zinc-950 flex items-center justify-center relative">
-              <div className="absolute inset-0 bg-gradient-radial from-orange-500/10 via-transparent to-transparent" />
-              <div className="relative flex flex-col items-center gap-3">
-                <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${accentGradientClasses(resolvedAccent)} border ${accentIconBorder(resolvedAccent)} flex items-center justify-center`}>
-                  <FallbackIcon className={`w-10 h-10 ${accentIconColor(resolvedAccent)}/80`} />
-                </div>
-                <span className="text-zinc-500 text-xs font-medium tracking-wider uppercase">
-                  {heroLabelForLayout(resolvedLayout, displayVendor.category)}
-                </span>
-              </div>
-            </div>
-          )}
+      <div className="bg-black min-h-screen" data-testid="shop-detail-page">
+        {hasHeroMedia ? (
+          /* 🏛️ Hero — bounded responsive banner when media exists */
+          <div className="relative w-full overflow-hidden aspect-[16/9] md:aspect-[21/9] max-h-[36vh] min-h-[180px]">
+            <img
+              src={displayVendor.image || displayVendor.logo}
+              alt={displayVendor.name}
+              className={`w-full h-full ${heroMediaGovernance.containStrategy === "contain" ? "object-contain" : "object-cover"} bg-zinc-900/70`}
+              loading="lazy"
+              onError={() => setImageError(true)}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
 
-          <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10">
+            <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => window.history.back()}
+                className="bg-black/60 backdrop-blur-sm border-zinc-700 text-white hover:bg-black/80"
+                data-testid="button-back"
+              >← Back</Button>
+            </div>
+
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="bg-black/60 backdrop-blur-sm border border-zinc-700 text-zinc-300 hover:text-orange-400 hover:bg-black/80 rounded-full"
+                onClick={handleShare}
+              ><Share2 size={18} /></Button>
+            </div>
+          </div>
+        ) : (
+          /* 🏛️ Compact Header — when no cover media exists */
+          <div className="container mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
             <Button
               variant="secondary"
               size="sm"
               onClick={() => window.history.back()}
-              className="bg-black/60 backdrop-blur-sm border-zinc-700 text-white hover:bg-black/80"
+              className="bg-zinc-900/80 border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800"
               data-testid="button-back"
             >← Back</Button>
-          </div>
 
-          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">
             <Button
               variant="ghost"
               size="icon"
-              className="bg-black/60 backdrop-blur-sm border border-zinc-700 text-zinc-300 hover:text-orange-400 hover:bg-black/80 rounded-full"
+              className="bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-orange-400 hover:bg-zinc-800 rounded-full"
               onClick={handleShare}
             ><Share2 size={18} /></Button>
           </div>
-        </div>
+        )}
 
         {/* Info Card */}
-        <div className="container mx-auto px-4 -mt-10 relative z-10">
+        <div className={`container mx-auto px-4 relative z-10 ${hasHeroMedia ? "-mt-10" : "mt-2"}`}>
           <div className="bg-gradient-to-br from-zinc-950 to-black rounded-2xl border border-zinc-800 p-6 shadow-xl shadow-black/50">
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1 min-w-0">
