@@ -81,8 +81,8 @@ router.get("/products", async (req: Request, res: Response) => {
           vendor: {
             status: "APPROVED",
             isShadowBanned: false,
-            businessType: { notIn: ["SERVICE", "HEALTHCARE", "SCHOOL", "EDUCATION"] },
-            category: { notIn: ["SERVICE", "HEALTHCARE", "HOSPITAL", "SCHOOL", "EDUCATION", "DOCTOR", "CLINIC", "service", "healthcare", "hospital", "school", "education", "doctor", "clinic"] }
+            businessType: { in: ["PRODUCT", "RETAIL"] },
+            category: { notIn: ["HEALTHCARE", "HOSPITAL", "SCHOOL", "EDUCATION", "DOCTOR", "CLINIC", "healthcare", "hospital", "school", "education", "doctor", "clinic"] }
           }
         },
         include: {
@@ -104,8 +104,8 @@ router.get("/products", async (req: Request, res: Response) => {
           vendor: {
             status: "APPROVED",
             isShadowBanned: false,
-            businessType: { notIn: ["SERVICE", "HEALTHCARE", "SCHOOL", "EDUCATION"] },
-            category: { notIn: ["SERVICE", "HEALTHCARE", "HOSPITAL", "SCHOOL", "EDUCATION", "DOCTOR", "CLINIC", "service", "healthcare", "hospital", "school", "education", "doctor", "clinic"] }
+            businessType: { in: ["PRODUCT", "RETAIL"] },
+            category: { notIn: ["HEALTHCARE", "HOSPITAL", "SCHOOL", "EDUCATION", "DOCTOR", "CLINIC", "healthcare", "hospital", "school", "education", "doctor", "clinic"] }
           }
         },
         include: {

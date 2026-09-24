@@ -338,7 +338,15 @@ router.get("/stores/:slug", async (req: Request, res: Response) => {
     });
 
     const mapped = await mapVendorByType(result.data, { products: result.data.products });
-    return res.json({ success: true, data: mapped });
+    const storePayload = {
+      ...mapped,
+      name: (mapped as any).name || (mapped as any).title || result.data.name,
+      slug: (mapped as any).slug || result.data.slug,
+      phone: (mapped as any).phone || (mapped as any).contactNumber || result.data.phone || result.data.mobile || undefined,
+      category: (mapped as any).category || result.data.category || undefined,
+      address: (mapped as any).address || result.data.address || undefined,
+    };
+    return res.json({ success: true, data: storePayload });
   } catch (e) {
     console.error(`[MARKETPLACE] Error fetching store ${req.params.slug}:`, e);
     return res.status(500).json({ success: false, error: "Internal server error" });
@@ -377,7 +385,15 @@ router.get("/vendors/id/:id", async (req: Request, res: Response) => {
     }
 
     const mapped = await mapVendorByType(result.data);
-    return res.json({ success: true, data: mapped });
+    const storePayload = {
+      ...mapped,
+      name: (mapped as any).name || (mapped as any).title || result.data.name,
+      slug: (mapped as any).slug || result.data.slug,
+      phone: (mapped as any).phone || (mapped as any).contactNumber || result.data.phone || result.data.mobile || undefined,
+      category: (mapped as any).category || result.data.category || undefined,
+      address: (mapped as any).address || result.data.address || undefined,
+    };
+    return res.json({ success: true, data: storePayload });
   } catch (e) {
     console.error("Vendor fetch error:", e);
     return res.status(500).json({ success: false, error: "Internal server error" });

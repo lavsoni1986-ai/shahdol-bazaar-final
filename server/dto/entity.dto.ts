@@ -585,15 +585,36 @@ export async function mapVendorByType(vendor: any, include?: any):
         default: {
             const base = await mapVendorToDTO(vendor, include);
             const id = typeof base.id === "string" ? parseInt(base.id, 10) || 0 : base.id;
-            const canonical: CanonicalVendorEntityV2 & { id: number } = {
+            const canonical: CanonicalVendorEntityV2 & {
+                id: number;
+                name: string;
+                slug: string;
+                category?: string;
+                phone?: string;
+                address?: string;
+                logo?: string | null;
+                images?: string[];
+                isVerified?: boolean | null;
+                businessType?: string;
+                entityType?: string;
+            } = {
                 id,
                 canonicalId: base.slug ? `vendor:${base.slug}` : String(base.id),
                 title: base.name,
                 subtitle: base.slug || undefined,
+                name: base.name,
+                slug: base.slug,
+                category: base.category || undefined,
+                phone: base.phone || undefined,
+                address: base.address || undefined,
+                logo: base.logo || undefined,
+                images: base.images || [],
+                isVerified: base.isVerified,
+                businessType: base.businessType,
+                entityType: base.entityType,
                 description: base.description || undefined,
                 logoUrl: base.logo || undefined,
                 contactNumber: base.phone || undefined,
-                address: base.address || undefined,
                 rating: base.rating ?? undefined,
                 trustScore: (base as any).trustScore ?? (base as any).dsslScore ?? undefined,
                 trustLabel: base.trustLabel ?? undefined,
