@@ -31,7 +31,7 @@ export const getGroq = (): Groq | null => {
   }
 };
 
-export const DEFAULT_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+export const DEFAULT_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 export async function callGroqChat(
   messages: { role: string; content: string | object }[],
