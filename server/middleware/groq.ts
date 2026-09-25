@@ -31,7 +31,7 @@ export const getGroq = (): Groq | null => {
   }
 };
 
-export const DEFAULT_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+export const DEFAULT_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
 
 export async function callGroqChat(
   messages: { role: string; content: string | object }[],
