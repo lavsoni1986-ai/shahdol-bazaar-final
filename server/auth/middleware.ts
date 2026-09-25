@@ -439,6 +439,8 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
         role: true,
         districtId: true,
         isAdmin: true,
+        tokenVersion: true,
+        mustChangePassword: true,
       });
       const user = normalizeAuthUserRecord(userRaw);
 
@@ -465,8 +467,9 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
           role: user.role as any,
           districtId: user.districtId,
           districtSlug: null,
-          tokenVersion: user.tokenVersion
-        } as JWTPayload;
+          tokenVersion: user.tokenVersion,
+          mustChangePassword: user.mustChangePassword ?? false,
+        } as JWTPayload & { mustChangePassword?: boolean };
 
         // Keep req.user aligned with downstream expectations
         (req.user as any).isAdmin = !!user.isAdmin;

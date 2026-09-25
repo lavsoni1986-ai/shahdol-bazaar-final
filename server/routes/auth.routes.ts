@@ -52,7 +52,11 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 
     // 🔐 Generate tokens with current version from DB
     console.log("[LOGIN] generating tokens");
-    const userTokenVersion = typeof (user as any).tokenVersion === "number" ? (user as any).tokenVersion : 1;
+    const rawTokenVersion = (user as any)?.tokenVersion;
+    const userTokenVersion =
+      typeof rawTokenVersion === "number" && Number.isFinite(rawTokenVersion) && rawTokenVersion > 0
+        ? rawTokenVersion
+        : 1;
     const tokens = generateTokenPair({
       userId: user.id,
       username: user.username,
@@ -105,7 +109,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
           role: normalizeRole(user.role),
           isAdmin: user.isAdmin,
           districtId: user.districtId,
-          mustChangePassword: (user as any).mustChangePassword ?? false,
+          mustChangePassword: Boolean((user as any)?.mustChangePassword),
           name: profile?.fullName || user.username,
           phone: profile?.phone || null,
         }
@@ -384,6 +388,12 @@ router.post("/refresh", async (req: Request, res: Response) => {
 
 router.get("/verify", optionalAuth, async (req: any, res) => {
   try {
+    // 🛡️ Prevent caching of authentication state
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Surrogate-Control", "no-store");
+
     console.log("[VERIFY] request received", {
       requestId: req.requestId || req?.ctx?.requestId,
       hasAccessTokenCookie: !!req.cookies?.accessToken,
