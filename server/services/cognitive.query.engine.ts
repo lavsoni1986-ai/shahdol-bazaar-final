@@ -27,12 +27,19 @@ export function cognitiveParseQuery(message: string): CognitiveParse {
   const searchTerms = new Set<string>([raw, ...terms]);
 
   // DOMAIN + ENTITY
-  if (/doctor|hospital|medical|clinic|blood|medicine/.test(raw)) {
+  if (/doctor|hospital|medical|clinic|blood|medicine|cardio|cardiologist|heart\s*(?:specialist|doctor|clinic)/.test(raw)) {
     domain = "HEALTHCARE";
     entity = "MEDICAL_SERVICE";
     searchTerms.add("hospital");
     searchTerms.add("medical");
     searchTerms.add("clinic");
+    searchTerms.add("doctor");
+  } else if (/school|admission|college|coaching|vidyalaya|education/.test(raw)) {
+    domain = "EDUCATION";
+    entity = "school";
+    searchTerms.add("school");
+    searchTerms.add("education");
+    searchTerms.add("admission");
   } else if (/food|samosa|restaurant|hotel|snacks|meal/.test(raw)) {
     domain = "FOOD";
     entity = "FOOD_VENDOR";
@@ -96,12 +103,13 @@ export function cognitiveParseQuery(message: string): CognitiveParse {
   else if (domain === "FOOD") fulfillment = "SHOW_OPEN_FOOD_OPTIONS";
   else if (domain === "TRANSPORT") fulfillment = "SHOW_TRAVEL_OPTIONS";
   else if (domain === "ELECTRONICS") fulfillment = "SHOW_REPAIR_SHOPS";
+  else if (domain === "EDUCATION") fulfillment = "SHOW_EDUCATION_OPTIONS";
   else fulfillment = "SHOW_DISCOVERY_RESULTS";
 
   let responseMode: CognitiveParse['responseMode'] = "DIRECT_MATCH";
 
   // Detect ambiguous queries
-  if (raw === "mobile" || raw === "doctor" || raw === "bus" || raw === "food") {
+  if (raw === "mobile" || raw === "doctor" || raw === "bus" || raw === "food" || raw === "school") {
     responseMode = "FOLLOWUP_REQUIRED";
   }
 
@@ -138,6 +146,9 @@ export function buildFollowup(cognition: CognitiveParse): string {
     if (cognition.domain === "FOOD") {
       return "Snacks, restaurant, ya hotel dhoond rahe hain?";
     }
+    if (cognition.domain === "EDUCATION") {
+      return "Aap school admission, college, ya coaching institute dhoond rahe hain?";
+    }
   }
   if (cognition.responseMode === "SUPPLY_GAP") {
     if (cognition.domain === "FOOD") {
@@ -151,6 +162,9 @@ export function buildFollowup(cognition: CognitiveParse): string {
     }
     if (cognition.domain === "ELECTRONICS") {
       return "Verified repair shops abhi available nahi hain. Nearby electronics stores explore kar sakte hain.";
+    }
+    if (cognition.domain === "EDUCATION") {
+      return "Verified schools ya educational institutions abhi onboard nahi hain. Admission details ke liye district education office check kar sakte hain.";
     }
   }
   if (cognition.responseMode === "EMERGENCY_ESCALATION") {

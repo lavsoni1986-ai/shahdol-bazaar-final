@@ -110,7 +110,8 @@ export function calculateRelevanceScore(
   let domainMatch = 0;
   if (cognition.domain === entity.entityType ||
     (cognition.domain === 'HEALTHCARE' && ['HOSPITAL', 'DOCTOR'].includes(entity.entityType)) ||
-    (cognition.domain === 'TRANSPORT' && entity.entityType === 'BUS')) {
+    (cognition.domain === 'TRANSPORT' && entity.entityType === 'BUS') ||
+    (cognition.domain === 'EDUCATION' && entity.entityType === 'SCHOOL')) {
     domainMatch = 25;
     matchReasons.push(`domain:${cognition.domain}`);
   }
@@ -156,21 +157,27 @@ export function calculateRelevanceScore(
     }
   }
 
-  // Calculate total relevance
-  const relevanceScore = textRelevance + domainMatch + trustScore + semanticMatch + popularity + intentBonus;
-  const confidenceScore = Math.min(relevanceScore / 100, 1); // Normalize to 0-1
+  // Critical Relevance Gate:
+  // If an entity has NO text relevance and NO domain match, trust/popularity/freshness
+  // must NEVER substitute for relevance. The candidate is rejected (relevanceScore = 0).
+  const isRelevant = textRelevance > 0 || domainMatch > 0;
+  const relevanceScore = isRelevant
+    ? textRelevance + domainMatch + trustScore + semanticMatch + popularity + intentBonus
+    : 0;
+
+  const confidenceScore = isRelevant ? Math.min(relevanceScore / 100, 1) : 0;
 
   return {
     ...entity,
     relevanceScore,
-    matchReasons,
+    matchReasons: isRelevant ? matchReasons : [],
     confidenceScore,
     rankingFactors: {
       textRelevance,
       domainMatch,
-      trustScore,
-      semanticMatch,
-      popularity
+      trustScore: isRelevant ? trustScore : 0,
+      semanticMatch: isRelevant ? semanticMatch : 0,
+      popularity: isRelevant ? popularity : 0
     }
   };
 }

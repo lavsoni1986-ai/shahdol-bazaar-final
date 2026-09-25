@@ -36,8 +36,9 @@ export async function groundQuery(context: GroundingContext): Promise<GroundingR
   // ============================================
   let expandedTerms: string[] = [];
 
-  if (cognition.entity && SEMANTIC_EXPANSIONS[cognition.entity]) {
-    expandedTerms = SEMANTIC_EXPANSIONS[cognition.entity];
+  const entityKey = typeof cognition.entity === 'string' ? cognition.entity.toLowerCase() : '';
+  if (entityKey && SEMANTIC_EXPANSIONS[entityKey]) {
+    expandedTerms = SEMANTIC_EXPANSIONS[entityKey];
     searchTerms = [...searchTerms, ...expandedTerms];
 
     bharatOSLogger.info(LogComponent.GROUNDING, 'semantic_expansion', 'Expanded search terms for entity', {
@@ -118,9 +119,22 @@ export async function groundQuery(context: GroundingContext): Promise<GroundingR
     }
 
     if (allowedEntityTypes) {
-      domainFilteredEntities = allEntities.filter(entity =>
-        allowedEntityTypes.includes(entity.entityType)
-      );
+      domainFilteredEntities = allEntities.filter(entity => {
+        if (!allowedEntityTypes.includes(entity.entityType)) {
+          return false;
+        }
+
+        // Canonical food domain constraint: SHOP and PRODUCT must be genuinely food-related
+        if (cognition.domain === 'FOOD') {
+          const cat = (entity.category || entity.meta?.category || '').toUpperCase();
+          const bType = (entity.businessType || entity.meta?.businessType || entity.subtitle || '').toUpperCase();
+          const vendorCat = (entity.vendor?.category || entity.meta?.vendor?.category || '').toUpperCase();
+          const foodTokens = ['FOOD', 'RESTAURANT', 'HOTEL', 'SNACKS', 'CAFE', 'SWEETS', 'BAKERY', 'EATERY', 'DHABA', 'MEAL'];
+          return foodTokens.some(t => cat.includes(t) || bType.includes(t) || vendorCat.includes(t));
+        }
+
+        return true;
+      });
 
       bharatOSLogger.info(LogComponent.GROUNDING, 'domain_isolation', 'Applied domain filtering', {
         domain: cognition.domain,

@@ -13,6 +13,7 @@ export interface IntentClassification {
   urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
   temporalContext: 'immediate' | 'scheduled' | 'general';
   geographicScope: 'nearby' | 'district' | 'broad';
+  domain?: string;
 
   // Sovereign structured intent (new contract)
   structuredIntent: StructuredIntent;
@@ -101,7 +102,7 @@ export function classifyQueryIntent(query: string, cognition: any): IntentClassi
 
   const entityHint = typeof cognition?.entity === 'string' ? cognition.entity.toLowerCase() : '';
   const target: IntentTarget =
-    entityHint.includes('doctor') || queryLower.includes('doctor') ? IntentTarget.DOCTOR :
+    entityHint.includes('doctor') || queryLower.includes('doctor') || queryLower.includes('cardio') || queryLower.includes('heart') ? IntentTarget.DOCTOR :
     entityHint.includes('hospital') || entityHint.includes('clinic') || queryLower.includes('hospital') ? IntentTarget.HOSPITAL :
     entityHint.includes('pharmacy') || entityHint.includes('chemist') || queryLower.includes('pharmacy') ? IntentTarget.PHARMACY :
     entityHint.includes('bus') || queryLower.includes('bus') ? IntentTarget.BUS :
@@ -111,6 +112,7 @@ export function classifyQueryIntent(query: string, cognition: any): IntentClassi
 
   const domain: CanonicalDomain =
     emergencyWords.some(word => queryLower.includes(word)) ? CanonicalDomain.SERVICES :
+    cognition?.domain === 'EDUCATION' || ['school', 'admission', 'college', 'coaching', 'vidyalaya', 'education'].some(word => queryLower.includes(word)) ? CanonicalDomain.EDUCATION :
     target === IntentTarget.BUS ? CanonicalDomain.TRANSPORT :
     [IntentTarget.DOCTOR, IntentTarget.HOSPITAL, IntentTarget.PHARMACY].includes(target) ? CanonicalDomain.HEALTHCARE :
     queryLower.includes('police') || queryLower.includes('government') ? CanonicalDomain.GOVERNANCE :
@@ -131,6 +133,7 @@ export function classifyQueryIntent(query: string, cognition: any): IntentClassi
     urgencyLevel,
     temporalContext,
     geographicScope,
+    domain: cognition?.domain || (domain as string),
     structuredIntent,
   };
 }
