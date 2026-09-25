@@ -129,6 +129,9 @@ export type VendorEntity = z.infer<typeof vendorEntitySchema>;
 export const productEntitySchema = canonicalEntitySchema.extend({
     entityType: z.literal(EntityType.PRODUCT),
 
+    imageUrl: z.string().nullable().optional(),
+    image: z.string().nullable().optional(),
+
     price: z.number().positive(),
     mrp: z.number().nullable().optional(),
     stock: z.number().default(0),
@@ -407,6 +410,8 @@ export async function mapProductToDTO(product: any, vendor?: any): Promise<Produ
                 ? [product.imageUrl]
                 : [];
 
+    const primaryImage = product.imageUrl || productImages[0] || null;
+
     return {
         id: product.id,
         entityType: EntityType.PRODUCT,
@@ -417,7 +422,9 @@ export async function mapProductToDTO(product: any, vendor?: any): Promise<Produ
         districtId: vendor?.districtId || 1,
         address: vendor?.address,
         phone: vendor?.phone || vendor?.mobile,
-        logo: product.imageUrl || null,
+        imageUrl: primaryImage,
+        image: primaryImage,
+        logo: primaryImage,
         images: productImages,
         price: product.price || 0,
         mrp: product.mrp || null,

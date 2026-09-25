@@ -52,6 +52,9 @@ interface ProductData {
   price: string | number;
   slug?: string;
   imageUrl?: string;
+  image?: string | null;
+  logo?: string | null;
+  images?: string[] | null;
   category?: string;
   isSponsored?: boolean;
   isTrending?: boolean;

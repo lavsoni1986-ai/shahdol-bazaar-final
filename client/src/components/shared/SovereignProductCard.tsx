@@ -30,6 +30,8 @@ export interface ProductCardData {
     mrp?: number | string | null;
     imageUrl?: string | null;
     image?: string | null;
+    logo?: string | null;
+    images?: string[] | null;
     category?: string | { name: string } | null;
     slug?: string | null;
     isTrending?: boolean;
@@ -55,6 +57,18 @@ interface SovereignProductCardProps {
 
 // ─── HELPERS ─────────────────────────────────────────────
 
+function isValidImageUrl(url?: string | null): boolean {
+    if (!url || typeof url !== "string") return false;
+    const trimmed = url.trim();
+    return (
+        trimmed.startsWith("https://") ||
+        trimmed.startsWith("http://") ||
+        trimmed.startsWith("//") ||
+        trimmed.startsWith("data:") ||
+        trimmed.startsWith("/")
+    );
+}
+
 function computeDiscount(price: number, mrp: number): number {
     if (mrp <= 0 || price >= mrp) return 0;
     return Math.round(((mrp - price) / mrp) * 100);
@@ -77,7 +91,13 @@ function getTitle(data: ProductCardData): string {
 }
 
 function getPrimaryImage(data: ProductCardData): string | null {
-    return data.imageUrl || data.image || null;
+    if (isValidImageUrl(data.imageUrl)) return data.imageUrl!;
+    if (isValidImageUrl(data.image)) return data.image!;
+    if (isValidImageUrl(data.logo)) return data.logo!;
+    if (Array.isArray(data.images) && data.images.length > 0 && isValidImageUrl(data.images[0])) {
+        return data.images[0];
+    }
+    return null;
 }
 
 // ─── IMAGE COMPONENT & FALLBACKS CENTRALIZED IN MEDIA-GOVERNANCE ───
