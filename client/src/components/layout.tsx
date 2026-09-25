@@ -177,9 +177,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     {[
                       { href: "/", label: "🏠 Home" },
                       { href: "/services", label: "🔧 Essential Services" },
-                      { href: "/about", label: "📈 About Us" },
+                      { href: "/about", label: "📜 Our Journey (2018–2026)" },
                       { href: "/contact", label: "📞 Contact Us" },
-                      { href: "/terms", label: "📜 Terms & Conditions" }
+                      { href: "/terms", label: "📋 Terms & Conditions" }
                     ].map((link) => (
                       <Link
                         key={link.href}

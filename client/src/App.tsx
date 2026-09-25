@@ -301,6 +301,9 @@ const Router = () => {
         <Route path="/shop/:id" component={ShopDetail} />
         <Route path="/vendor/:slug" component={ShopDetail} />
         <Route path="/about" component={About} />
+        <Route path="/journey" component={About} />
+        <Route path="/our-journey" component={About} />
+        <Route path="/about/our-journey" component={About} />
         <Route path="/contact" component={Contact} />
         <Route path="/terms" component={Terms} />
         <Route path="/pricing" component={PricingPlans} />
