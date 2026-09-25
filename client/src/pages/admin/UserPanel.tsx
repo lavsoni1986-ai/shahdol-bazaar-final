@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api-client";
 import { safeData } from "@/lib/admin-response";
 import { useDistrict } from "@/contexts/DistrictContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * 🛡️ SOVEREIGN UI: GlassCard Component
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 
 export default function UserPanel() {
+  const { user: currentUser } = useAuth();
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [userToReset, setUserToReset] = useState<any | null>(null);
   const [isConfirmResetOpen, setIsConfirmResetOpen] = useState(false);
@@ -110,7 +112,128 @@ export default function UserPanel() {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
         </div>
-        {/* 🔐 CONFIRMATION DIALOG */}
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-white">User Intelligence Panel</h1>
+            <p className="text-gray-400 mt-1">Monitor and manage user trust & risk levels</p>
+          </div>
+
+          <div className="flex gap-2">
+            {statusOptions.map(status => (
+              <button
+                key={status}
+                onClick={() => setSelectedStatus(status)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedStatus === status
+                    ? "bg-orange-500 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          {Array.isArray(users) && users.map((user: any) => (
+            <GlassCard key={user.id} className="p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <User className="text-blue-500" size={20} />
+                    <h3 className="text-xl font-semibold text-white">{user.username}</h3>
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      user.userIntelligence?.status === 'NORMAL' ? 'bg-green-500/20 text-green-400' :
+                      user.userIntelligence?.status === 'PROBATION' ? 'bg-blue-500/20 text-blue-400' :
+                      user.userIntelligence?.status === 'MONITORED' ? 'bg-yellow-500/20 text-yellow-400' :
+                      user.userIntelligence?.status === 'QUARANTINE' ? 'bg-orange-500/20 text-orange-400' :
+                      'bg-red-500/20 text-red-400'
+                    }`}>
+                      {user.userIntelligence?.status || 'UNKNOWN'}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <p className="text-gray-400 text-sm">Trust Score</p>
+                      <div className="flex items-center gap-2">
+                        <Shield className="text-green-500" size={16} />
+                        <span className="font-semibold">{user.userIntelligence?.trustScore || 0}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm">Risk Score</p>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="text-red-500" size={16} />
+                        <span className="font-semibold">{user.userIntelligence?.riskScore || 0}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm">Orders</p>
+                      <span className="font-semibold">{user.userIntelligence?.orderCount || 0}</span>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-sm">Reviews</p>
+                      <span className="font-semibold">{user.userIntelligence?.reviewCount || 0}</span>
+                    </div>
+                  </div>
+
+                  {user.userIntelligence?.meta?.trustBreakdown && (
+                    <div className="text-xs text-gray-500 bg-black/20 p-3 rounded">
+                      <p><strong>Breakdown:</strong> Orders: {user.userIntelligence.meta.trustBreakdown.orders},
+                      Reviews: {user.userIntelligence.meta.trustBreakdown.reviews},
+                      Devices: {user.userIntelligence.meta.trustBreakdown.devices},
+                       Fraud History: {user.userIntelligence.meta.trustBreakdown.fraudHistory}</p>
+                    </div>
+                  )}
+
+                </div>
+
+                {/* 🔑 ACTION: RESET PASSWORD */}
+                <div className="flex items-center sm:items-start gap-2 shrink-0 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserToReset(user);
+                      setIsConfirmResetOpen(true);
+                    }}
+                    disabled={currentUser?.id === user.id || resetPasswordMutation.isPending}
+                    title={
+                      currentUser?.id === user.id
+                        ? "Cannot reset your own password here"
+                        : "Reset user password and generate temporary credentials"
+                    }
+                    className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
+                      currentUser?.id === user.id
+                        ? "bg-white/5 text-gray-500 cursor-not-allowed border border-white/5"
+                        : "bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/60 active:scale-[0.98]"
+                    }`}
+                  >
+                    <KeyRound size={14} className={currentUser?.id === user.id ? "text-gray-500" : "text-orange-400"} />
+                    <span>Reset Password</span>
+                  </button>
+                </div>
+              </div>
+            </GlassCard>
+          ))}
+        </div>
+
+        {(!users || users.length === 0) && (
+          <GlassCard className="p-12 text-center">
+            <p className="text-gray-400">No users found for the selected status.</p>
+          </GlassCard>
+        )}
+      </div>
+
+      {/* 🔐 CONFIRMATION DIALOG */}
       <Dialog open={isConfirmResetOpen} onOpenChange={setIsConfirmResetOpen}>
         <DialogContent className="bg-slate-900 border border-slate-700 text-white max-w-md">
           <DialogHeader>
@@ -228,101 +351,6 @@ export default function UserPanel() {
           </div>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
-    );
-  }
-
-  return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-white">User Intelligence Panel</h1>
-            <p className="text-gray-400 mt-1">Monitor and manage user trust & risk levels</p>
-          </div>
-
-          <div className="flex gap-2">
-            {statusOptions.map(status => (
-              <button
-                key={status}
-                onClick={() => setSelectedStatus(status)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedStatus === status
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                }`}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid gap-4">
-          {Array.isArray(users) && users.map((user: any) => (
-            <GlassCard key={user.id} className="p-6">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <User className="text-blue-500" size={20} />
-                    <h3 className="text-xl font-semibold text-white">{user.username}</h3>
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      user.userIntelligence?.status === 'NORMAL' ? 'bg-green-500/20 text-green-400' :
-                      user.userIntelligence?.status === 'PROBATION' ? 'bg-blue-500/20 text-blue-400' :
-                      user.userIntelligence?.status === 'MONITORED' ? 'bg-yellow-500/20 text-yellow-400' :
-                      user.userIntelligence?.status === 'QUARANTINE' ? 'bg-orange-500/20 text-orange-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>
-                      {user.userIntelligence?.status || 'UNKNOWN'}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <p className="text-gray-400 text-sm">Trust Score</p>
-                      <div className="flex items-center gap-2">
-                        <Shield className="text-green-500" size={16} />
-                        <span className="font-semibold">{user.userIntelligence?.trustScore || 0}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-sm">Risk Score</p>
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="text-red-500" size={16} />
-                        <span className="font-semibold">{user.userIntelligence?.riskScore || 0}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-sm">Orders</p>
-                      <span className="font-semibold">{user.userIntelligence?.orderCount || 0}</span>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-sm">Reviews</p>
-                      <span className="font-semibold">{user.userIntelligence?.reviewCount || 0}</span>
-                    </div>
-                  </div>
-
-                  {user.userIntelligence?.meta?.trustBreakdown && (
-                    <div className="text-xs text-gray-500 bg-black/20 p-3 rounded">
-                      <p><strong>Breakdown:</strong> Orders: {user.userIntelligence.meta.trustBreakdown.orders},
-                      Reviews: {user.userIntelligence.meta.trustBreakdown.reviews},
-                      Devices: {user.userIntelligence.meta.trustBreakdown.devices},
-                       Fraud History: {user.userIntelligence.meta.trustBreakdown.fraudHistory}</p>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            </GlassCard>
-          ))}
-        </div>
-
-        {(!users || users.length === 0) && (
-          <GlassCard className="p-12 text-center">
-            <p className="text-gray-400">No users found for the selected status.</p>
-          </GlassCard>
-        )}
-      </div>
     </AdminLayout>
   );
 }
