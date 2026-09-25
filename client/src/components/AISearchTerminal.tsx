@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Link } from "wouter";
+import { Phone, MessageCircle, MapPin, ArrowRight } from "lucide-react";
 import { useSearch } from "@/hooks/useSearch";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -86,22 +88,7 @@ export default function AISearchTerminal() {
   };
 
   const normalizeSearchResults = (results: any[]): CanonicalEntity[] => {
-    return results.map(v => normalizeCanonicalEntity({
-      id: v.id,
-      name: v.name || v.title || "Local Partner",
-      title: v.title || v.name || "Local Partner",
-      phone: v.phone || null,
-      address: v.address || null,
-      rating: v.rating ?? 4.5,
-      description: v.reason || v.description || null,
-      isVerified: v.isVerified ?? true,
-      entityType: v.entityType,
-      type: v.type || v.entityType,
-      category: v.category,
-      slug: v.slug,
-      meta: v.meta,
-      raw: v,
-    }, district?.slug));
+    return results.map(v => normalizeCanonicalEntity(v, district?.slug));
   };
 
   return (
@@ -273,49 +260,97 @@ export default function AISearchTerminal() {
               )}
               {normalizedResults.map((entity, index) => {
                 const rawVendor = safeResults[index];
+                const rawPhone = entity.phone || rawVendor?.phone || rawVendor?.meta?.phone;
+                const cleanPhone = rawPhone ? String(rawPhone).replace(/\D/g, '') : null;
+                const phone10 = cleanPhone && cleanPhone.length >= 10 ? cleanPhone.slice(-10) : null;
+                const addressText = entity.address || rawVendor?.address || rawVendor?.meta?.address;
+
+                // Entity-specific canonical view label
+                const viewLabel = (() => {
+                  switch (entity.kind) {
+                    case 'product': return 'View Product';
+                    case 'hospital': return 'View Hospital';
+                    case 'service': return 'View Service';
+                    case 'bus': return 'View Timetable';
+                    case 'school': return 'View School';
+                    default: return 'Visit Store';
+                  }
+                })();
+
+                const whatsappText = entity.kind === 'product'
+                  ? `नमस्ते, मुझे शहडोल बाज़ार पर "${entity.title}" के बारे में जानकारी चाहिए।`
+                  : `नमस्ते, मुझे शहडोल बाज़ार पर "${entity.title}" के बारे में जानकारी चाहिए।`;
 
                 return (
-                  <div key={`${entity.id || 'unknown'}-${index}`} className="mb-3">
+                  <div key={`${entity.id || 'unknown'}-${index}`} className="mb-4">
+                    {/* Best Match indicator */}
+                    {index === 0 && (
+                      <div className="mb-1.5 flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider rounded-full">
+                          ★ Best Match
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Rich Grounded Entity Card */}
                     <SovereignEntityCard
                       entity={entity}
                       variant="search"
                       onTrack={(action) => trackAction(entity.id, action, query)}
                     />
 
-                    {/* Response mode badges */}
-                    {index === 0 && (
-                      <div className="mt-1">
-                        <span className="px-2 py-1 bg-green-600 text-white text-xs rounded">
-                          Best Match
-                        </span>
-                      </div>
-                    )}
+                    {/* Direct Citizen Actions Bar */}
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      {/* 1. Primary Canonical View CTA */}
+                      <Link
+                        href={entity.route}
+                        onClick={() => trackAction(entity.id, ACTION_TYPES.BOOK_VENDOR, query)}
+                        className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-bold transition-all active:scale-[0.98] min-h-[44px] shadow-sm"
+                      >
+                        <span>{viewLabel}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
 
-                    {/* Action buttons */}
-                    {Array.isArray(rawVendor.actions) && rawVendor.actions.length > 0 && (
-                      <div className="flex gap-2 mt-2 ml-2">
-                        {rawVendor.actions.map((action: any) => (
-                          <button
-                            key={action.type}
-                            onClick={() => {
-                              const actionKey = (action.type.toUpperCase() + "_VENDOR") as keyof typeof ACTION_TYPES;
-                              const resolvedAction = ACTION_TYPES[actionKey] || action.type;
-                              trackAction(entity.id, resolvedAction, query);
-                              if (action.type === "CALL") {
-                                window.location.href = `tel:${action.value}`;
-                              } else if (action.type === "WHATSAPP") {
-                                window.open(`https://wa.me/${action.value}`, "_blank");
-                              } else if (action.type === "MAPS") {
-                                window.open(action.value, "_blank");
-                              }
-                            }}
-                            className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                          >
-                            {action.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                      {/* 2. Direct Call Action */}
+                      {phone10 && (
+                        <a
+                          href={`tel:${phone10}`}
+                          onClick={() => trackAction(entity.id, ACTION_TYPES.CALL_VENDOR, query)}
+                          className="flex-1 min-w-[85px] inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all active:scale-[0.98] min-h-[44px]"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>Call</span>
+                        </a>
+                      )}
+
+                      {/* 3. Direct WhatsApp Action */}
+                      {phone10 && (
+                        <a
+                          href={`https://wa.me/91${phone10}?text=${encodeURIComponent(whatsappText)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => trackAction(entity.id, ACTION_TYPES.WHATSAPP_VENDOR, query)}
+                          className="flex-1 min-w-[95px] inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all active:scale-[0.98] min-h-[44px]"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>WhatsApp</span>
+                        </a>
+                      )}
+
+                      {/* 4. Directions Action (for physical locations) */}
+                      {addressText && entity.kind !== 'product' && (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText + ", " + (district?.name || "Shahdol"))}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => trackAction(entity.id, ACTION_TYPES.OPEN_MAPS, query)}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-white/10 text-xs font-medium transition-all active:scale-[0.98] min-h-[44px]"
+                        >
+                          <MapPin className="w-3.5 h-3.5 text-orange-400" />
+                          <span>Map</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
                 );
               })}

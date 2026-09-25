@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SovereignProductCard, type ProductCardData } from "@/components/shared/SovereignProductCard";
+import { SovereignTrustBadge, resolveTrustLevel } from "@/components/shared/SovereignTrustBadge";
 import type { CanonicalEntity } from "@/shared/api/response-normalizers";
 import { resolveEntityCTAs, hasCommerceDisplay, resolveEntityExperience } from "@/governance";
 import { trackEvent } from "@/lib/analytics";
@@ -80,7 +81,7 @@ function toProductCardData(entity: CanonicalEntity): ProductCardData {
         title: entity.title,
         name: entity.title,
         price: entity.price ?? 0,
-        mrp: raw.mrp ?? null,
+        mrp: raw.mrp ?? raw.meta?.mrp ?? null,
         imageUrl: entity.imageUrl ?? null,
         image: null,
         category: entity.category ?? 'General',
@@ -88,11 +89,11 @@ function toProductCardData(entity: CanonicalEntity): ProductCardData {
         isSponsored: Boolean(raw.isSponsored ?? raw.sponsored ?? false),
         isTrending: Boolean(raw.isTrending ?? raw.trending ?? false),
         discount: raw.discount ?? null,
-        sellerName: entity.subtitle ?? raw.sellerName ?? null,
-        sellerSlug: raw.sellerSlug ?? raw.vendorSlug ?? null,
+        sellerName: entity.subtitle ?? raw.sellerName ?? raw.meta?.vendorName ?? null,
+        sellerSlug: raw.sellerSlug ?? raw.vendorSlug ?? raw.meta?.vendor?.slug ?? null,
         sellerVerified: entity.isVerified ?? (entity.dsslScore != null && entity.dsslScore >= 50),
         dsslScore: entity.dsslScore ?? null,
-        district: raw.district ?? null,
+        district: raw.district ?? raw.meta?.district ?? null,
         deliveryInfo: raw.deliveryInfo ?? null,
         rating: entity.rating ?? null,
         reviewCount: entity.reviewCount ?? null,
@@ -220,7 +221,16 @@ export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: Sover
             <div className={variant === 'search' ? 'min-w-0 flex-1' : 'space-y-4'}>
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-[11px] font-black uppercase tracking-[0.24em] text-orange-300">{label}</p>
+                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-orange-300">{label}</p>
+                            {(entity.isVerified || (entity.dsslScore != null && entity.dsslScore >= 50)) && (
+                                <SovereignTrustBadge
+                                    level={entity.isVerified ? "verified" : resolveTrustLevel({ isVerified: entity.isVerified, dsslScore: entity.dsslScore })}
+                                    entityKind={entity.kind}
+                                    size="sm"
+                                />
+                            )}
+                        </div>
                         <h3 className="text-white font-bold text-base leading-tight line-clamp-2">{entity.title}</h3>
                     </div>
 

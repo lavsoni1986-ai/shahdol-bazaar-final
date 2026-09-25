@@ -205,6 +205,11 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                     <h3 className="text-sm font-bold text-white line-clamp-1 group-hover:text-orange-400 transition-colors">
                         {title}
                     </h3>
+                    {data.sellerName && (
+                        <p className="text-xs text-zinc-400 line-clamp-1">
+                            by <span className="text-zinc-300 font-semibold">{data.sellerName}</span>
+                        </p>
+                    )}
                     <div className="flex items-center gap-2 mt-1">
                         <span className="text-sm font-black text-white">₹{formatPrice(price)}</span>
                         {mrp && mrp > price && (

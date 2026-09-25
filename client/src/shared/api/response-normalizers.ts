@@ -42,7 +42,7 @@ function detectEntityKind(entity: any, hint?: CanonicalEntityKind): CanonicalEnt
 
   const entityType = (entity.entityType || '').toString().toLowerCase();
   const type = (entity.type || entity.serviceType || entity.businessType || entity.category || '').toString().toLowerCase();
-  const category = (entity.category || entity.businessType || entity.type || '').toString().toLowerCase();
+  const category = (entity.category || entity.meta?.category || entity.businessType || entity.meta?.businessType || entity.type || '').toString().toLowerCase();
   const name = (entity.name || entity.title || '').toString().toLowerCase();
 
   if (
@@ -57,19 +57,49 @@ function detectEntityKind(entity: any, hint?: CanonicalEntityKind): CanonicalEnt
     return 'bus';
   }
 
-  if (type === 'product' || entity.price != null || entity.mrp != null) {
+  if (
+    entityType === 'product' ||
+    type === 'product' ||
+    entity.price != null ||
+    entity.mrp != null ||
+    entity.meta?.price != null ||
+    (typeof entity.id === 'string' && entity.id.startsWith('PRODUCT-'))
+  ) {
     return 'product';
   }
 
-  if (type === 'service' || category === 'service' || category === 'services' || type === 'worker') {
+  if (
+    entityType === 'service' ||
+    type === 'service' ||
+    category === 'service' ||
+    category === 'services' ||
+    type === 'worker' ||
+    (typeof entity.id === 'string' && entity.id.startsWith('SERVICE-'))
+  ) {
     return 'service';
   }
 
-  if (type === 'hospital' || category.includes('hospital') || name.includes('hospital') || category.includes('clinic')) {
+  if (
+    entityType === 'hospital' ||
+    entityType === 'doctor' ||
+    type === 'hospital' ||
+    type === 'doctor' ||
+    category.includes('hospital') ||
+    name.includes('hospital') ||
+    category.includes('clinic') ||
+    (typeof entity.id === 'string' && (entity.id.startsWith('HOSPITAL-') || entity.id.startsWith('DOCTOR-')))
+  ) {
     return 'hospital';
   }
 
-  if (type === 'school' || category.includes('school') || category.includes('college') || category.includes('education')) {
+  if (
+    entityType === 'school' ||
+    type === 'school' ||
+    category.includes('school') ||
+    category.includes('college') ||
+    category.includes('education') ||
+    (typeof entity.id === 'string' && entity.id.startsWith('SCHOOL-'))
+  ) {
     return 'school';
   }
 
@@ -79,6 +109,9 @@ function detectEntityKind(entity: any, hint?: CanonicalEntityKind): CanonicalEnt
 function normalizeEntitySlug(entity: any): string {
   if (entity.slug) {
     return String(entity.slug);
+  }
+  if (entity.meta?.slug) {
+    return String(entity.meta.slug);
   }
 
   const candidate = String(entity.name || entity.title || entity.productName || entity.schoolName || entity.businessName || 'entity');
@@ -122,13 +155,25 @@ export function normalizeCanonicalEntity(entity: any, districtSlug?: string, kin
 
   const kind = detectEntityKind(entity, kindHint);
   const slug = normalizeEntitySlug(entity);
-  const category = typeof entity.category === 'string'
-    ? entity.category
-    : entity.category?.name || entity.category?.title || null;
+  const rawCat = entity.category ?? entity.meta?.category ?? entity.meta?.businessType;
+  const category = typeof rawCat === 'string'
+    ? rawCat
+    : rawCat?.name || rawCat?.title || null;
+
+  // Build description with bus timings/fare if applicable
+  let description = entity.description || entity.meta?.description || entity.summary || entity.about || entity.details || null;
+  if (kind === 'bus' && (entity.meta?.firstBusTime || entity.meta?.fare)) {
+    const timingParts: string[] = [];
+    if (entity.meta?.firstBusTime) timingParts.push(`Timing: ${entity.meta.firstBusTime} - ${entity.meta.lastBusTime || 'Evening'}`);
+    if (entity.meta?.fare) timingParts.push(`Fare: ${entity.meta.fare}`);
+    description = timingParts.join(' • ');
+  }
 
   return {
     id: (() => {
       const raw =
+        entity.meta?.id ??
+        entity.sourceId ??
         entity.id ??
         entity.productId ??
         entity.serviceId ??
@@ -142,14 +187,14 @@ export function normalizeCanonicalEntity(entity: any, districtSlug?: string, kin
         return raw;
       }
 
-      if (
-        typeof raw === "string" &&
-        /^\d+$/.test(raw)
-      ) {
-        const parsed = Number(raw);
-        return Number.isFinite(parsed) && parsed > 0
-          ? parsed
-          : 0;
+      if (typeof raw === "string") {
+        const cleaned = raw.replace(/^[A-Za-z]+-/, '');
+        if (/^\d+$/.test(cleaned)) {
+          const parsed = Number(cleaned);
+          if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+          }
+        }
       }
 
       return 0;
@@ -157,17 +202,17 @@ export function normalizeCanonicalEntity(entity: any, districtSlug?: string, kin
     slug,
     kind,
     title: String(entity.name || entity.title || entity.productName || entity.schoolName || entity.businessName || entity.serviceName || 'Untitled'),
-    subtitle: entity.vendor?.name || entity.shopName || entity.businessName || entity.type || null,
-    description: entity.description || entity.summary || entity.about || entity.details || null,
+    subtitle: entity.subtitle ?? entity.meta?.vendorName ?? entity.vendor?.name ?? entity.shopName ?? entity.businessName ?? entity.reason ?? entity.type ?? null,
+    description,
     category,
-    imageUrl: entity.imageUrl || entity.image || entity.logo || entity.photo || entity.thumbnail || null,
-    phone: entity.phone || entity.mobile || entity.contactNumber || entity.phoneNumber || null,
-    address: entity.address || entity.location || entity.city || entity.vicinity || null,
-    rating: entity.rating ?? entity.avgRating ?? null,
-    reviewCount: entity.reviewCount ?? entity.reviews?.length ?? null,
-    dsslScore: entity.dsslScore ?? entity.trustScore ?? null,
-    price: entity.price ?? entity.fare ?? entity.fees ?? null,
-    isVerified: entity.isVerified ?? entity.approved ?? false,
+    imageUrl: entity.imageUrl || entity.image || entity.meta?.imageUrl || entity.meta?.image || entity.meta?.logo || entity.logo || entity.photo || entity.thumbnail || null,
+    phone: entity.phone || entity.meta?.phone || entity.mobile || entity.contactNumber || entity.phoneNumber || null,
+    address: entity.address || entity.meta?.address || entity.location || entity.city || entity.vicinity || null,
+    rating: entity.rating ?? entity.meta?.rating ?? entity.avgRating ?? null,
+    reviewCount: entity.reviewCount ?? entity.meta?.reviewCount ?? entity.reviews?.length ?? null,
+    dsslScore: entity.dsslScore ?? entity.trustScore ?? entity.meta?.trustScore ?? entity.meta?.dsslScore ?? null,
+    price: entity.price ?? entity.meta?.price ?? entity.fare ?? entity.fees ?? (typeof entity.meta?.fare === 'number' ? entity.meta.fare : null),
+    isVerified: entity.isVerified ?? entity.meta?.isVerified ?? entity.approved ?? false,
     route: buildEntityRoute(kind, districtSlug || getCurrentDistrictSlug(), slug),
     raw: entity,
   };
