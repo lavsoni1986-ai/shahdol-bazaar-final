@@ -87,7 +87,8 @@ router.get("/products", async (req: Request, res: Response) => {
         },
         include: {
           vendor: true,
-          images: true
+          images: true,
+          category: true
         }
       });
 
@@ -110,7 +111,8 @@ router.get("/products", async (req: Request, res: Response) => {
         },
         include: {
           vendor: true,
-          images: true
+          images: true,
+          category: true
         }
       });
 
