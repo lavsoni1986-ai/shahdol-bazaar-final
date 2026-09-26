@@ -64,6 +64,13 @@ export const registerDTO = z.object({
     (v) => v === "" ? undefined : v,
     z.string().optional()
   ),
+
+  // MERCHANT SPECIALIZATION — optional, non-privileged business types only
+  businessType: z.enum(["PRODUCT", "SERVICE"]).optional().default("PRODUCT"),
+  category: z.preprocess(
+    (v) => v === "" ? undefined : v,
+    z.string().max(50).optional()
+  ),
 });
 
 // ============================================

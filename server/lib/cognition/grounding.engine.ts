@@ -103,7 +103,8 @@ export async function groundQuery(context: GroundingContext): Promise<GroundingR
       'EDUCATION': ['SCHOOL'],
       'TRANSPORT': ['BUS'],
       'FOOD': ['SHOP', 'PRODUCT'], // Food can be shops or products
-      'SERVICE': ['SHOP'], // Services are typically shops
+      'SERVICES': ['SERVICE'], // Strictly SERVICE - NO SHOP, NO PRODUCT
+      'SERVICE': ['SERVICE'],
       'GROCERY': ['SHOP', 'PRODUCT']
     };
 
@@ -169,5 +170,10 @@ const SEMANTIC_EXPANSIONS: Record<string, string[]> = {
   "pharmacy": ["medicine", "medical", "drugs", "chemist", "healthcare"],
   "bus": ["transport", "travel", "public transport", "rtc", "travel", "journey"],
   "taxi": ["cab", "ride", "transport", "auto", "car rental", "vehicle"],
-  "blood bank": ["blood", "donation", "medical", "emergency", "healthcare", "transfusion"]
+  "blood bank": ["blood", "donation", "medical", "emergency", "healthcare", "transfusion"],
+  "plumber": ["plumbing", "pipe", "leak", "tap", "drainage", "sanitary", "water"],
+  "electrician": ["wiring", "electrical", "switch", "light", "fan", "current", "fuse", "bijli"],
+  "mechanic": ["repair", "garage", "vehicle", "bike", "motorcycle", "car", "service"],
+  "carpenter": ["wood", "furniture", "door", "window", "cabinet", "badhai"],
+  "painter": ["painting", "color", "whitewash", "distemper", "wall", "putai"]
 };

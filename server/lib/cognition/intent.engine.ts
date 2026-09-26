@@ -110,8 +110,15 @@ export function classifyQueryIntent(query: string, cognition: any): IntentClassi
     // Default target stays discoverable; keep it conservative
     IntentTarget.HOSPITAL;
 
+  const isHealthcareEmergency = emergencyWords.some(word => queryLower.includes(word)) &&
+    (queryLower.includes('blood') || queryLower.includes('doctor') || queryLower.includes('hospital') || queryLower.includes('medical') || queryLower.includes('ambulance') || queryLower.includes('clinic'));
+
+  const isServiceTrade = cognition?.domain === 'SERVICES' ||
+    /plumber|plumbing|pipe\s*leak|electrician|bijli\s*mistri|mechanic|auto\s*garage|carpenter|badhai|painter|putai\s*mistri|putai|mistri|(?:ac|ro|fridge|refrigerator|washing\s*machine)\s*(?:repair|service)/.test(queryLower);
+
   const domain: CanonicalDomain =
-    emergencyWords.some(word => queryLower.includes(word)) ? CanonicalDomain.SERVICES :
+    isHealthcareEmergency ? CanonicalDomain.HEALTHCARE :
+    isServiceTrade ? CanonicalDomain.SERVICES :
     cognition?.domain === 'EDUCATION' || ['school', 'admission', 'college', 'coaching', 'vidyalaya', 'education'].some(word => queryLower.includes(word)) ? CanonicalDomain.EDUCATION :
     target === IntentTarget.BUS ? CanonicalDomain.TRANSPORT :
     [IntentTarget.DOCTOR, IntentTarget.HOSPITAL, IntentTarget.PHARMACY].includes(target) ? CanonicalDomain.HEALTHCARE :

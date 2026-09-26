@@ -123,7 +123,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 
 router.post("/register", registerLimiter, async (req: Request, res: Response) => {
   try {
-    const { username, password, role, phone, shopName, shopAddress } = registerDTO.parse(req.body);
+    const { username, password, role, phone, shopName, shopAddress, businessType, category } = registerDTO.parse(req.body);
 
     // ✅ Enforce district from header (x-district-slug) - client sends this
     const slug = req.headers["x-district-slug"] as string;
@@ -180,8 +180,8 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
             userId: user.id,
             status: "PENDING" as any,
             isShadowBanned: false,
-            businessType: "PRODUCT",
-            category: "RETAIL",
+            businessType: businessType === "SERVICE" ? "SERVICE" : "PRODUCT",
+            category: category ? String(category).trim().toUpperCase() : (businessType === "SERVICE" ? "SERVICE" : "RETAIL"),
             dsslScore: 70,
             phone: phone || null,
             address: shopAddress || null,
