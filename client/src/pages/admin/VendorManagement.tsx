@@ -200,21 +200,21 @@ export default function VendorManagement() {
                     Edit
                   </button>
 
-                  {v.status === 'REJECTED' ? (
-                    /* 🛡️ BHARAT-OS: Restore Button for Suspended Vendors */
-                    <button
-                      onClick={() => updateStatusMutation.mutate({ id: v.id, status: 'APPROVED' })}
-                      className="text-green-500 hover:text-green-400 font-bold"
-                    >
-                      Approve
-                    </button>
-                  ) : (
-                    /* 🛑 Sovereign Suspend Button */
+                  {v.status === 'APPROVED' ? (
+                    /* 🛑 Sovereign Suspend Button for Active Vendors */
                     <button
                       onClick={() => setVendorToSuspend(v)}
                       className="text-red-500 hover:text-red-400"
                     >
                       Suspend
+                    </button>
+                  ) : (
+                    /* 🛡️ BHARAT-OS: Approve Button for Pending and Suspended Vendors */
+                    <button
+                      onClick={() => updateStatusMutation.mutate({ id: v.id, status: 'APPROVED' })}
+                      className="text-green-500 hover:text-green-400 font-bold"
+                    >
+                      Approve
                     </button>
                   )}
                 </td>

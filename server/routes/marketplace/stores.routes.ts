@@ -182,12 +182,14 @@ router.get("/stores", validateQuery(storesQueryDTO), async (req: Request, res: R
     }
 
     const categoryQuery = (req.query.category as string) || (req.query.q as string) || "";
+    const isServiceQuery = /^(?:service|services)$/i.test(categoryQuery.trim());
 
     // 🔥 AI RANKING: Order by discovery engine rank score with sovereign fallback
     let stores: any[] = [];
 
     try {
-      stores = await getDiscoveryByType(effectiveDistrictId, "SHOP");
+      const discoveryType = isServiceQuery ? "SERVICE" : "SHOP";
+      stores = await getDiscoveryByType(effectiveDistrictId, discoveryType);
     } catch (err) {
       console.warn("⚠️ PSR discovery failed, falling back to direct vendor query");
     }
@@ -197,7 +199,9 @@ router.get("/stores", validateQuery(storesQueryDTO), async (req: Request, res: R
         where: {
           districtId: effectiveDistrictId,
           status: "APPROVED",
-          ...(categoryQuery
+          ...(isServiceQuery
+            ? { businessType: "SERVICE" }
+            : categoryQuery
             ? {
               searchText: {
                 contains: categoryQuery.toLowerCase(),
