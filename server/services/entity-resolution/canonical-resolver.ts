@@ -165,7 +165,7 @@ export async function resolveVendorBySlug(
 
         const vendor = await prisma.vendor.findFirst({
             where: {
-                slug: normalizedSlug,
+                slug: { equals: normalizedSlug, mode: 'insensitive' },
                 ...vendorVisibilityFilter(districtId),
             },
             include: {
@@ -180,7 +180,7 @@ export async function resolveVendorBySlug(
         if (!vendor) {
             // Check if vendor exists at all (without governance filters) for diagnostics
             const rawVendor = await prisma.vendor.findFirst({
-                where: { slug: normalizedSlug },
+                where: { slug: { equals: normalizedSlug, mode: 'insensitive' } },
                 select: {
                     id: true,
                     status: true,

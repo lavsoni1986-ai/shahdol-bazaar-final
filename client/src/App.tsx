@@ -275,6 +275,8 @@ const Router = () => {
         <Route path="/:district/partner/:slug" component={ShopDetail} />
         <Route path="/:district/product/:slug" component={ProductDetail} />
         <Route path="/:district/service/:slug" component={ServiceDetail} />
+        <Route path="/services/:slug" component={ServiceDetail} />
+        <Route path="/service/:slug" component={ServiceDetail} />
         <Route path="/:district/ai/concierge" component={AIConciergePage} />
         <Route path="/ai/concierge" component={AIConciergePage} />
         <Route path="/cart" component={CartPage} />
