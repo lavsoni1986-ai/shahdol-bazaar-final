@@ -26,6 +26,7 @@ interface VendorData {
   isVerified?: boolean;
   dsslScore?: number;
   safetyBadges?: string[];
+  serviceHours?: string;
 }
 
 const fetchServiceBySlug = async (slug: string): Promise<VendorData> => {
@@ -84,7 +85,9 @@ export default function ServiceDetail() {
     name: vendor.businessName || vendor.name,
     phone: vendor.mobile || vendor.phone,
     address: vendor.address || "Address not provided",
-    hours: inferredType === "hospital" ? "24/7 Emergency Services" : "9:00 AM - 5:00 PM",
+    hours: inferredType === "hospital"
+      ? "24/7 Emergency Services"
+      : (vendor.serviceHours && vendor.serviceHours.trim() ? vendor.serviceHours.trim() : "9:00 AM - 5:00 PM"),
     features: inferredType === "school"
       ? ["Academic Excellence", "Experienced Faculty", "Modern Facilities", "Sports & Activities"]
       : inferredType === "hospital"

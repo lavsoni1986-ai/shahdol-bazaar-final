@@ -102,6 +102,22 @@ interface ContactGridProps {
   whatsapp?: string;
 }
 
+function formatWhatsAppUrl(raw: string): string {
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw;
+  }
+  const digits = raw.replace(/\D/g, "");
+  let normalized = digits;
+  if (digits.length === 10) {
+    normalized = `91${digits}`;
+  } else if (digits.length === 11 && digits.startsWith("0")) {
+    normalized = `91${digits.slice(1)}`;
+  } else if (digits.length === 12 && digits.startsWith("91")) {
+    normalized = digits;
+  }
+  return `https://wa.me/${normalized}`;
+}
+
 export function SovereignContactGrid({ phone, address, hours, mapLink, whatsapp }: ContactGridProps) {
   return (
     <div className="grid grid-cols-4 gap-3 -mt-12 relative z-10 px-4">
@@ -119,7 +135,7 @@ export function SovereignContactGrid({ phone, address, hours, mapLink, whatsapp 
         <SovereignContactButton type="hours" value={hours} />
       )}
       {whatsapp && (
-        <a href={`https://wa.me/${whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer">
+        <a href={formatWhatsAppUrl(whatsapp)} target="_blank" rel="noopener noreferrer">
           <SovereignContactButton type="whatsapp" />
         </a>
       )}
