@@ -105,7 +105,8 @@ router.get("/hospitals", async (req: Request, res: Response) => {
     countVendorsByCategory('HOSPITAL', districtId)
   ]);
 
-  return sendSuccess(res, hospitals.map(mapVendorByType));
+  const mapped = await Promise.all(hospitals.map((h) => mapVendorByType(h)));
+  return sendSuccess(res, mapped);
 });
 
 // --- FETCH HOSPITAL BY SLUG ---

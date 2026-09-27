@@ -1,4 +1,4 @@
-import { Route, useLocation, useRoute, Switch, Redirect } from "wouter";
+import { Route, useLocation, useRoute, useParams, Switch, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import React, { lazy, Suspense, useEffect, useState, ComponentType, useRef } from "react";
 
@@ -198,6 +198,18 @@ function ShopRedirect() {
   return null;
 }
 
+function DistrictHospitalsRedirect({ params }: { params?: { district?: string } }) {
+  const routeParams = useParams<{ district?: string }>();
+  const district = params?.district || routeParams.district || "shahdol";
+  return <Redirect to={`/${district}/hospitals`} replace />;
+}
+
+function DistrictServicesRedirect({ params }: { params?: { district?: string } }) {
+  const routeParams = useParams<{ district?: string }>();
+  const district = params?.district || routeParams.district || "shahdol";
+  return <Redirect to={`/${district}/services`} replace />;
+}
+
 function DistrictHomeRoute() {
   const [location] = useLocation();
   const [, params] = useRoute("/:district");
@@ -244,8 +256,16 @@ const Router = () => {
         <Route path="/:district/bus" component={BusTimetable} />
         <Route path="/hospitals" component={HospitalsPage} />
         <Route path="/:district/hospitals" component={HospitalsPage} />
+        <Route path="/healthcare"><Redirect to="/hospitals" /></Route>
+        <Route path="/:district/healthcare" component={DistrictHospitalsRedirect} />
+        <Route path="/doctors"><Redirect to="/hospitals" /></Route>
+        <Route path="/:district/doctors" component={DistrictHospitalsRedirect} />
         <Route path="/services" component={ServicesPage} />
         <Route path="/:district/services" component={ServicesPage} />
+        <Route path="/jobs"><Redirect to="/services" /></Route>
+        <Route path="/:district/jobs" component={DistrictServicesRedirect} />
+        <Route path="/offers"><Redirect to="/marketplace" /></Route>
+        <Route path="/:district/offers"><Redirect to="/marketplace" /></Route>
         <Route path="/education"><Redirect to="/schools" /></Route>
 
         <Route path="/vendor/register">  <Redirect to="/auth?role=partner&mode=register" /></Route>
