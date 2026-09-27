@@ -1,6 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CloudRain, Sun, Cloud, MapPin, Thermometer, Calendar } from "lucide-react";
+import { CloudRain, Sun, Cloud, MapPin, Calendar } from "lucide-react";
 import { Card, CardContent } from "../ui/card";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { apiRequest } from "@/lib/api-client";
@@ -55,16 +55,14 @@ export default function LocalPulseBanner({ districtSlug: propSlug, districtId: p
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <MapPin className="w-5 h-5 text-white/70" />
-              <span className="text-white font-medium">Shahdol Local Pulse</span>
+              <span className="text-white font-medium">{currentDistrict?.name || 'Shahdol'} Local Pulse</span>
             </div>
 
-            <div className="flex items-center gap-3">
-              {getWeatherIcon(pulseData.weather)}
-              <div className="flex items-center gap-1">
-                <Thermometer className="w-4 h-4 text-white/70" />
-                <span className="text-white text-sm">{pulseData.temperature}°C</span>
+            {pulseData.weather && (
+              <div className="flex items-center">
+                {getWeatherIcon(pulseData.weather)}
               </div>
-            </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
