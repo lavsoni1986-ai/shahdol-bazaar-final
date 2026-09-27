@@ -93,7 +93,7 @@ function adaptDiscoveryHomePayload(feed: any[]) {
         slug: x.slug,
         logo: x.image,
         image: x.image,
-        category: x.subtitle,
+        category: x.meta?.category || x.subtitle,
         address: x.address,
         phone: x.phone,
         isSponsored: x.isSponsored,

@@ -126,7 +126,7 @@ async function mapVendor(v: any, sovereignMetadata?: any): Promise<DiscoveryEnti
     actionType: "BUY",
     title: dto.name,
     slug: dto.slug,
-    subtitle: dto.businessType || dto.category,
+    subtitle: dto.category || dto.businessType,
     image: dto.logo,
     phone: dto.phone,
     address: dto.address,

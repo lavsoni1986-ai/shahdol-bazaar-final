@@ -393,17 +393,17 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
 
                 {/* Open status + reason */}
                 <div className="flex items-center gap-3 text-xs">
-                    <span className={`flex items-center gap-1 ${open ? "text-emerald-400" : "text-zinc-500"}`}>
+                    <span className={`flex items-center gap-1 shrink-0 ${open ? "text-emerald-400" : "text-zinc-500"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${open ? "bg-emerald-400 animate-pulse" : "bg-zinc-500"}`} />
                         {open ? "Open Now" : "Closed"}
                     </span>
-                    {data.reason && <span className="text-zinc-400">{data.reason}</span>}
+                    {data.reason && <span className="text-zinc-400 truncate">{data.reason}</span>}
                 </div>
 
                 {/* CTA buttons */}
                 <div className="grid grid-cols-2 gap-3 mt-5">
                     <button className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm font-semibold hover:bg-white/[0.1] transition-all active:scale-[0.98]">
-                        <Navigation className="w-4 h-4 text-white/70" /> Direct
+                        <Navigation className="w-4 h-4 text-white/70" /> View Store
                     </button>
                     <button
                         onClick={handleCall}

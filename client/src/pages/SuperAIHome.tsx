@@ -178,7 +178,7 @@ export default function SuperAIHome() {
           <div className="relative">
             <div className="absolute -inset-4 bg-orange-500/5 blur-[60px] rounded-full opacity-50" />
             <div className="relative">
-              <FeaturedShops entities={partners} />
+              <FeaturedShops entities={partners} products={products} />
             </div>
           </div>
         </motion.section>
