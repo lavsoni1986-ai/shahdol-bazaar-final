@@ -396,10 +396,48 @@ export interface GovernedImageState {
     handleError: () => void;
 }
 
+/**
+ * Safely optimizes Cloudinary image URLs with automatic format (WebP/AVIF),
+ * automatic quality compression, and responsive max width.
+ *
+ * Rules:
+ * - Only modifies URLs matching res.cloudinary.com
+ * - Does not double-inject transformations
+ * - Preserves existing path, version, and filename
+ * - Preserves non-Cloudinary URLs exactly as-is
+ */
+export function optimizeCloudinaryUrl(
+    url: string | null | undefined,
+    options: { width?: number; quality?: string } = {}
+): string | null {
+    if (!url || typeof url !== "string") return null;
+    const trimmed = url.trim();
+    if (!trimmed.includes("res.cloudinary.com") || !trimmed.includes("/image/upload/")) {
+        return trimmed;
+    }
+
+    // If the URL already contains f_auto or q_auto, return untouched
+    if (trimmed.includes("f_auto") || trimmed.includes("q_auto")) {
+        return trimmed;
+    }
+
+    const targetWidth = options.width || 400;
+    const targetQuality = options.quality || "auto";
+    const transformSegment = `f_auto,q_${targetQuality},w_${targetWidth}`;
+
+    const uploadIndex = trimmed.indexOf("/image/upload/");
+    if (uploadIndex === -1) return trimmed;
+
+    const prefix = trimmed.substring(0, uploadIndex + "/image/upload/".length);
+    const suffix = trimmed.substring(uploadIndex + "/image/upload/".length);
+
+    return `${prefix}${transformSegment}/${suffix}`;
+}
+
 export function useGovernedImage(
     initialSrc: string | null | undefined,
     categoryName?: string | null,
-    options?: { lazy?: boolean; rootMargin?: string }
+    options?: { lazy?: boolean; rootMargin?: string; width?: number }
 ): GovernedImageState {
     const [imgLoaded, setImgLoaded] = useState(false);
     const [hasError, setHasError] = useState(false);
@@ -452,7 +490,11 @@ export function useGovernedImage(
     
     const isFallback = !initialSrc || hasError;
     const fallbackConfig = useMemo(() => resolveCategoryFallback(categoryName), [categoryName]);
-    const src = isFallback ? null : (initialSrc ?? null);
+    const optimizedSrc = useMemo(
+        () => (isFallback ? null : optimizeCloudinaryUrl(initialSrc, { width: options?.width })),
+        [initialSrc, isFallback, options?.width]
+    );
+    const src = isFallback ? null : optimizedSrc;
     
     return useMemo(() => ({
         src: isVisible ? src : null,
@@ -515,6 +557,7 @@ export interface GovernedImageProps {
     imgClassName?: string;
     lazy?: boolean;
     name?: string | null;
+    optimizedWidth?: number;
 }
 
 export const GovernedImage = React.memo(function GovernedImage({
@@ -527,8 +570,10 @@ export const GovernedImage = React.memo(function GovernedImage({
     imgClassName = "",
     lazy = true,
     name,
+    optimizedWidth,
 }: GovernedImageProps) {
-    const { src: imgUrl, isFallback, fallbackConfig, imgLoaded, imageError, containerRef, handleLoad, handleError } = useGovernedImage(src, categoryName, { lazy });
+    const targetWidth = optimizedWidth || (aspectRatioHint === "16/9" ? 640 : aspectRatioHint === "4/3" ? 500 : 400);
+    const { src: imgUrl, isFallback, fallbackConfig, imgLoaded, imageError, containerRef, handleLoad, handleError } = useGovernedImage(src, categoryName, { lazy, width: targetWidth });
     const { governance } = useMediaDetection(isFallback ? null : imgUrl, aspectRatioHint, contextHint);
 
     const isLowEnd = isLowEndAndroidDevice();

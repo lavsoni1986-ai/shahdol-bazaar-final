@@ -44,21 +44,6 @@ export default function SuperAIHome() {
 
   const handleNavigation = (path: string) => setLocation(`/${districtSlug}${path}`);
 
-  // 🛡️ PREMIUM SKELETON LOADING
-  if (!isReady || isLoading || !data) {
-    return (
-      <div className="min-h-screen bg-[#050505] p-4 space-y-8">
-        <div className="h-10 bg-white/10 rounded-full animate-pulse w-1/2 mx-auto" />
-        <div className="h-20 bg-white/5 rounded-3xl animate-pulse" />
-        <div className="grid grid-cols-3 gap-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-24 bg-white/5 rounded-2xl animate-pulse" />
-          ))}
-        </div>
-        <div className="h-48 bg-white/5 rounded-[40px] animate-pulse" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#050505] text-white pb-[88px] selection:bg-orange-500/30">
@@ -145,7 +130,13 @@ export default function SuperAIHome() {
           <button className="text-[10px] font-black uppercase text-gray-500 hover:text-orange-400 transition">See All</button>
         </div>
 
-        {products.length === 0 ? (
+        {isLoading ? (
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="min-w-[260px] h-64 bg-white/5 rounded-3xl animate-pulse border border-white/5 flex-shrink-0" />
+            ))}
+          </div>
+        ) : products.length === 0 ? (
           <p className="text-center text-gray-500 text-sm">
             अभी कोई ट्रेंडिंग नहीं — आप पहले explore करें 🔍
           </p>
@@ -178,15 +169,31 @@ export default function SuperAIHome() {
           <div className="relative">
             <div className="absolute -inset-4 bg-orange-500/5 blur-[60px] rounded-full opacity-50" />
             <div className="relative">
-              <FeaturedShops entities={partners} products={products} />
+              {isLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-44 bg-white/5 rounded-3xl animate-pulse border border-white/5" />
+                  ))}
+                </div>
+              ) : (
+                <FeaturedShops entities={partners} products={products} />
+              )}
             </div>
           </div>
         </motion.section>
 
         {/* 🟡 4. TRUSTED DEALS */}
         <section className="px-4">
-          <h2 className="text-xl font-black italic mb-6">Trusted Deals in Shahdol</h2>
-          <OffersGrid products={products} />
+          <h2 className="text-xl font-black italic mb-6">Trusted Deals in {currentDistrict?.name || 'Shahdol'}</h2>
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-48 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
+              ))}
+            </div>
+          ) : (
+            <OffersGrid products={products} />
+          )}
         </section>
 
         {/* 🔧 5. SERVICE NETWORK */}
@@ -233,13 +240,29 @@ export default function SuperAIHome() {
         {/* ❤️ 7. HEALTHCARE */}
         <section className="px-4">
           <h2 className="text-xl font-black italic mb-6">Healthcare</h2>
-          <HealthPulse hospitals={hospitals} />
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-40 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
+              ))}
+            </div>
+          ) : (
+            <HealthPulse hospitals={hospitals} />
+          )}
         </section>
 
-        {/* 🎓 7. EDUCATION */}
+        {/* 🎓 8. EDUCATION */}
         <section className="px-4">
           <h2 className="text-xl font-black italic mb-6">Education</h2>
-          <SchoolPulse schools={schools} />
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-40 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
+              ))}
+            </div>
+          ) : (
+            <SchoolPulse schools={schools} />
+          )}
         </section>
 
 

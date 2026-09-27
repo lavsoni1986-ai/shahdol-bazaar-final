@@ -23,6 +23,34 @@ declare global {
   }
 }
 
+let cloudinaryScriptPromise: Promise<any> | null = null;
+
+function loadCloudinaryWidgetScript(): Promise<any> {
+  if (typeof window !== "undefined" && window.cloudinary) {
+    return Promise.resolve(window.cloudinary);
+  }
+  if (!cloudinaryScriptPromise) {
+    cloudinaryScriptPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[src*="upload-widget.cloudinary.com"]');
+      if (existing) {
+        existing.addEventListener("load", () => resolve(window.cloudinary));
+        existing.addEventListener("error", reject);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://upload-widget.cloudinary.com/global/all.js";
+      script.async = true;
+      script.onload = () => resolve(window.cloudinary);
+      script.onerror = (err) => {
+        cloudinaryScriptPromise = null;
+        reject(err);
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return cloudinaryScriptPromise;
+}
+
 export const ImageUpload = ({ value, onChange, onRemove, label }: ImageUploadProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
@@ -36,14 +64,16 @@ export const ImageUpload = ({ value, onChange, onRemove, label }: ImageUploadPro
   }, []);
 
   useEffect(() => {
-    if (!window.cloudinary) {
-      console.warn("Cloudinary script not found. It should be in index.html");
-    }
+    loadCloudinaryWidgetScript().catch(() => {});
     return () => cleanupUIFreeze();
   }, [cleanupUIFreeze]);
 
-  const handleUpload = useCallback(() => {
-    if (!window.cloudinary) {
+  const handleUpload = useCallback(async () => {
+    setIsUploading(true);
+    try {
+      await loadCloudinaryWidgetScript();
+    } catch {
+      setIsUploading(false);
       toast({
         variant: "destructive",
         title: "Error",
@@ -52,7 +82,15 @@ export const ImageUpload = ({ value, onChange, onRemove, label }: ImageUploadPro
       return;
     }
 
-    setIsUploading(true);
+    if (!window.cloudinary) {
+      setIsUploading(false);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Cloudinary is not loaded. Please refresh.",
+      });
+      return;
+    }
 
     const myWidget = window.cloudinary.createUploadWidget(
       {

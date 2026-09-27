@@ -1,6 +1,6 @@
 // 🚀 BharatOS Production Service Worker
 // Version: Stable Semantic Release
-const CACHE_VERSION = 'v1.1.0';
+const CACHE_VERSION = 'v1.2.0';
 const CACHE_NAME = `shahdolbazaar-${CACHE_VERSION}`;
 
 // 🚨 DEVELOPMENT MODE DETECTION
@@ -144,16 +144,39 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ⚡ 2. CRITICAL ASSETS (JS, CSS, HTML, Source): Network-First
+  // ⚡ 2. IMMUTABLE ASSETS (/assets/*): Cache-First for content-hashed Vite bundles
+  const isHashedAsset = event.request.url.includes('/assets/');
+  if (isHashedAsset) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(event.request).then((response) => {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // ⚡ 3. CRITICAL ASSETS (HTML, navigation, non-hashed JS/CSS): Network-First (NO 'no-store')
   const isCriticalResource = 
+    event.request.mode === 'navigate' ||
+    event.request.url.includes('.html') ||
     event.request.url.includes('.js') || 
     event.request.url.includes('.css') ||
-    event.request.url.includes('.html') ||
     event.request.url.includes('/src/');
 
   if (isCriticalResource) {
     event.respondWith(
-      fetch(event.request, { cache: 'no-store' })
+      fetch(event.request)
         .then((response) => {
           if (response && response.status === 200) {
             const responseToCache = response.clone();

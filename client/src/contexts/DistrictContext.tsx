@@ -64,9 +64,17 @@ export function createDistrictObject(slug: string): District {
 }
 
 
+function getInitialDistrict(): District {
+  if (typeof window !== "undefined") {
+    const slug = resolveDistrictSlugFromPath(window.location.pathname);
+    return createDistrictObject(slug);
+  }
+  return createDistrictObject(DEFAULT_DISTRICT_SLUG);
+}
+
 export function DistrictProvider({ children }: { children: React.ReactNode }) {
-  const [currentDistrict, setDistrict] = useState<District | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentDistrict, setDistrict] = useState<District | null>(getInitialDistrict);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const syncDistrict = () => {
@@ -84,7 +92,6 @@ export function DistrictProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     };
 
-    syncDistrict();
     window.addEventListener("popstate", syncDistrict);
     return () => window.removeEventListener("popstate", syncDistrict);
   }, []);
