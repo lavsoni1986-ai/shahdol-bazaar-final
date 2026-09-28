@@ -6,7 +6,9 @@
 // NO duplicate product rendering allowed.
 // NO commerce assumptions for non-product entities.
 
+import { useState } from "react";
 import { Link } from "wouter";
+import { optimizeCloudinaryUrl } from "@/design/media-governance";
 import {
     ShoppingBag,
     HeartPulse,
@@ -188,57 +190,188 @@ export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: Sover
     }
 
     // ── NON-PRODUCT ENTITY: STANDARD ENTITY CARD ──
+    const [imageError, setImageError] = useState(false);
+    const optimizedImageUrl = entity.imageUrl
+        ? optimizeCloudinaryUrl(entity.imageUrl, { width: 800 }) || entity.imageUrl
+        : null;
+    const hasImage = Boolean(optimizedImageUrl) && !imageError;
+
     const priceLabel = entity.price !== undefined && entity.price !== null ? `₹${entity.price}` : null;
     const ratingLabel = entity.rating !== undefined && entity.rating !== null ? `${entity.rating.toFixed(1)} ⭐` : null;
     // 🏛️ Use canonical governance engine to check commerce eligibility
     const hasCommerce = hasCommerceDisplay(mapToCanonicalKind(entity.kind) as any);
 
+    // ── VARIANT: SEARCH (COMPACT INLINE LIST ITEM) ──
+    if (variant === 'search') {
+        return (
+            <Link
+                href={route}
+                className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 overflow-hidden transition hover:border-orange-500/40 hover:bg-white/10"
+                onClick={handleClick}
+            >
+                {hasImage ? (
+                    <div className="flex-shrink-0 h-14 w-14 rounded-2xl overflow-hidden bg-zinc-800 border border-white/10">
+                        <img
+                            src={optimizedImageUrl!}
+                            alt={entity.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            onError={() => setImageError(true)}
+                        />
+                    </div>
+                ) : (
+                    <div className="flex-shrink-0 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                        <Icon className="h-6 w-6" />
+                    </div>
+                )}
+
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-orange-300">{label}</p>
+                                {(entity.isVerified || (entity.dsslScore != null && entity.dsslScore >= 50)) && (
+                                    <SovereignTrustBadge
+                                        level={entity.isVerified ? "verified" : resolveTrustLevel({ isVerified: entity.isVerified, dsslScore: entity.dsslScore })}
+                                        entityKind={entity.kind}
+                                        size="sm"
+                                    />
+                                )}
+                            </div>
+                            <h3 className="text-white font-bold text-base leading-tight line-clamp-2">{entity.title}</h3>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-2 text-right">
+                            {priceLabel && hasCommerce && <span className="text-sm font-black text-emerald-300">{priceLabel}</span>}
+                            {ratingLabel && <span className="text-xs text-slate-300">{ratingLabel}</span>}
+                        </div>
+                    </div>
+
+                    {entity.subtitle && (
+                        <p className="text-xs text-slate-400 line-clamp-1">{entity.subtitle}</p>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-2">
+                        {entity.category && <Badge className="bg-white/5 text-slate-200 border border-white/10">{entity.category}</Badge>}
+                        {entity.address && (
+                            <span className="flex items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5" />
+                                {entity.address}
+                            </span>
+                        )}
+                        {entity.phone && (
+                            <span className="flex items-center gap-1">
+                                <Phone className="h-3.5 w-3.5" />
+                                {entity.phone}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2">
+                        <EntityCTAButton entity={entity} />
+                    </div>
+                </div>
+            </Link>
+        );
+    }
+
+    // ── VARIANT: GRID (DISCOVERY CARD — HOMEPAGE / LISTING) ──
     return (
         <Link
             href={route}
-            className={
-                variant === 'search'
-                    ? 'group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 overflow-hidden transition hover:border-orange-500/40 hover:bg-white/10'
-                    : 'block rounded-[1.75rem] border border-white/10 bg-white/5 p-5 transition hover:border-orange-500/30 hover:bg-white/10'
-            }
+            className={`group block rounded-[1.75rem] border border-white/10 bg-white/5 transition hover:border-orange-500/30 hover:bg-white/10 ${
+                hasImage ? 'overflow-hidden' : 'p-5'
+            }`}
             onClick={handleClick}
         >
-            {entity.imageUrl ? (
-                <div className="flex-shrink-0 h-14 w-14 rounded-2xl overflow-hidden bg-zinc-800 border border-white/10">
+            {hasImage ? (
+                /* ── PROMINENT TOP MEDIA BANNER (~16:9 / ~h-40) ── */
+                <div className="relative w-full aspect-[16/9] sm:aspect-[2/1] max-h-48 overflow-hidden bg-zinc-950 flex items-center justify-center border-b border-white/5">
+                    {/* Ambient blurred backdrop so portrait/square images don't have harsh black bars */}
                     <img
-                        src={entity.imageUrl}
-                        alt={entity.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
+                        src={optimizedImageUrl!}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-110 pointer-events-none"
                     />
-                </div>
-            ) : (
-                <div className="flex-shrink-0 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                    <Icon className="h-6 w-6" />
-                </div>
-            )}
 
-            <div className={variant === 'search' ? 'min-w-0 flex-1' : 'space-y-4'}>
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-orange-300">{label}</p>
-                            {(entity.isVerified || (entity.dsslScore != null && entity.dsslScore >= 50)) && (
-                                <SovereignTrustBadge
-                                    level={entity.isVerified ? "verified" : resolveTrustLevel({ isVerified: entity.isVerified, dsslScore: entity.dsslScore })}
-                                    entityKind={entity.kind}
-                                    size="sm"
-                                />
-                            )}
+                    {/* Foreground crisp image — object-contain ensures signboards, text, and clinic details are 100% visible and uncropped */}
+                    <img
+                        src={optimizedImageUrl!}
+                        alt={entity.title}
+                        className="relative z-10 w-full h-full object-contain p-1.5 transition-transform duration-300 group-hover:scale-[1.02]"
+                        loading="lazy"
+                        onError={() => setImageError(true)}
+                    />
+
+                    {/* Gradient shadow at bottom of banner for seamless content transition */}
+                    <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-zinc-950/90 via-zinc-950/40 to-transparent pointer-events-none z-10" />
+
+                    {/* Rating overlay badge if available */}
+                    {ratingLabel && (
+                        <div className="absolute top-3 right-3 z-20 bg-black/60 backdrop-blur-md border border-white/10 rounded-full px-2.5 py-0.5 text-xs font-semibold text-slate-200 shadow-md">
+                            {ratingLabel}
                         </div>
-                        <h3 className="text-white font-bold text-base leading-tight line-clamp-2">{entity.title}</h3>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-2 text-right">
-                        {priceLabel && hasCommerce && <span className="text-sm font-black text-emerald-300">{priceLabel}</span>}
-                        {ratingLabel && <span className="text-xs text-slate-300">{ratingLabel}</span>}
-                    </div>
+                    )}
                 </div>
+            ) : null}
+
+            {/* ── CARD BODY CONTENT ── */}
+            <div className={hasImage ? 'p-5 space-y-4' : 'space-y-4'}>
+                {hasImage ? (
+                    /* With image: Header sits directly below the prominent banner */
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-orange-300">{label}</p>
+                                {(entity.isVerified || (entity.dsslScore != null && entity.dsslScore >= 50)) && (
+                                    <SovereignTrustBadge
+                                        level={entity.isVerified ? "verified" : resolveTrustLevel({ isVerified: entity.isVerified, dsslScore: entity.dsslScore })}
+                                        entityKind={entity.kind}
+                                        size="sm"
+                                    />
+                                )}
+                            </div>
+                            <h3 className="text-white font-bold text-base leading-tight line-clamp-2 group-hover:text-orange-400 transition-colors">
+                                {entity.title}
+                            </h3>
+                        </div>
+
+                        {priceLabel && hasCommerce && (
+                            <div className="flex flex-col items-end gap-1 text-right shrink-0">
+                                <span className="text-sm font-black text-emerald-300">{priceLabel}</span>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    /* Without image (e.g. Apollo): Balanced header with Icon alongside Title, eliminating dead space */
+                    <div className="flex items-start gap-3.5">
+                        <div className="flex-shrink-0 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                            <Icon className="h-6 w-6" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-orange-300">{label}</p>
+                                {(entity.isVerified || (entity.dsslScore != null && entity.dsslScore >= 50)) && (
+                                    <SovereignTrustBadge
+                                        level={entity.isVerified ? "verified" : resolveTrustLevel({ isVerified: entity.isVerified, dsslScore: entity.dsslScore })}
+                                        entityKind={entity.kind}
+                                        size="sm"
+                                    />
+                                )}
+                            </div>
+                            <h3 className="text-white font-bold text-base leading-tight line-clamp-2 group-hover:text-orange-400 transition-colors">
+                                {entity.title}
+                            </h3>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-1 text-right shrink-0">
+                            {priceLabel && hasCommerce && <span className="text-sm font-black text-emerald-300">{priceLabel}</span>}
+                            {ratingLabel && <span className="text-xs text-slate-300">{ratingLabel}</span>}
+                        </div>
+                    </div>
+                )}
 
                 {entity.subtitle && (
                     <p className="text-xs text-slate-400 line-clamp-1">{entity.subtitle}</p>
@@ -260,22 +393,14 @@ export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: Sover
                     )}
                 </div>
 
-                {variant === 'search' && (
-                    <div className="flex items-center gap-2 pt-1">
-                        <EntityCTAButton entity={entity} />
-                    </div>
-                )}
-            </div>
-
-            {variant === 'grid' && (
-                <div className="flex items-center justify-between gap-3 pt-3">
+                <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/5">
                     <div className="flex items-center gap-2 text-slate-400 text-xs">
                         {entity.reviewCount != null && <span>{entity.reviewCount} reviews</span>}
                         {entity.dsslScore != null && <span>{entity.dsslScore}% dssl</span>}
                     </div>
                     <EntityCTAButton entity={entity} />
                 </div>
-            )}
+            </div>
         </Link>
     );
 }
