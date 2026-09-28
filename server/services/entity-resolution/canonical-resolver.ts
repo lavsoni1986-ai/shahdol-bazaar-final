@@ -163,9 +163,30 @@ export async function resolveVendorBySlug(
         // 2. Attempt lookup with full governance filters
         diagnostics.entityId = normalizedSlug;
 
+        // Build candidate slug queries to tolerate underscore vs hyphen variations safely
+        const rawSlug = slug.trim();
+        const candidateSlugs = Array.from(
+            new Set([
+                rawSlug,
+                normalizedSlug,
+                rawSlug.toLowerCase(),
+                normalizedSlug.replace(/-/g, '_'),
+                rawSlug.replace(/_/g, '-'),
+                rawSlug.replace(/-/g, '_'),
+            ].filter(Boolean))
+        );
+
+        const slugFilter = candidateSlugs.length === 1
+            ? { slug: { equals: candidateSlugs[0], mode: 'insensitive' as const } }
+            : {
+                OR: candidateSlugs.map(s => ({
+                    slug: { equals: s, mode: 'insensitive' as const }
+                }))
+            };
+
         const vendor = await prisma.vendor.findFirst({
             where: {
-                slug: { equals: normalizedSlug, mode: 'insensitive' },
+                ...slugFilter,
                 ...vendorVisibilityFilter(districtId),
             },
             include: {
@@ -180,7 +201,7 @@ export async function resolveVendorBySlug(
         if (!vendor) {
             // Check if vendor exists at all (without governance filters) for diagnostics
             const rawVendor = await prisma.vendor.findFirst({
-                where: { slug: { equals: normalizedSlug, mode: 'insensitive' } },
+                where: slugFilter,
                 select: {
                     id: true,
                     status: true,
