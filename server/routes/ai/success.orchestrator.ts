@@ -197,7 +197,7 @@ export async function handleSuccessFlow({
 
     // Separate by entity type
     const vendors = integrityAdjustedEntities
-      .filter(e => e.entityType === 'SHOP')
+      .filter(e => e.entityType === 'SHOP' || e.entityType === 'SERVICE')
       .slice(0, 5);
 
     let products = integrityAdjustedEntities
@@ -212,8 +212,18 @@ export async function handleSuccessFlow({
       .filter(e => e.entityType === 'DOCTOR')
       .slice(0, 5);
 
-    // Get services
-    const services = await prisma.serviceWorker.findMany({
+    // Sovereign services from discovery feed (stored as SERVICE in Vendor table)
+    const sovereignServices = integrityAdjustedEntities
+      .filter(e => e.entityType === 'SERVICE')
+      .map(e => ({
+        id: e.sourceId,
+        name: e.title,
+        serviceType: e.category || e.meta?.category || e.subtitle || "Local Service",
+        phone: e.phone || null
+      }));
+
+    // Get legacy services if any
+    const legacyServices = await prisma.serviceWorker.findMany({
       where: {
         districtId,
         isActive: true,
@@ -224,6 +234,8 @@ export async function handleSuccessFlow({
       },
       take: 3
     });
+
+    const services = [...sovereignServices, ...legacyServices].slice(0, 5);
 
     // Shared learning
     await safeExecute('shared_learning', async () => {

@@ -141,6 +141,36 @@ export function getUnifiedGroundingIndex(entity: any): string[] {
   if (entity.city) searchableTerms.push(entity.city.toLowerCase());
   if (entity.locality) searchableTerms.push(entity.locality.toLowerCase());
 
+  // Controlled entity metadata indexing (Phase 3.10)
+  if (entity.meta) {
+    if (typeof entity.meta.category === 'string' && entity.meta.category.trim()) {
+      searchableTerms.push(entity.meta.category.toLowerCase().trim());
+    }
+    if (Array.isArray(entity.meta.skillTags)) {
+      for (const skill of entity.meta.skillTags) {
+        if (typeof skill === 'string' && skill.trim()) {
+          searchableTerms.push(skill.toLowerCase().trim());
+        }
+      }
+    }
+    if (Array.isArray(entity.meta.specialties)) {
+      for (const spec of entity.meta.specialties) {
+        if (typeof spec === 'string' && spec.trim()) {
+          searchableTerms.push(spec.toLowerCase().trim());
+        }
+      }
+    }
+    if (typeof entity.meta.description === 'string' && entity.meta.description.trim()) {
+      const descTokens = entity.meta.description
+        .toLowerCase()
+        .replace(/[^\w\s\u0900-\u097F]/g, ' ')
+        .split(/\s+/)
+        .filter((t: string) => t.length > 2)
+        .slice(0, 25);
+      searchableTerms.push(...descTokens);
+    }
+  }
+
   // Semantic aliases (expand based on entity type)
   const semanticAliases = getSemanticAliases(entity);
   searchableTerms.push(...semanticAliases);
@@ -151,7 +181,7 @@ export function getUnifiedGroundingIndex(entity: any): string[] {
 
 function getSemanticAliases(entity: any): string[] {
   const aliases: string[] = [];
-  const type = (entity.entityType || entity.businessType || entity.category || '').toLowerCase();
+  const type = (entity.entityType || entity.businessType || entity.category || entity.meta?.category || '').toLowerCase();
 
   // Medical aliases
   if (type.includes('hospital') || type.includes('medical') || type.includes('clinic')) {
@@ -163,7 +193,10 @@ function getSemanticAliases(entity: any): string[] {
     aliases.push('school', 'college', 'education', 'स्कूल', 'कॉलेज', 'शिक्षा');
   }
 
-  // Add more semantic mappings...
+  // Service aliases (Phase 3.10)
+  if (type.includes('service') || type.includes('repair') || entity.entityType === 'SERVICE') {
+    aliases.push('service', 'servicing', 'repair', 'repairing', 'सेवा', 'मरम्मत');
+  }
 
   return aliases;
 }

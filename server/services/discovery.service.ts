@@ -22,6 +22,7 @@ export interface DiscoveryEntity {
   title: string;
   slug: string;
   subtitle?: string;
+  category?: string;
   image?: string | null;
   phone?: string | null;
   address?: string | null;
@@ -227,6 +228,7 @@ function mapWorker(w: any): DiscoveryEntity {
     title: dto.name,
     slug: dto.slug,
     subtitle: dto.businessType || "Service",
+    category: dto.category || "SERVICE",
     image: dto.image || dto.logo || null,
     phone: dto.phone,
     address: dto.address,

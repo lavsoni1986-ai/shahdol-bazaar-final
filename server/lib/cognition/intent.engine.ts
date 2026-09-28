@@ -114,7 +114,7 @@ export function classifyQueryIntent(query: string, cognition: any): IntentClassi
     (queryLower.includes('blood') || queryLower.includes('doctor') || queryLower.includes('hospital') || queryLower.includes('medical') || queryLower.includes('ambulance') || queryLower.includes('clinic'));
 
   const isServiceTrade = cognition?.domain === 'SERVICES' ||
-    /plumber|plumbing|pipe\s*leak|electrician|bijli\s*mistri|mechanic|auto\s*garage|carpenter|badhai|painter|putai\s*mistri|putai|mistri|(?:ac|ro|fridge|refrigerator|washing\s*machine)\s*(?:repair|service)/.test(queryLower);
+    /plumber|plumbing|pipe\s*leak|electrician|bijli\s*mistri|mechanic|auto\s*garage|carpenter|badhai|painter|putai\s*mistri|putai|mistri|(?:ac|ro|fridge|refrigerator|washing\s*machine|tv|television|led\s*tv|lcd\s*tv|crt\s*tv)\s*(?:repair|service|servicing)/.test(queryLower);
 
   const domain: CanonicalDomain =
     isHealthcareEmergency ? CanonicalDomain.HEALTHCARE :

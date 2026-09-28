@@ -54,12 +54,15 @@ export function cognitiveParseQuery(message: string): CognitiveParse {
     searchTerms.add("ticket");
   } else if (
     !/mobile|phone|screen/.test(raw) &&
-    /plumber|plumbing|pipe\s*leak|electrician|bijli\s*mistri|mechanic|auto\s*garage|carpenter|badhai|painter|putai\s*mistri|putai|mistri|(?:ac|ro|fridge|refrigerator|washing\s*machine)\s*(?:repair|service)/.test(raw)
+    /plumber|plumbing|pipe\s*leak|electrician|bijli\s*mistri|mechanic|auto\s*garage|carpenter|badhai|painter|putai\s*mistri|putai|mistri|(?:ac|ro|fridge|refrigerator|washing\s*machine|tv|television|led\s*tv|lcd\s*tv|crt\s*tv)\s*(?:repair|service|servicing)/.test(raw)
   ) {
     domain = "SERVICES";
     entity = "LOCAL_SERVICE";
     searchTerms.add("service");
-    const tradeMatch = raw.match(/plumber|electrician|mechanic|carpenter|painter|badhai|putai|garage/);
+    if (/repair|मरम्मत/.test(raw)) {
+      searchTerms.add("repair");
+    }
+    const tradeMatch = raw.match(/plumber|electrician|mechanic|carpenter|painter|badhai|putai|garage|tv|television/);
     if (tradeMatch) {
       searchTerms.add(tradeMatch[0]);
     }
