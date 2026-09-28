@@ -177,7 +177,7 @@ function mapHospital(h: any, sovereignMetadata?: any): DiscoveryEntity {
     title: dto.name,
     slug: dto.slug,
     subtitle: dto.businessType || "Hospital",
-    image: dto.logo,
+    image: dto.image || dto.logo || null,
     phone: dto.phone,
     address: dto.address,
     dsslScore: dto.trustScore || 70,
@@ -227,7 +227,7 @@ function mapWorker(w: any): DiscoveryEntity {
     title: dto.name,
     slug: dto.slug,
     subtitle: dto.businessType || "Service",
-    image: dto.logo,
+    image: dto.image || dto.logo || null,
     phone: dto.phone,
     address: dto.address,
     dsslScore: dto.trustScore || 75,
@@ -378,6 +378,14 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
             status: "APPROVED" as any,
             isShadowBanned: false,
           },
+          include: {
+            products: {
+              include: {
+                images: true,
+              },
+              take: 1,
+            },
+          },
           take: DISCOVERY_BUDGET.hospitals,
           orderBy: { createdAt: "desc" },
         }),
@@ -410,6 +418,14 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
             businessType: 'SERVICE',
             status: "APPROVED" as any,
             isShadowBanned: false,
+          },
+          include: {
+            products: {
+              include: {
+                images: true,
+              },
+              take: 1,
+            },
           },
           take: DISCOVERY_BUDGET.workers,
         }),

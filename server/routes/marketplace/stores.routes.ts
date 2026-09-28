@@ -342,8 +342,12 @@ router.get("/stores/:slug", async (req: Request, res: Response) => {
     });
 
     const mapped = await mapVendorByType(result.data, { products: result.data.products });
+    const canonicalImage = (mapped as any).image || (mapped as any).logo || result.data.logo || result.data.products?.[0]?.images?.[0]?.url || result.data.products?.[0]?.imageUrl || null;
     const storePayload = {
       ...mapped,
+      image: canonicalImage,
+      logo: canonicalImage,
+      images: (mapped as any).images || result.data.images || [],
       name: (mapped as any).name || (mapped as any).title || result.data.name,
       slug: (mapped as any).slug || result.data.slug,
       phone: (mapped as any).phone || (mapped as any).contactNumber || result.data.phone || result.data.mobile || undefined,
@@ -388,9 +392,13 @@ router.get("/vendors/id/:id", async (req: Request, res: Response) => {
       await trackVendorView(req.ctx.userId, id, req);
     }
 
-    const mapped = await mapVendorByType(result.data);
+    const mapped = await mapVendorByType(result.data, { products: result.data.products });
+    const canonicalImage = (mapped as any).image || (mapped as any).logo || result.data.logo || result.data.products?.[0]?.images?.[0]?.url || result.data.products?.[0]?.imageUrl || null;
     const storePayload = {
       ...mapped,
+      image: canonicalImage,
+      logo: canonicalImage,
+      images: (mapped as any).images || result.data.images || [],
       name: (mapped as any).name || (mapped as any).title || result.data.name,
       slug: (mapped as any).slug || result.data.slug,
       phone: (mapped as any).phone || (mapped as any).contactNumber || result.data.phone || result.data.mobile || undefined,

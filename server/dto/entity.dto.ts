@@ -57,6 +57,7 @@ export const canonicalEntitySchema = z.object({
 
     // Branding
     logo: z.string().nullable().optional(),
+    image: z.string().nullable().optional(),
     images: z.array(z.string()).optional(),
 
     // Trust & Quality
@@ -317,6 +318,42 @@ function deriveSponsored(vendor: any): boolean {
 }
 
 /**
+ * Canonical primary image resolution for Healthcare and Service providers.
+ * Priority:
+ * 1. vendor.logo
+ * 2. vendor.images[0]
+ * 3. vendor.products[0].images[0].url
+ * 4. vendor.products[0].imageUrl
+ * 5. null
+ */
+export function resolveProviderPrimaryImage(vendor: any): string | null {
+    if (!vendor) return null;
+
+    if (isValidImageUrl(vendor.logo)) {
+        return vendor.logo;
+    }
+
+    if (Array.isArray(vendor.images) && vendor.images.length > 0 && isValidImageUrl(vendor.images[0])) {
+        return vendor.images[0];
+    }
+
+    const firstProduct = Array.isArray(vendor.products) && vendor.products.length > 0 ? vendor.products[0] : null;
+    if (firstProduct) {
+        const firstProdImg = Array.isArray(firstProduct.images) && firstProduct.images.length > 0 ? firstProduct.images[0] : null;
+        const prodImgUrl = firstProdImg?.url || firstProdImg?.imageUrl || (typeof firstProdImg === 'string' ? firstProdImg : null);
+        if (isValidImageUrl(prodImgUrl)) {
+            return prodImgUrl;
+        }
+
+        if (isValidImageUrl(firstProduct.imageUrl)) {
+            return firstProduct.imageUrl;
+        }
+    }
+
+    return null;
+}
+
+/**
  * Convert Vendor DB model to DTO
  */
 export async function mapVendorToDTO(vendor: any, include?: any): Promise<VendorEntity> {
@@ -454,10 +491,15 @@ export async function mapProductToDTO(product: any, vendor?: any): Promise<Produ
 /**
  * Convert Hospital/Healthcare Vendor to DTO
  */
-export function mapHealthcareToDTO(vendor: any): HealthcareEntity {
+export function mapHealthcareToDTO(vendor: any, include?: any): HealthcareEntity {
     const hospitalData = vendor.hospitalData || {};
     const vendorName = getVendorDisplayName(vendor);
     const verified = isVendorVerified(vendor);
+    const vendorWithProducts = (vendor.products && vendor.products.length > 0)
+        ? vendor
+        : { ...vendor, products: include?.products || vendor.products || [] };
+    const primaryImage = resolveProviderPrimaryImage(vendorWithProducts);
+
     return {
         id: vendor.id,
         entityType: EntityType.HOSPITAL,
@@ -468,7 +510,9 @@ export function mapHealthcareToDTO(vendor: any): HealthcareEntity {
         districtId: vendor.districtId,
         address: vendor.address,
         phone: vendor.phone || vendor.mobile,
-        logo: vendor.logo,
+        image: primaryImage,
+        logo: primaryImage,
+        images: Array.isArray(vendor.images) ? vendor.images : [],
         specialties: vendor.specialties || [],
         availability24x7: hospitalData.is24x7 ?? null,
         ambulanceService: hospitalData.ambulanceService ?? null,
@@ -529,10 +573,15 @@ export function mapSchoolToDTO(vendor: any): SchoolEntity {
 /**
  * Convert Service/Worker Vendor to DTO
  */
-export function mapServiceToDTO(vendor: any): ServiceEntity {
+export function mapServiceToDTO(vendor: any, include?: any): ServiceEntity {
     const serviceData = vendor.hospitalData || {};
     const vendorName = getVendorDisplayName(vendor);
     const verified = isVendorVerified(vendor);
+    const vendorWithProducts = (vendor.products && vendor.products.length > 0)
+        ? vendor
+        : { ...vendor, products: include?.products || vendor.products || [] };
+    const primaryImage = resolveProviderPrimaryImage(vendorWithProducts);
+
     return {
         id: vendor.id,
         entityType: EntityType.SERVICE,
@@ -543,7 +592,9 @@ export function mapServiceToDTO(vendor: any): ServiceEntity {
         districtId: vendor.districtId,
         address: vendor.address,
         phone: vendor.phone || vendor.mobile,
-        logo: vendor.logo,
+        image: primaryImage,
+        logo: primaryImage,
+        images: Array.isArray(vendor.images) ? vendor.images : [],
         category: vendor.category,
         skillTags: vendor.specialties || [],
         hourlyRate: serviceData.hourlyRate || null,
@@ -578,7 +629,7 @@ export async function mapVendorByType(vendor: any, include?: any):
 
     switch (canonicalType) {
         case CanonicalBusinessType.HEALTHCARE:
-            return mapHealthcareToDTO(vendor);
+            return mapHealthcareToDTO(vendor, include);
         case CanonicalBusinessType.EDUCATION:
             return mapSchoolToDTO(vendor);
         case CanonicalBusinessType.FOOD:
@@ -588,7 +639,7 @@ export async function mapVendorByType(vendor: any, include?: any):
         case CanonicalBusinessType.FINANCIAL:
         case CanonicalBusinessType.PROFESSIONAL:
         case CanonicalBusinessType.ENTERTAINMENT:
-            return mapServiceToDTO(vendor);
+            return mapServiceToDTO(vendor, include);
         default: {
             const base = await mapVendorToDTO(vendor, include);
             const id = typeof base.id === "string" ? parseInt(base.id, 10) || 0 : base.id;

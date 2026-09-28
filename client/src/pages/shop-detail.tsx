@@ -46,7 +46,7 @@ import {
 } from "@/governance";
 import { trackEvent } from "@/lib/analytics";
 import { SovereignTrustBadge, resolveTrustLevel } from "@/components/shared/SovereignTrustBadge";
-import { MEDIA_GOVERNANCE, GovernedImage } from "@/design/media-governance";
+import { MEDIA_GOVERNANCE, GovernedImage, optimizeCloudinaryUrl } from "@/design/media-governance";
 import type { MediaType } from "@/design/media-governance";
 
 // ─── TYPES ──────────────────────────────────────────────
@@ -460,7 +460,9 @@ export default function ShopDetail() {
 
   // Governance-driven media
   const heroMediaGovernance = MEDIA_GOVERNANCE[resolvedMediaType];
-  const hasHeroMedia = !imageError && Boolean(displayVendor.image || displayVendor.logo);
+  const heroRawImage = displayVendor.image || displayVendor.logo;
+  const hasHeroMedia = !imageError && Boolean(heroRawImage);
+  const heroOptimizedSrc = optimizeCloudinaryUrl(heroRawImage, { width: 1200 }) || heroRawImage;
 
   return (
     <>
@@ -469,7 +471,7 @@ export default function ShopDetail() {
           /* 🏛️ Hero — bounded responsive banner when media exists */
           <div className="relative w-full overflow-hidden aspect-[16/9] md:aspect-[21/9] max-h-[36vh] min-h-[180px]">
             <img
-              src={displayVendor.image || displayVendor.logo}
+              src={heroOptimizedSrc}
               alt={displayVendor.name}
               className={`w-full h-full ${heroMediaGovernance.containStrategy === "contain" ? "object-contain" : "object-cover"} bg-zinc-900/70`}
               loading="lazy"
