@@ -469,15 +469,26 @@ export default function ShopDetail() {
       <div className="bg-black min-h-screen" data-testid="shop-detail-page">
         {hasHeroMedia ? (
           /* 🏛️ Hero — bounded responsive banner when media exists */
-          <div className="relative w-full overflow-hidden aspect-[16/9] md:aspect-[21/9] max-h-[36vh] min-h-[180px]">
+          <div className="relative w-full overflow-hidden aspect-[16/9] sm:aspect-[2/1] md:aspect-[21/9] max-h-[32vh] sm:max-h-[36vh] min-h-[180px] bg-zinc-950 flex items-center justify-center border-b border-white/5">
+            {/* Layer 1: Ambient Blurred Backdrop — fills letterbox space with authentic image tones */}
+            <img
+              src={heroOptimizedSrc}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-30 scale-110 pointer-events-none"
+            />
+
+            {/* Layer 2: Foreground Crisp Signboard — 100% visible, zero cropping */}
             <img
               src={heroOptimizedSrc}
               alt={displayVendor.name}
-              className={`w-full h-full ${heroMediaGovernance.containStrategy === "contain" ? "object-contain" : "object-cover"} bg-zinc-900/70`}
-              loading="lazy"
+              className="relative z-10 w-full h-full object-contain p-2"
+              loading="eager"
               onError={() => setImageError(true)}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+
+            {/* Layer 3: Subtle bottom gradient transition */}
+            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none z-10" />
 
             <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10">
               <Button
@@ -519,7 +530,7 @@ export default function ShopDetail() {
         )}
 
         {/* Info Card */}
-        <div className={`container mx-auto px-4 relative z-10 ${hasHeroMedia ? "-mt-10" : "mt-2"}`}>
+        <div className={`container mx-auto px-4 relative z-10 ${hasHeroMedia ? "-mt-4 sm:-mt-6" : "mt-2"} pb-8`}>
           <div className="bg-gradient-to-br from-zinc-950 to-black rounded-2xl border border-zinc-800 p-6 shadow-xl shadow-black/50">
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1 min-w-0">
@@ -716,26 +727,7 @@ export default function ShopDetail() {
         </div>
       </div>
 
-      {/* 🔥 Sticky WhatsApp */}
-      {phone && (
-        <a
-          href={whatsappLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="whatsapp-float fixed bottom-6 right-6 p-3 rounded-full shadow-xl z-50 flex items-center justify-center hover:scale-110 transition-all border-2 border-zinc-700"
-          title={`Chat with ${displayVendor.name} on WhatsApp`}
-          aria-label={`Chat with ${displayVendor.name} on WhatsApp`}
-          style={{ background: "#25D366", width: "64px", height: "64px" }}
-          onClick={(e) => {
-            e.preventDefault();
-            handleWhatsAppClick();
-            const userStr = localStorage.getItem('user');
-            if (userStr && JSON.parse(userStr)?.id) {
-              window.open(whatsappLink, '_blank');
-            }
-          }}
-        ><MessageCircle size={32} className="text-white" /></a>
-      )}
+
 
       {/* Booking Modal */}
       {displayVendor && (
