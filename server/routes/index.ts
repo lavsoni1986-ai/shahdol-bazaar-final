@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../storage";
-import { requireAuth, requireSuperAdmin, requireCSRF } from "../auth/middleware";
+import { requireAuth, requireSuperAdmin, requireCSRF, requireCityAdmin } from "../auth/middleware";
 import { findActiveOffersByDistrict, deleteOfferById } from "../repositories/offer.repo";
 import { findAllCategories, deleteCategoryById } from "../repositories/category.repo";
 import { adminRateLimiter } from "../auth/rateLimiter";
@@ -197,7 +197,7 @@ router.get("/districts/:slug", async (req, res) => {
   return success(res, district);
 });
 
-// 🛡️ SOVEREIGN API: Offers endpoint
+// 🛡️ SOVEREIGN API: Offers endpoint (admin list — all active offers for district)
 router.get("/offers", async (req, res) => {
   try {
     if (!req.districtId) {
@@ -213,14 +213,113 @@ router.get("/offers", async (req, res) => {
   }
 });
 
-router.delete("/offers/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+// 🛡️ SOVEREIGN API: Create News/Offer — CITY_ADMIN or higher
+router.post("/offers", requireAuth, requireCityAdmin, async (req, res) => {
   try {
+    // District MUST come from authenticated server context — never trust client-supplied body
+    const districtId = req.ctx?.districtId ?? req.districtId;
+    if (!districtId) {
+      return failure(res, "DISTRICT_REQUIRED", "District context required", 400);
+    }
+
+    // Explicit field allowlist — prevents mass-assignment
+    const rawContent = typeof req.body?.content === "string" ? req.body.content.trim() : "";
+    if (!rawContent) {
+      return failure(res, "VALIDATION_ERROR", "Content is required", 400);
+    }
+    if (rawContent.length > 500) {
+      return failure(res, "VALIDATION_ERROR", "Content must be 500 characters or less", 400);
+    }
+
+    // Enforce News type classification — client cannot override this
+    const offer = await prisma.offer.create({
+      data: {
+        content: rawContent,
+        type: "GLOBAL_NEWS",
+        isActive: true,
+        districtId: Number(districtId),
+        userId: req.ctx?.userId ?? null,
+        vendorId: null,
+      },
+      select: { id: true, content: true, type: true, isActive: true, createdAt: true, districtId: true },
+    });
+
+    return res.status(201).json({ success: true, data: offer });
+  } catch (err) {
+    console.error("Offer create error:", err);
+    return failure(res, "SERVER_ERROR", "Failed to create news", 500);
+  }
+});
+
+// 🛡️ SOVEREIGN API: Delete Offer — district ownership enforced
+router.delete("/offers/:id", requireAuth, async (req, res) => {
+  try {
+    if (!req.user) {
+      return failure(res, "AUTH_REQUIRED", "Authentication required", 401);
+    }
+
     const offerId = parseInt(req.params.id);
-    await deleteOfferById(offerId);
-    return success(res, { message: "Offer deleted" });
+    if (isNaN(offerId) || offerId <= 0) {
+      return failure(res, "INVALID_ID", "Invalid offer ID", 400);
+    }
+
+    // Resolve requester authority
+    const { normalizeRole, UserRole } = await import("../../shared/roles");
+    const normalizedRole = normalizeRole(req.user.role);
+    const isSuperAdmin = normalizedRole === UserRole.SUPER_ADMIN;
+    const requesterDistrictId = req.ctx?.districtId ?? req.districtId;
+
+    // Non-SUPER_ADMIN must have a district context
+    if (!isSuperAdmin && !requesterDistrictId) {
+      return failure(res, "DISTRICT_REQUIRED", "District context required", 400);
+    }
+
+    // Verify the target offer exists
+    const targetOffer = await prisma.offer.findUnique({
+      where: { id: offerId },
+      select: { id: true, districtId: true },
+    });
+
+    if (!targetOffer) {
+      return failure(res, "NOT_FOUND", "News item not found", 404);
+    }
+
+    // SUPER_ADMIN: cross-district permitted. District admin: must own the item.
+    if (!isSuperAdmin && targetOffer.districtId !== Number(requesterDistrictId)) {
+      return failure(res, "FORBIDDEN", "You can only delete news from your own district", 403);
+    }
+
+    await prisma.offer.delete({ where: { id: offerId } });
+    return success(res, { message: "News item deleted" });
   } catch (err) {
     console.error("Offer delete error:", err);
-    return failure(res, "SERVER_ERROR", "Failed to delete offer", 500);
+    return failure(res, "SERVER_ERROR", "Failed to delete news item", 500);
+  }
+});
+
+// 🌐 PUBLIC API: Local News — returns published GLOBAL_NEWS for the district
+router.get("/news", async (req, res) => {
+  try {
+    const districtId = req.ctx?.districtId ?? req.districtId;
+    if (!districtId) {
+      return failure(res, "DISTRICT_REQUIRED", "District context required", 400);
+    }
+
+    const news = await prisma.offer.findMany({
+      where: {
+        districtId: Number(districtId),
+        isActive: true,
+        type: "GLOBAL_NEWS",
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: { id: true, content: true, type: true, isActive: true, createdAt: true },
+    });
+
+    return success(res, news);
+  } catch (err) {
+    console.error("Public news fetch error:", err);
+    return failure(res, "SERVER_ERROR", "Failed to fetch news", 500);
   }
 });
 
