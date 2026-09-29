@@ -296,6 +296,10 @@ const Router = () => {
         <Route path="/:district/service/:slug" component={ServiceDetail} />
         <Route path="/services/:slug" component={ServiceDetail} />
         <Route path="/service/:slug" component={ServiceDetail} />
+        <Route path="/schools/:slug" component={ShopDetail} />
+        <Route path="/:district/schools/:slug" component={ShopDetail} />
+        <Route path="/school/:slug" component={ShopDetail} />
+        <Route path="/:district/school/:slug" component={ShopDetail} />
         <Route path="/:district/ai/concierge" component={AIConciergePage} />
         <Route path="/ai/concierge" component={AIConciergePage} />
         <Route path="/cart" component={CartPage} />
@@ -316,7 +320,6 @@ const Router = () => {
           </AuthGuard>
         </Route>
 
-        <Route path="/school/:slug" component={SchoolsPage} />
         <Route path="/service/:type/:slug" component={ServicesPage} />
         <Route path="/product/:id" component={ProductDetail} />
         <Route path="/shop/:id" component={ShopDetail} />

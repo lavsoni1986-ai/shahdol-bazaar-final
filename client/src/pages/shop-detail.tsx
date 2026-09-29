@@ -68,10 +68,11 @@ type Product = {
  * Resolve entity kind from vendor data fields.
  * Uses canonical governance resolvers — NO hardcoded category branching.
  */
-function resolveVendorKind(vendor: Record<string, any>, isHealthcareRoute?: boolean): string {
+function resolveVendorKind(vendor: Record<string, any>, isHealthcareRoute?: boolean, isSchoolRoute?: boolean): string {
   // 1. Canonical business and entity types (from DTO)
   const businessType = (vendor.businessType || vendor.meta?.businessType || "").toString().toLowerCase();
   const entityType = (vendor.entityType || vendor.type || "").toString().toLowerCase();
+  const category = (vendor.category || vendor.meta?.category || "").toString().toLowerCase();
 
   if (
     businessType === "healthcare" ||
@@ -91,7 +92,10 @@ function resolveVendorKind(vendor: Record<string, any>, isHealthcareRoute?: bool
   if (
     businessType === "education" ||
     businessType === "school" ||
-    entityType === "school"
+    entityType === "school" ||
+    category === "education" ||
+    category === "school" ||
+    isSchoolRoute
   ) {
     return "service";
   }
@@ -120,8 +124,9 @@ function resolveVendorKind(vendor: Record<string, any>, isHealthcareRoute?: bool
   if (type === "service" || type === "school") return "service";
   if (type === "shop" || type === "store" || type === "vendor") return "marketplace";
 
-  // 5. Healthcare route context ONLY as a fallback when canonical classification is unavailable
+  // 5. Route context ONLY as a fallback when canonical classification is unavailable
   if (isHealthcareRoute) return "healthcare";
+  if (isSchoolRoute) return "service";
 
   // 6. Default fallback
   return "marketplace";
@@ -221,6 +226,10 @@ export default function ShopDetail() {
   const [, marketplaceStoreParams] = useRoute("/marketplace/stores/:slug");
   const [, healthcareParams] = useRoute("/healthcare/:slug");
   const [, districtHealthcareParams] = useRoute("/:district/healthcare/:slug");
+  const [, schoolsParams] = useRoute("/schools/:slug");
+  const [, districtSchoolsParams] = useRoute("/:district/schools/:slug");
+  const [, schoolParams] = useRoute("/school/:slug");
+  const [, districtSchoolParams] = useRoute("/:district/school/:slug");
 
   const routeShopParams = shopParams as { id?: string } | null;
   const routeVendorParams = vendorParams as { slug?: string } | null;
@@ -228,6 +237,10 @@ export default function ShopDetail() {
   const routeMarketplaceParams = marketplaceStoreParams as { slug?: string } | null;
   const routeHealthcareParams = healthcareParams as { slug?: string } | null;
   const routeDistrictHealthcareParams = districtHealthcareParams as { slug?: string } | null;
+  const routeSchoolsParams = schoolsParams as { slug?: string } | null;
+  const routeDistrictSchoolsParams = districtSchoolsParams as { slug?: string } | null;
+  const routeSchoolParams = schoolParams as { slug?: string } | null;
+  const routeDistrictSchoolParams = districtSchoolParams as { slug?: string } | null;
 
   const vendorId = routeShopParams?.id;
   const slug =
@@ -235,7 +248,11 @@ export default function ShopDetail() {
     routePartnerParams?.slug ||
     routeMarketplaceParams?.slug ||
     routeHealthcareParams?.slug ||
-    routeDistrictHealthcareParams?.slug;
+    routeDistrictHealthcareParams?.slug ||
+    routeSchoolsParams?.slug ||
+    routeDistrictSchoolsParams?.slug ||
+    routeSchoolParams?.slug ||
+    routeDistrictSchoolParams?.slug;
 
   const [imageError, setImageError] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -253,9 +270,10 @@ export default function ShopDetail() {
 
   // ─── GOVERNANCE RESOLUTION ─────────────────────────────
   const isHealthcareRoute = !!(healthcareParams || districtHealthcareParams);
+  const isSchoolRoute = !!(schoolsParams || districtSchoolsParams || schoolParams || districtSchoolParams);
   const entityKind = vendor
-    ? resolveVendorKind(vendor as Record<string, any>, isHealthcareRoute)
-    : (isHealthcareRoute ? "healthcare" : "marketplace");
+    ? resolveVendorKind(vendor as Record<string, any>, isHealthcareRoute, isSchoolRoute)
+    : (isHealthcareRoute ? "healthcare" : isSchoolRoute ? "service" : "marketplace");
   const experience = vendor ? resolveEntityExperience({
     entityKind,
     category: (vendor as any).category,

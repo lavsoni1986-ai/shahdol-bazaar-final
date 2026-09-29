@@ -538,9 +538,14 @@ export function mapHealthcareToDTO(vendor: any, include?: any): HealthcareEntity
 /**
  * Convert School/Education Vendor to DTO
  */
-export function mapSchoolToDTO(vendor: any): SchoolEntity {
+export function mapSchoolToDTO(vendor: any, include?: any): SchoolEntity {
     const vendorName = getVendorDisplayName(vendor);
     const verified = isVendorVerified(vendor);
+    const vendorWithProducts = (vendor.products && vendor.products.length > 0)
+        ? vendor
+        : { ...vendor, products: include?.products || vendor.products || [] };
+    const primaryImage = resolveProviderPrimaryImage(vendorWithProducts);
+
     return {
         id: vendor.id,
         entityType: EntityType.SCHOOL,
@@ -551,7 +556,9 @@ export function mapSchoolToDTO(vendor: any): SchoolEntity {
         districtId: vendor.districtId,
         address: vendor.address,
         phone: vendor.phone || vendor.mobile,
-        logo: vendor.logo,
+        image: primaryImage,
+        logo: primaryImage,
+        images: Array.isArray(vendor.images) ? vendor.images : [],
         board: vendor.specialties?.[0] || null,
         classes: [],
         isVerified: verified,
@@ -631,7 +638,7 @@ export async function mapVendorByType(vendor: any, include?: any):
         case CanonicalBusinessType.HEALTHCARE:
             return mapHealthcareToDTO(vendor, include);
         case CanonicalBusinessType.EDUCATION:
-            return mapSchoolToDTO(vendor);
+            return mapSchoolToDTO(vendor, include);
         case CanonicalBusinessType.FOOD:
         case CanonicalBusinessType.TRANSPORT:
         case CanonicalBusinessType.RETAIL:

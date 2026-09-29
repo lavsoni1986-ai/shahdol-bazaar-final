@@ -203,7 +203,7 @@ function mapSchool(s: any): DiscoveryEntity {
     title: dto.name,
     slug: dto.slug,
     subtitle: dto.businessType || "School",
-    image: dto.logo,
+    image: dto.image || dto.logo,
     phone: dto.phone,
     address: dto.address,
     dsslScore: dto.trustScore || 65,
@@ -404,6 +404,14 @@ export async function getUnifiedDiscoveryFeed(districtId: number): Promise<Disco
             businessType: 'SCHOOL',
             status: "APPROVED" as any,
             isShadowBanned: false,
+          },
+          include: {
+            products: {
+              include: {
+                images: true,
+              },
+              take: 1,
+            },
           },
           take: DISCOVERY_BUDGET.schools,
         }),
