@@ -12,7 +12,6 @@ import { BrandingProvider } from "@/contexts/BrandingProvider";
 import { DistrictProvider } from "@/contexts/DistrictContext";
 import SuperAIHome from "./pages/SuperAIHome";
 import { LiquidRoute } from "@/components/LiquidMotion";
-import { FloatingWhatsApp } from "@/components/FloatingWhatsApp";
 import { isRegisteredDistrictSlug } from "@/shared/routing/reserved-routes";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -377,7 +376,6 @@ export default function App() {
                 <Layout>
                   <Router />
                 </Layout>
-                <FloatingWhatsApp />
               </CartProvider>
             </AuthProvider>
           </BrandingProvider>

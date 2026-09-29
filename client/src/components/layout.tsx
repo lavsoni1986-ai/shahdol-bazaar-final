@@ -76,9 +76,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('open-shahdol-ai', handleOpenAI);
   }, [currentDistrict?.slug]);
 
-  const headerOpacity = Math.max(0, 1 - scrollY / 200);
-  const headerScale = Math.max(0.85, 1 - scrollY / 500);
-
   const [, setLocation] = useLocation();
 
   const handleLogout = useCallback(async () => {
@@ -113,11 +110,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           On all other routes: shows hamburger + brand + profile
           NO duplicate headers anywhere in page components.
       */}
-      <header className="h-16 px-4 md:px-6 flex justify-between items-center border-b border-white/5 bg-black/40 backdrop-blur-xl fixed w-full top-0 z-[100]" style={{
-        opacity: isProductRoute ? 1 : headerOpacity,
-        transform: `scale(${isProductRoute ? 1 : headerScale})`,
-        transformOrigin: 'top center',
-      }}>
+      <header className={`h-16 px-4 md:px-6 flex justify-between items-center border-b border-white/5 fixed w-full top-0 z-[100] transition-colors duration-200 ${
+        scrollY > 20 ? 'bg-[#030003]/95 backdrop-blur-xl' : 'bg-[#030003]/80 backdrop-blur-md'
+      }`}>
         {isProductRoute ? (
           <>
             {/* Left: Back Navigation */}
@@ -303,7 +298,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* BOTTOM NAV */}
       {!isAdminOrVendor && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-[#030003]/90 backdrop-blur-xl border-t border-white/10 z-[80]">
+        <nav className="fixed bottom-0 left-0 right-0 bg-[#030003] border-t border-white/10 z-[80] pb-[env(safe-area-inset-bottom,0px)]">
           <div className="flex justify-around items-center py-2">
             {navItems.map((item, index) => {
               const Icon = item.icon;

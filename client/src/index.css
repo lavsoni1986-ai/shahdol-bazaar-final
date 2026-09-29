@@ -26,14 +26,13 @@
   -webkit-backdrop-filter: none !important;
 }
 
-/* 📉 Reduce effect opacity layers — flatten glow/neon */
+/* 📉 Reduce effect opacity layers — flatten decorative glow without touching UI surfaces */
 .reduce-effects .animate-pulse {
   animation: none !important;
 }
 
-.reduce-effects [class*="blur-"],
-.reduce-effects [class*="shadow-"] {
-  opacity: 0.3 !important;
+.reduce-effects [data-glow] {
+  opacity: 0.2 !important;
 }
 
 .reduce-effects [class*="hover:scale-"]:hover {
