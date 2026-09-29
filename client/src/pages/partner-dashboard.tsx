@@ -65,7 +65,8 @@ export default function PartnerDashboard() {
     description: ""
   });
 
-  const [storeSettings, setStoreSettings] = useState({ shopName: "", address: "", phone: "" });
+  const [storeSettings, setStoreSettings] = useState({ shopName: "", address: "", phone: "", logo: "" });
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   const isHealthcare = vendorStats?.businessType === "HEALTHCARE" ||
     vendorStats?.category?.toLowerCase() === "healthcare" ||
@@ -108,7 +109,8 @@ export default function PartnerDashboard() {
       setStoreSettings({
         shopName: stats.vendorName || (user as any)?.shopName || "",
         address: stats.address || (user as any)?.shopAddress || "",
-        phone: stats.phone || ""
+        phone: stats.phone || "",
+        logo: stats.logo || (Array.isArray(stats.images) && stats.images[0]) || ""
       });
 
       // 2. Fetch specific data based on vendor type
@@ -412,14 +414,79 @@ export default function PartnerDashboard() {
     }
   };
 
+  const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      return;
+    }
+
+    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type.toLowerCase())) {
+      toast.error("Only JPG, PNG, and WebP images are supported");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    setUploadingProfileImage(true);
+    try {
+      const result = await apiRequest("POST", "/upload/single", formData);
+      const uploadedUrl = result?.url || (result?.urls && result.urls[0]);
+      if (uploadedUrl) {
+        setStoreSettings(prev => ({ ...prev, logo: uploadedUrl }));
+        await apiRequest("PATCH", "/vendor/profile", {
+          phone: storeSettings.phone,
+          address: storeSettings.address,
+          logo: uploadedUrl,
+          images: [uploadedUrl]
+        });
+        toast.success("School profile image updated! 📸");
+        await loadVendorData();
+      } else {
+        toast.error("Upload succeeded but no image URL was returned");
+      }
+    } catch (err: any) {
+      console.error("🔴 [PARTNER] Image upload error:", err);
+      toast.error(err.message || "Failed to upload image");
+    } finally {
+      setUploadingProfileImage(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveProfileImage = async () => {
+    if (!confirm("Are you sure you want to remove the school profile image?")) return;
+    try {
+      setStoreSettings(prev => ({ ...prev, logo: "" }));
+      await apiRequest("PATCH", "/vendor/profile", {
+        phone: storeSettings.phone,
+        address: storeSettings.address,
+        logo: null,
+        images: []
+      });
+      toast.success("School profile image removed 🗑️");
+      await loadVendorData();
+    } catch (err: any) {
+      console.error("🔴 [PARTNER] Image remove error:", err);
+      toast.error(err.message || "Failed to remove image");
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await apiRequest("PATCH", "/vendor/profile", {
         phone: storeSettings.phone,
-        address: storeSettings.address
+        address: storeSettings.address,
+        logo: storeSettings.logo || null,
+        images: storeSettings.logo ? [storeSettings.logo] : []
       });
       toast.success("Settings Saved! ✅");
+      await loadVendorData();
     } catch (err: any) {
       toast.error(err.message || "Failed to update settings");
     }
@@ -1015,6 +1082,85 @@ export default function PartnerDashboard() {
                     <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Complete Address</label>
                     <textarea value={storeSettings.address} onChange={e => setStoreSettings({...storeSettings, address: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:border-emerald-500/50 text-white min-h-[100px]"></textarea>
                   </div>
+
+                  {/* School Profile Image / Admission Poster (Education / School only) */}
+                  {isEducation && (
+                    <div className="pt-4 border-t border-white/10 space-y-3">
+                      <div>
+                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1">
+                          SCHOOL PROFILE IMAGE
+                        </label>
+                        <p className="text-xs text-gray-400">
+                          Upload your school photo or admission poster.
+                        </p>
+                      </div>
+
+                      {storeSettings.logo ? (
+                        <div className="space-y-3">
+                          <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-white/5 max-w-sm aspect-[4/3] flex items-center justify-center p-2">
+                            <img
+                              src={storeSettings.logo}
+                              alt="School Profile Preview"
+                              className="w-full h-full object-contain rounded-xl"
+                            />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all">
+                              <Pencil className="w-3.5 h-3.5" />
+                              Change Image
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                onChange={handleProfileImageUpload}
+                                className="hidden"
+                                disabled={uploadingProfileImage}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handleRemoveProfileImage}
+                              disabled={uploadingProfileImage}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold transition-all"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="cursor-pointer border-2 border-dashed border-white/20 hover:border-emerald-500/50 bg-white/5 hover:bg-white/10 rounded-2xl p-6 flex flex-col items-center justify-center transition-all group max-w-sm block">
+                            {uploadingProfileImage ? (
+                              <div className="flex flex-col items-center gap-2 py-4">
+                                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                                <span className="text-xs text-emerald-400 font-bold">Uploading to Cloudinary...</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center text-center gap-2">
+                                <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+                                  <GraduationCap className="w-6 h-6" />
+                                </div>
+                                <span className="text-sm font-bold text-white">Upload Image</span>
+                                <span className="text-[10px] text-gray-500">JPG, PNG, WebP up to 5MB</span>
+                              </div>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/jpg,image/webp"
+                              onChange={handleProfileImageUpload}
+                              className="hidden"
+                              disabled={uploadingProfileImage}
+                            />
+                          </label>
+                        </div>
+                      )}
+                      {uploadingProfileImage && (
+                        <p className="text-xs text-emerald-400 animate-pulse">
+                          Uploading image, please wait...
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <button type="submit" className="w-full bg-emerald-600 text-black py-3 rounded-xl font-black text-sm uppercase hover:bg-emerald-500 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] mt-4">
                     Save Changes
                   </button>

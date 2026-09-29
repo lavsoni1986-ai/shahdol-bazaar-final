@@ -90,6 +90,8 @@ router.get("/vendor/stats", requireAuth, async (req, res) => {
         description: vendor.description || "",
         phone: vendor.phone || vendor.mobile || "",
         address: vendor.address || "",
+        logo: vendor.logo || null,
+        images: Array.isArray(vendor.images) ? vendor.images : [],
         totalOrders: orders,
         totalRevenue: revenue._sum.totalPrice || 0,
         totalProducts: products,
@@ -125,7 +127,26 @@ router.patch("/vendor/profile", requireAuth, async (req, res) => {
     const vendor = await resolveAuthVendor(req);
     if (!vendor) return failure(res, "NOT_FOUND", "Vendor profile not found", 404);
 
-    const { specialties, serviceArea, serviceHours, description, phone, mobile, address } = req.body;
+    const { specialties, serviceArea, serviceHours, description, phone, mobile, address, logo, images } = req.body;
+
+    let validatedLogo: string | null | undefined = undefined;
+    if (logo === null || logo === "") {
+      validatedLogo = null;
+    } else if (typeof logo === "string") {
+      const trimmed = logo.trim();
+      if (trimmed.startsWith("https://") || trimmed.startsWith("http://") || trimmed.startsWith("/")) {
+        validatedLogo = trimmed;
+      }
+    }
+
+    let validatedImages: string[] | undefined = undefined;
+    if (Array.isArray(images)) {
+      validatedImages = images
+        .filter((img: any) => typeof img === "string" && (img.startsWith("https://") || img.startsWith("http://") || img.startsWith("/")))
+        .map((img: string) => img.trim());
+    } else if (validatedLogo !== undefined) {
+      validatedImages = validatedLogo ? [validatedLogo] : [];
+    }
 
     const updated = await prisma.vendor.update({
       where: { id: vendor.id },
@@ -136,7 +157,9 @@ router.patch("/vendor/profile", requireAuth, async (req, res) => {
         ...(typeof description === "string" ? { description } : {}),
         ...(typeof phone === "string" ? { phone } : {}),
         ...(typeof mobile === "string" ? { mobile } : {}),
-        ...(typeof address === "string" ? { address } : {})
+        ...(typeof address === "string" ? { address } : {}),
+        ...(validatedLogo !== undefined ? { logo: validatedLogo } : {}),
+        ...(validatedImages !== undefined ? { images: validatedImages } : {})
       }
     });
 
