@@ -1,6 +1,6 @@
 // 📁 client/src/pages/SuperAIHome.tsx (FINAL SOVEREIGN VERSION)
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +8,8 @@ import { useBalance } from "@/hooks/useBalance";
 import { useHomeSnapshot } from "@/hooks/useHomeSnapshot";
 import { motion } from "framer-motion";
 import { fadeUp, stagger } from "@/lib/motion.config";
-import { Wallet, ArrowRight, Bus } from "lucide-react";
+import { Wallet, ArrowRight, Bus, Newspaper } from "lucide-react";
+import { apiRequest } from "@/lib/api-client";
 
 // Components
 import { AISearchTerminal } from "@/components/home/AISearchTerminal";
@@ -267,7 +268,10 @@ export default function SuperAIHome() {
 
 
 
-        {/* 💰 9. WALLET */}
+        {/* 📰 9. LATEST LOCAL NEWS */}
+        <LatestLocalNews />
+
+        {/* 💰 10. WALLET */}
         {isAuthenticated && balance && balance.totalSpent > 0 && (
           <section className="px-4">
             <div
@@ -300,5 +304,79 @@ export default function SuperAIHome() {
         />
       )}
     </div>
+  );
+}
+
+// --- Latest Local News (self-contained, non-blocking) ---
+interface NewsItem {
+  id: number;
+  content: string;
+  imageUrl?: string | null;
+  createdAt: string;
+}
+
+function LatestLocalNews() {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    apiRequest("GET", "/news")
+      .then((res) => {
+        const items: NewsItem[] = Array.isArray(res?.data) ? res.data : [];
+        setNews(items.slice(0, 3));
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  if (loaded && news.length === 0) return null;
+
+  return (
+    <section className="px-4">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-black italic flex items-center gap-2">
+          <Newspaper className="w-4 h-4 text-orange-500" /> Latest Local News
+        </h2>
+      </div>
+
+      {!loaded ? (
+        <div className="space-y-3">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-20 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {news.map((item) => (
+            <div
+              key={item.id}
+              className="bg-black/40 rounded-2xl border border-white/10 p-4 flex gap-4 items-start"
+            >
+              {item.imageUrl && (
+                <img
+                  src={item.imageUrl}
+                  alt=""
+                  width={80}
+                  height={60}
+                  className="w-20 h-16 rounded-xl object-cover shrink-0 border border-white/10"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm leading-relaxed line-clamp-3">{item.content}</p>
+                {item.createdAt && (
+                  <p className="text-gray-600 text-xs mt-1">
+                    {new Date(item.createdAt).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

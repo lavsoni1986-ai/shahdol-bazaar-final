@@ -231,17 +231,28 @@ router.post("/offers", requireAuth, requireCityAdmin, async (req, res) => {
       return failure(res, "VALIDATION_ERROR", "Content must be 500 characters or less", 400);
     }
 
+    // Validate optional imageUrl — HTTPS only, no dangerous protocols
+    let safeImageUrl: string | null = null;
+    if (typeof req.body?.imageUrl === "string" && req.body.imageUrl.trim()) {
+      const raw = req.body.imageUrl.trim();
+      if (!/^https:\/\/.{4,}/.test(raw)) {
+        return failure(res, "VALIDATION_ERROR", "imageUrl must be a valid HTTPS URL", 400);
+      }
+      safeImageUrl = raw;
+    }
+
     // Enforce News type classification — client cannot override this
     const offer = await prisma.offer.create({
       data: {
         content: rawContent,
+        imageUrl: safeImageUrl,
         type: "GLOBAL_NEWS",
         isActive: true,
         districtId: Number(districtId),
         userId: req.ctx?.userId ?? null,
         vendorId: null,
       },
-      select: { id: true, content: true, type: true, isActive: true, createdAt: true, districtId: true },
+      select: { id: true, content: true, imageUrl: true, type: true, isActive: true, createdAt: true, districtId: true },
     });
 
     return res.status(201).json({ success: true, data: offer });
@@ -313,7 +324,7 @@ router.get("/news", async (req, res) => {
       },
       orderBy: { createdAt: "desc" },
       take: 10,
-      select: { id: true, content: true, type: true, isActive: true, createdAt: true },
+      select: { id: true, content: true, imageUrl: true, type: true, isActive: true, createdAt: true },
     });
 
     return success(res, news);
