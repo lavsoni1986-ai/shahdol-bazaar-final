@@ -262,6 +262,80 @@ router.post("/offers", requireAuth, requireCityAdmin, async (req, res) => {
   }
 });
 
+// 🛡️ SOVEREIGN API: Update News/Offer — CITY_ADMIN or higher, district ownership enforced
+router.patch("/offers/:id", requireAuth, requireCityAdmin, async (req, res) => {
+  try {
+    const offerId = parseInt(req.params.id);
+    if (isNaN(offerId) || offerId <= 0) {
+      return failure(res, "INVALID_ID", "Invalid offer ID", 400);
+    }
+
+    // Resolve requester authority
+    const { normalizeRole, UserRole } = await import("../../shared/roles");
+    const normalizedRole = normalizeRole(req.user!.role);
+    const isSuperAdmin = normalizedRole === UserRole.SUPER_ADMIN;
+    const requesterDistrictId = req.ctx?.districtId ?? req.districtId;
+
+    if (!isSuperAdmin && !requesterDistrictId) {
+      return failure(res, "DISTRICT_REQUIRED", "District context required", 400);
+    }
+
+    // Fetch target — must exist and must be GLOBAL_NEWS
+    const targetOffer = await prisma.offer.findUnique({
+      where: { id: offerId },
+      select: { id: true, districtId: true, type: true },
+    });
+
+    if (!targetOffer) {
+      return failure(res, "NOT_FOUND", "News item not found", 404);
+    }
+
+    // Only GLOBAL_NEWS records are editable through this endpoint
+    if (targetOffer.type !== "GLOBAL_NEWS") {
+      return failure(res, "FORBIDDEN", "Only GLOBAL_NEWS items can be edited here", 403);
+    }
+
+    // District ownership check — mirrors DELETE
+    if (!isSuperAdmin && targetOffer.districtId !== Number(requesterDistrictId)) {
+      return failure(res, "FORBIDDEN", "You can only edit news from your own district", 403);
+    }
+
+    // Allowlist: only content and imageUrl may be updated
+    const rawContent = typeof req.body?.content === "string" ? req.body.content.trim() : "";
+    if (!rawContent) {
+      return failure(res, "VALIDATION_ERROR", "Content is required", 400);
+    }
+    if (rawContent.length > 500) {
+      return failure(res, "VALIDATION_ERROR", "Content must be 500 characters or less", 400);
+    }
+
+    // imageUrl: explicit null = remove, valid HTTPS string = update, undefined = keep existing
+    let imageUrlUpdate: { imageUrl: string | null } | Record<string, never> = {};
+    if (req.body && "imageUrl" in req.body) {
+      if (req.body.imageUrl === null || req.body.imageUrl === "") {
+        imageUrlUpdate = { imageUrl: null };
+      } else if (typeof req.body.imageUrl === "string") {
+        const raw = req.body.imageUrl.trim();
+        if (!/^https:\/\/.{4,}/.test(raw)) {
+          return failure(res, "VALIDATION_ERROR", "imageUrl must be a valid HTTPS URL", 400);
+        }
+        imageUrlUpdate = { imageUrl: raw };
+      }
+    }
+
+    const updated = await prisma.offer.update({
+      where: { id: offerId },
+      data: { content: rawContent, ...imageUrlUpdate },
+      select: { id: true, content: true, imageUrl: true, type: true, isActive: true, createdAt: true, districtId: true },
+    });
+
+    return success(res, updated);
+  } catch (err) {
+    console.error("Offer update error:", err);
+    return failure(res, "SERVER_ERROR", "Failed to update news", 500);
+  }
+});
+
 // 🛡️ SOVEREIGN API: Delete Offer — district ownership enforced
 router.delete("/offers/:id", requireAuth, async (req, res) => {
   try {

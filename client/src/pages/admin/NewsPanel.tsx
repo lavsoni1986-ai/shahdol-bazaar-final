@@ -2,7 +2,7 @@
 
 import AdminLayout from "./AdminLayout";
 import { useState, useEffect, useRef } from "react";
-import { Zap, Trash2, PlusCircle, X, ImagePlus, Loader2 } from "lucide-react";
+import { Zap, Trash2, PlusCircle, X, ImagePlus, Loader2, Pencil } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 import { safeData } from "@/lib/admin-response";
 
@@ -21,6 +21,7 @@ export default function NewsPanel() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -86,13 +87,25 @@ export default function NewsPanel() {
       await apiRequest("DELETE", `offers/${id}`);
       setSuccess("News item deleted.");
       setTimeout(() => setSuccess(null), 3000);
+      // If we were editing this item, cancel edit mode
+      if (editingId === id) resetForm();
       loadOffers();
     } catch (err: any) {
       setError(err?.message || "Failed to delete.");
     }
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleEdit = (offer: Offer) => {
+    setEditingId(offer.id);
+    setForm({ content: offer.content, imageUrl: offer.imageUrl ?? null });
+    setShowForm(true);
+    setError(null);
+    setSuccess(null);
+    // Scroll form into view on mobile
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
@@ -103,23 +116,38 @@ export default function NewsPanel() {
 
     setSubmitting(true);
     try {
-      await apiRequest("POST", "/offers", {
-        content,
-        ...(form.imageUrl ? { imageUrl: form.imageUrl } : {}),
-      });
-      setSuccess("News published successfully.");
-      setForm(EMPTY_FORM);
-      setShowForm(false);
+      if (editingId !== null) {
+        // PATCH — send imageUrl key always so server knows intent
+        await apiRequest("PATCH", `/offers/${editingId}`, {
+          content,
+          imageUrl: form.imageUrl ?? null,
+        });
+        setSuccess("News updated successfully.");
+      } else {
+        await apiRequest("POST", "/offers", {
+          content,
+          ...(form.imageUrl ? { imageUrl: form.imageUrl } : {}),
+        });
+        setSuccess("News published successfully.");
+      }
+      resetForm();
       setTimeout(() => setSuccess(null), 4000);
       loadOffers();
     } catch (err: any) {
-      setError(err?.message || "Failed to publish news.");
+      setError(err?.message || (editingId ? "Failed to update news." : "Failed to publish news."));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const resetForm = () => { setShowForm(false); setForm(EMPTY_FORM); setError(null); };
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setError(null);
+  };
+
+  const isEditing = editingId !== null;
 
   return (
     <AdminLayout>
@@ -129,7 +157,9 @@ export default function NewsPanel() {
           <h1 className="text-2xl font-bold text-white">News &amp; Alerts</h1>
           <div className="flex gap-2">
             <button
-              onClick={() => { setShowForm((v) => !v); setError(null); }}
+              onClick={() => {
+                if (showForm) { resetForm(); } else { setShowForm(true); setError(null); }
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
             >
               {showForm ? <X className="w-4 h-4" /> : <PlusCircle className="w-4 h-4" />}
@@ -152,10 +182,19 @@ export default function NewsPanel() {
           <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg px-4 py-3 text-sm">{success}</div>
         )}
 
-        {/* Create Form */}
+        {/* Create / Edit Form */}
         {showForm && (
-          <form onSubmit={handleCreate} className="bg-black/40 rounded-xl border border-white/10 p-5 space-y-4">
-            <h2 className="text-white font-semibold text-lg">Create Local News</h2>
+          <form onSubmit={handleSubmit} className="bg-black/40 rounded-xl border border-white/10 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-semibold text-lg">
+                {isEditing ? "Edit News" : "Create Local News"}
+              </h2>
+              {isEditing && (
+                <span className="text-xs text-orange-400 font-bold uppercase tracking-widest bg-orange-500/10 px-2 py-1 rounded-md">
+                  Editing #{editingId}
+                </span>
+              )}
+            </div>
 
             <div className="space-y-1">
               <label className="text-gray-400 text-sm font-medium">
@@ -231,14 +270,17 @@ export default function NewsPanel() {
                 className="flex items-center gap-2 px-5 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
               >
                 <Zap className="w-4 h-4" />
-                {submitting ? "Publishing..." : "Publish News"}
+                {submitting
+                  ? (isEditing ? "Updating..." : "Publishing...")
+                  : (isEditing ? "Update News" : "Publish News")
+                }
               </button>
               <button
                 type="button"
                 onClick={resetForm}
                 className="px-5 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors text-sm"
               >
-                Cancel
+                {isEditing ? "Cancel Edit" : "Cancel"}
               </button>
             </div>
           </form>
@@ -261,7 +303,9 @@ export default function NewsPanel() {
             {offers.map((offer) => (
               <div
                 key={offer.id}
-                className="bg-black/40 rounded-xl border border-white/10 p-4 flex items-start justify-between group"
+                className={`bg-black/40 rounded-xl border p-4 flex items-start justify-between group transition-colors ${
+                  editingId === offer.id ? "border-orange-500/40 bg-orange-500/5" : "border-white/10"
+                }`}
               >
                 <div className="flex items-start gap-4 flex-1 min-w-0">
                   {offer.imageUrl ? (
@@ -293,13 +337,22 @@ export default function NewsPanel() {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(offer.id)}
-                  title="Delete news item"
-                  className="p-2 bg-red-500/10 text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white ml-3 shrink-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex gap-1 ml-3 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => handleEdit(offer)}
+                    title="Edit news item"
+                    className="p-2 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500 hover:text-white transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(offer.id)}
+                    title="Delete news item"
+                    className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

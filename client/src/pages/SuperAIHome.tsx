@@ -154,7 +154,10 @@ export default function SuperAIHome() {
 
       <div className="space-y-8 md:space-y-12 mt-8 md:mt-12">
 
-        {/* 🥉 3. SPONSORED SPOTLIGHTS (THE REVENUE LAYER) */}
+        {/* 📰 3. LATEST LOCAL NEWS */}
+        <LatestLocalNews />
+
+        {/* 🥉 4. SPONSORED SPOTLIGHTS (THE REVENUE LAYER) */}
         <motion.section
           className="px-4"
           initial="hidden"
@@ -183,7 +186,7 @@ export default function SuperAIHome() {
           </div>
         </motion.section>
 
-        {/* 🟡 4. TRUSTED DEALS */}
+        {/* 🟡 5. TRUSTED DEALS */}
         <section className="px-4">
           <h2 className="text-xl font-black italic mb-6">Trusted Deals in {currentDistrict?.name || 'Shahdol'}</h2>
           {isLoading ? (
@@ -197,7 +200,7 @@ export default function SuperAIHome() {
           )}
         </section>
 
-        {/* 🔧 5. SERVICE NETWORK */}
+        {/* 🔧 6. SERVICE NETWORK */}
         <section className="px-4">
           <h2 className="text-xl font-black italic mb-6">Service Network</h2>
           <ServiceNetwork workers={services} isLoading={isLoading} />
@@ -214,7 +217,7 @@ export default function SuperAIHome() {
           </section>
         )}
 
-        {/* 🚌 6. TRANSIT — Compact Utility CTA */}
+        {/* 🚌 7. TRANSIT — Compact Utility CTA */}
         <section className="px-4">
           <div
             onClick={() => handleNavigation('/bus-timetable')}
@@ -238,7 +241,7 @@ export default function SuperAIHome() {
           </div>
         </section>
 
-        {/* ❤️ 7. HEALTHCARE */}
+        {/* ❤️ 8. HEALTHCARE */}
         <section className="px-4">
           <h2 className="text-xl font-black italic mb-6">Healthcare</h2>
           {isLoading ? (
@@ -252,7 +255,7 @@ export default function SuperAIHome() {
           )}
         </section>
 
-        {/* 🎓 8. EDUCATION */}
+        {/* 🎓 9. EDUCATION */}
         <section className="px-4">
           <h2 className="text-xl font-black italic mb-6">Education</h2>
           {isLoading ? (
@@ -267,9 +270,6 @@ export default function SuperAIHome() {
         </section>
 
 
-
-        {/* 📰 9. LATEST LOCAL NEWS */}
-        <LatestLocalNews />
 
         {/* 💰 10. WALLET */}
         {isAuthenticated && balance && balance.totalSpent > 0 && (
