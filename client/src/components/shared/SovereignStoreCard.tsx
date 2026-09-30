@@ -333,14 +333,14 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
         if (!href) {
             return (
                 <div className={`group relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-5 opacity-50 cursor-not-allowed ${className}`}>
-                    <div className="flex items-center gap-4 mb-4">
+                    <div className="flex items-center gap-3 mb-4">
                         <GovernedImage
                             src={imageSrc}
                             alt={name}
                             categoryName={categoryName}
                             name={name}
                             aspectRatioHint="square"
-                            className="w-14 h-14 rounded-full shrink-0"
+                            className="w-12 h-12 rounded-full shrink-0"
                         />
                         <div className="min-w-0">
                             <h3 className="text-base font-bold text-white">{name}</h3>
@@ -366,14 +366,14 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
                 )}
 
                 {/* Header */}
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-3 mb-4">
                     <GovernedImage
                         src={imageSrc}
                         alt={name}
                         categoryName={categoryName}
                         name={name}
                         aspectRatioHint="square"
-                        className="w-14 h-14 rounded-full shrink-0"
+                        className="w-12 h-12 rounded-full shrink-0"
                     />
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
