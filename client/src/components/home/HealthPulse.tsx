@@ -23,15 +23,12 @@ export default function HealthPulse({ hospitals = [] }: HealthPulseProps) {
   }
 
   return (
-    <section>
-      <h2 className="text-xl font-black text-white mb-6 tracking-tighter">Health Pulse</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {safeHospitals.slice(0, 4).map((hospital, index) => (
-          <div key={`healthcare-${hospital.slug || hospital.id}-${index}`} onClick={() => setLocation(hospital.route)}>
-            <SovereignEntityCard entity={hospital} variant="grid" />
-          </div>
-        ))}
-      </div>
-    </section>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {safeHospitals.slice(0, 4).map((hospital, index) => (
+        <div key={`healthcare-${hospital.slug || hospital.id}-${index}`} onClick={() => setLocation(hospital.route)}>
+          <SovereignEntityCard entity={hospital} variant="grid" />
+        </div>
+      ))}
+    </div>
   );
 }

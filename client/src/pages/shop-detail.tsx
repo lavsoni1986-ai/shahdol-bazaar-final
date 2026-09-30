@@ -97,7 +97,7 @@ function resolveVendorKind(vendor: Record<string, any>, isHealthcareRoute?: bool
     category === "school" ||
     isSchoolRoute
   ) {
-    return "service";
+    return "education";
   }
 
   // Explicit retail / commerce protection: never let retail vendors be overridden
@@ -121,32 +121,48 @@ function resolveVendorKind(vendor: Record<string, any>, isHealthcareRoute?: bool
   // 4. Existing type fallback
   const type = (vendor.type || "").toString().toLowerCase();
   if (type === "hospital" || type === "healthcare") return "healthcare";
-  if (type === "service" || type === "school") return "service";
+  if (type === "service") return "service";
+  if (type === "school" || type === "education") return "education";
   if (type === "shop" || type === "store" || type === "vendor") return "marketplace";
 
   // 5. Route context ONLY as a fallback when canonical classification is unavailable
   if (isHealthcareRoute) return "healthcare";
-  if (isSchoolRoute) return "service";
+  if (isSchoolRoute) return "education";
 
   // 6. Default fallback
   return "marketplace";
 }
 
-function heroIconForLayout(layout: ResolvedExperience["layout"]) {
+function heroIconForLayout(layout: ResolvedExperience["layout"], kind?: string) {
+  if (kind === "education" || layout === "info") return BookOpen;
+  if (kind === "healthcare") return Stethoscope;
+  if (layout === "service") return Building2;
+  return Store;
+}
+
+function heroLabelForLayout(layout: ResolvedExperience["layout"], category?: string | null, kind?: string): string {
+  if (category) return category;
+  if (kind === "education") return "Institution";
+  if (kind === "healthcare") return "Healthcare Facility";
   switch (layout) {
-    case "service": return Stethoscope;
-    case "info": return BookOpen;
-    default: return Building2;
+    case "service": return "Service Provider";
+    case "info": return "Institution";
+    default: return "Shop";
   }
 }
 
-function heroLabelForLayout(layout: ResolvedExperience["layout"], category?: string | null): string {
-  if (category) return category;
-  switch (layout) {
-    case "service": return "Service Provider";
-    case "info": return "Information";
-    default: return "Shop";
-  }
+function aboutEntityTitle(kind: string, layout: ResolvedExperience["layout"]): string {
+  if (kind === "education") return "the Institution";
+  if (kind === "healthcare") return "the Facility";
+  if (layout === "service" || kind === "service") return "Service Provider";
+  return "the Shop";
+}
+
+function AboutEntityIcon({ kind, layout, className }: { kind: string; layout: ResolvedExperience["layout"]; className?: string }) {
+  if (kind === "education") return <BookOpen size={18} className={className} />;
+  if (kind === "healthcare") return <Stethoscope size={18} className={className} />;
+  if (layout === "service" || kind === "service") return <Building2 size={18} className={className} />;
+  return <Store size={18} className={className} />;
 }
 
 function accentGradientClasses(accent: ResolvedExperience["accent"]): string {
@@ -273,7 +289,7 @@ export default function ShopDetail() {
   const isSchoolRoute = !!(schoolsParams || districtSchoolsParams || schoolParams || districtSchoolParams);
   const entityKind = vendor
     ? resolveVendorKind(vendor as Record<string, any>, isHealthcareRoute, isSchoolRoute)
-    : (isHealthcareRoute ? "healthcare" : isSchoolRoute ? "service" : "marketplace");
+    : (isHealthcareRoute ? "healthcare" : isSchoolRoute ? "education" : "marketplace");
   const experience = vendor ? resolveEntityExperience({
     entityKind,
     category: (vendor as any).category,
@@ -554,7 +570,7 @@ export default function ShopDetail() {
               <div className="flex-1 min-w-0">
                 {/* 🏛️ Category badge — governance accent */}
                 <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider mb-2 ${accentBadgeClasses(resolvedAccent)}`}>
-                  {displayVendor.category || heroLabelForLayout(resolvedLayout)}
+                  {displayVendor.category || heroLabelForLayout(resolvedLayout, null, entityKind)}
                 </span>
                 <h1 className="text-2xl md:text-3xl font-bold text-white mt-2 flex items-center gap-2 truncate">
                   {displayVendor.name}
@@ -624,7 +640,7 @@ export default function ShopDetail() {
                   }}
                 >
                   <Button className="w-full bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-600 hover:to-emerald-500 text-white py-6 text-base shadow-md shadow-emerald-700/20 transition-all active:scale-95 rounded-xl">
-                    <MessageCircle className="mr-2 h-5 w-5" /> व्हाट्सएप चैट
+                    <MessageCircle className="mr-2 h-5 w-5" /> {entityKind === "education" ? "एडमिशन पूछताछ" : "व्हाट्सएप चैट"}
                   </Button>
                 </a>
               )}
@@ -644,8 +660,8 @@ export default function ShopDetail() {
             {/* About */}
             <div className="mt-6 pt-6 border-t border-zinc-800">
               <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-white">
-                <Store size={18} className={accentIconColor(resolvedAccent)} />
-                About {resolvedLayout === "service" ? "Service Provider" : "the Shop"}
+                <AboutEntityIcon kind={entityKind} layout={resolvedLayout} className={accentIconColor(resolvedAccent)} />
+                About {aboutEntityTitle(entityKind, resolvedLayout)}
               </h3>
               <p className="text-zinc-400 leading-relaxed whitespace-pre-wrap text-sm">
                 {displayVendor.description || "No description available."}
@@ -735,7 +751,7 @@ export default function ShopDetail() {
                   <div className="text-center py-12 bg-zinc-900/50 rounded-[2rem] border border-dashed border-zinc-800">
                     <Package className="text-zinc-700 h-10 w-10 mx-auto mb-3" />
                     <p className="text-zinc-500 font-medium text-sm">
-                      Abhi is {resolvedLayout === "service" ? "service provider" : "shop"} mein koi items nahi hain.
+                      Abhi is {resolvedLayout === "service" ? "service provider" : entityKind === "education" ? "institution" : "shop"} mein koi items nahi hain.
                     </p>
                   </div>
                 )}
@@ -783,6 +799,7 @@ export default function ShopDetail() {
                   <option value="price_quote">Get Price Quote</option>
                   <option value="bulk_order">Bulk Order</option>
                   <option value="service_booking">Book a Service</option>
+                  <option value="admission_inquiry">Admission Inquiry</option>
                   <option value="general">General Inquiry</option>
                 </select>
               </div>
