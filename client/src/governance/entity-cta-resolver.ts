@@ -338,7 +338,7 @@ export const ENTITY_CTA_POLICIES: Record<EntityKind, EntityCTAPolicy> = {
         allowedActions: ["enroll_now", "request_callback", "call_now", "get_directions", "whatsapp"],
         interactionMode: "enrollment",
         hasCommerceDisplay: false,
-        hasBookingFlow: true,
+        hasBookingFlow: false,
         hasEmergencyContact: false,
         hasQuantitySelector: false,
         hasDeliveryOptions: false,
