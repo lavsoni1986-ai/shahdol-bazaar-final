@@ -160,7 +160,7 @@ export function calculateRelevanceScore(
   // Critical Relevance Gate:
   // If an entity has NO text relevance and NO domain match, trust/popularity/freshness
   // must NEVER substitute for relevance. The candidate is rejected (relevanceScore = 0).
-  const isRelevant = textRelevance > 0 || domainMatch > 0;
+  const isRelevant = textRelevance >= 10 || domainMatch > 0;
   const relevanceScore = isRelevant
     ? textRelevance + domainMatch + trustScore + semanticMatch + popularity + intentBonus
     : 0;
