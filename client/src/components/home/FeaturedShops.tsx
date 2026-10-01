@@ -14,13 +14,55 @@ function normalizeItems<T>(value: unknown): T[] {
   return [];
 }
 
+const NON_RETAIL_BUSINESS_TYPES = new Set([
+  "SCHOOL",
+  "HEALTHCARE",
+  "HOSPITAL",
+  "SERVICE",
+  "EDUCATION",
+]);
+
+function isRetailEntity(entity: CanonicalEntity): boolean {
+  const raw = (entity.raw || {}) as Record<string, any>;
+  const rawBusinessType = (
+    raw.businessType ||
+    raw.type ||
+    raw.vendorType ||
+    raw.sellerType ||
+    ""
+  ).toString().trim().toUpperCase();
+
+  if (NON_RETAIL_BUSINESS_TYPES.has(rawBusinessType)) {
+    return false;
+  }
+
+  const rawEntityType = (raw.entityType || "").toString().trim().toUpperCase();
+  if (NON_RETAIL_BUSINESS_TYPES.has(rawEntityType)) {
+    return false;
+  }
+
+  const kind = (entity.kind || "").toString().trim().toLowerCase();
+  if (kind === "school" || kind === "hospital" || kind === "healthcare" || kind === "service" || kind === "education") {
+    return false;
+  }
+
+  const category = (entity.category || raw.category || "").toString().trim().toUpperCase();
+  if (NON_RETAIL_BUSINESS_TYPES.has(category)) {
+    return false;
+  }
+
+  return true;
+}
+
 export function FeaturedShops({ entities: externalEntities, products, onTrack }: FeaturedShopsProps) {
   const { currentDistrict } = useDistrict();
   const entities = normalizeItems<CanonicalEntity>(externalEntities);
   const safeEntities = normalizeItems<CanonicalEntity>(entities);
   const safeProducts = normalizeItems<CanonicalEntity>(products);
 
-  if (safeEntities.length === 0) {
+  const retailEntities = safeEntities.filter(isRetailEntity);
+
+  if (retailEntities.length === 0) {
     return (
       <EmptyState
         title="No featured shops available"
@@ -31,7 +73,7 @@ export function FeaturedShops({ entities: externalEntities, products, onTrack }:
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {safeEntities.slice(0, 4).map((entity) => {
+      {retailEntities.slice(0, 4).map((entity) => {
         // Cross-reference legitimate product catalog hint and high-res image fallback
         const matchingProduct = safeProducts.find((p) => {
           const slugMatch = entity.slug && (
