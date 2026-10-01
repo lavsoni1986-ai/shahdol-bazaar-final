@@ -6,7 +6,7 @@
 import { useRoute } from "wouter";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -130,6 +130,8 @@ export default function ProductDetail() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [showStickyCTA, setShowStickyCTA] = useState(false);
+  const inlineCtaRef = useRef<HTMLDivElement>(null);
 
   // Fetch product
   const {
@@ -204,6 +206,48 @@ export default function ProductDetail() {
       toast.error(err?.message || "Review submit failed");
     },
   });
+
+  // Scroll-triggered Sticky Mobile CTA observer
+  // Ensures inline CTA and sticky CTA are NEVER visible simultaneously on mobile (<768px).
+  // Sticky CTA reveals only when inline CTA has scrolled past the top of the viewport.
+  useEffect(() => {
+    const el = inlineCtaRef.current;
+    if (!el) return;
+
+    const updateVisibility = (entry?: IntersectionObserverEntry) => {
+      const rect = entry ? entry.boundingClientRect : el.getBoundingClientRect();
+      const isIntersecting = entry
+        ? entry.isIntersecting
+        : rect.top < window.innerHeight && rect.bottom > 0;
+
+      // Show sticky CTA ONLY when inline CTA has scrolled above the top of the viewport
+      if (!isIntersecting && rect.bottom < 0) {
+        setShowStickyCTA(true);
+      } else {
+        setShowStickyCTA(false);
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        updateVisibility(entry);
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(el);
+    updateVisibility();
+
+    const handleScroll = () => updateVisibility();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [product?.id]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -393,14 +437,16 @@ export default function ProductDetail() {
             />
 
             {/* CTA */}
-            <PrimaryCTAGroup
-              onAddToCart={handleAddToCart}
-              onWhatsApp={handleWhatsApp}
-              onCall={handleCall}
-              sellerPhone={sellerPhoneVal}
-              productName={product.name}
-              productPrice={product.price}
-            />
+            <div ref={inlineCtaRef}>
+              <PrimaryCTAGroup
+                onAddToCart={handleAddToCart}
+                onWhatsApp={handleWhatsApp}
+                onCall={handleCall}
+                sellerPhone={sellerPhoneVal}
+                productName={product.name}
+                productPrice={product.price}
+              />
+            </div>
 
             {/* Description */}
             {product.description && (
@@ -485,6 +531,7 @@ export default function ProductDetail() {
         price={priceNum}
         onAddToCart={handleAddToCart}
         onWhatsApp={handleWhatsApp}
+        visible={showStickyCTA}
       />
 
       {/* Review Dialog */}

@@ -582,6 +582,7 @@ interface StickyMobileCTAProps {
     stock?: number;
     /** Entity kind for governance-driven label (default: product) */
     entityKind?: string;
+    visible?: boolean;
 }
 
 export function StickyMobileCTA({
@@ -592,6 +593,7 @@ export function StickyMobileCTA({
     disabled = false,
     stock,
     entityKind = "product",
+    visible = true,
 }: StickyMobileCTAProps) {
     const isOutOfStock = stock !== undefined && stock <= 0;
 
@@ -604,7 +606,13 @@ export function StickyMobileCTA({
 
     return (
         <div
-            className="fixed md:hidden left-0 right-0 z-[70] bg-black/95 backdrop-blur-xl border-t border-white/10 p-3"
+            className={cn(
+                "fixed md:hidden left-0 right-0 z-[70] bg-black/95 backdrop-blur-xl border-t border-white/10 p-3 transition-all duration-300 ease-in-out",
+                visible
+                    ? "translate-y-0 opacity-100 pointer-events-auto"
+                    : "translate-y-full opacity-0 pointer-events-none"
+            )}
+            aria-hidden={!visible}
             style={{ bottom: `${SAFE_AREAS.bottomNav + 12}px` }}
         >
             <div className="flex items-center gap-3">
@@ -617,7 +625,8 @@ export function StickyMobileCTA({
                     {showWhatsApp && !isOutOfStock && (
                         <Button
                             onClick={onWhatsApp}
-                            disabled={disabled}
+                            disabled={disabled || !visible}
+                            tabIndex={visible ? 0 : -1}
                             className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg"
                         >
                             <MessageCircle className="w-4 h-4 mr-1.5" />
@@ -627,6 +636,7 @@ export function StickyMobileCTA({
                     {isOutOfStock ? (
                         <Button
                             disabled
+                            tabIndex={-1}
                             className="flex-1 border border-zinc-600 text-zinc-500 bg-transparent cursor-not-allowed py-3 rounded-xl text-xs font-bold uppercase tracking-wider"
                         >
                             Out of Stock
@@ -634,7 +644,8 @@ export function StickyMobileCTA({
                     ) : (
                         <Button
                             onClick={onAddToCart}
-                            disabled={disabled}
+                            disabled={disabled || !visible}
+                            tabIndex={visible ? 0 : -1}
                             className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-orange-600/20 transition-all active:scale-[0.98]"
                         >
                             <PrimaryIcon className="w-4 h-4 mr-1.5" />
