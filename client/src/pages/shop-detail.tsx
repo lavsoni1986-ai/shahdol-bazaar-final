@@ -609,10 +609,12 @@ export default function ShopDetail() {
             {/* 🏛️ CTA Buttons — governance-driven */}
             <div className={`grid ${phone ? 'grid-cols-2' : 'grid-cols-1'} gap-3 mb-4`}>
               {phone && (
-                <a href={`tel:${phone}`} className="w-full" onClick={handleCallClick}>
-                  <Button className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white py-6 text-base shadow-md shadow-orange-600/20 transition-all active:scale-95 rounded-xl">
-                    <Phone className="mr-2 h-5 w-5" /> कॉल करें
-                  </Button>
+                <a
+                  href={`tel:${phone}`}
+                  onClick={handleCallClick}
+                  className="w-full inline-flex items-center justify-center bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-medium py-6 text-base shadow-md shadow-orange-600/20 transition-all active:scale-95 rounded-xl"
+                >
+                  <Phone className="mr-2 h-5 w-5" /> कॉल करें
                 </a>
               )}
 
@@ -629,7 +631,6 @@ export default function ShopDetail() {
                   href={whatsappLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full"
                   onClick={(e) => {
                     e.preventDefault();
                     handleWhatsAppClick();
@@ -638,10 +639,9 @@ export default function ShopDetail() {
                       window.open(whatsappLink, '_blank');
                     }
                   }}
+                  className="w-full inline-flex items-center justify-center bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-600 hover:to-emerald-500 text-white font-medium py-6 text-base shadow-md shadow-emerald-700/20 transition-all active:scale-95 rounded-xl"
                 >
-                  <Button className="w-full bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-600 hover:to-emerald-500 text-white py-6 text-base shadow-md shadow-emerald-700/20 transition-all active:scale-95 rounded-xl">
-                    <MessageCircle className="mr-2 h-5 w-5" /> {entityKind === "education" ? "एडमिशन पूछताछ" : "व्हाट्सएप चैट"}
-                  </Button>
+                  <MessageCircle className="mr-2 h-5 w-5" /> {entityKind === "education" ? "एडमिशन पूछताछ" : "व्हाट्सएप चैट"}
                 </a>
               )}
             </div>
@@ -649,10 +649,12 @@ export default function ShopDetail() {
             {/* 🏛️ Emergency contact — governance-driven */}
             {resolvedHasEmergency && phone && (
               <div className="mb-4">
-                <a href={`tel:${phone}`} className="w-full" onClick={handleCallClick}>
-                  <button className="w-full bg-gradient-to-r from-red-800 to-red-700 hover:from-red-700 hover:to-red-600 text-white font-bold py-3.5 text-base shadow-md shadow-red-800/20 transition-all active:scale-95 rounded-xl border border-red-700/30">
-                    <AlertCircle className="inline mr-2 h-5 w-5" /> Emergency Contact
-                  </button>
+                <a
+                  href={`tel:${phone}`}
+                  onClick={handleCallClick}
+                  className="w-full inline-flex items-center justify-center bg-gradient-to-r from-red-800 to-red-700 hover:from-red-700 hover:to-red-600 text-white font-bold py-3.5 text-base shadow-md shadow-red-800/20 transition-all active:scale-95 rounded-xl border border-red-700/30"
+                >
+                  <AlertCircle className="mr-2 h-5 w-5" /> Emergency Contact
                 </a>
               </div>
             )}
