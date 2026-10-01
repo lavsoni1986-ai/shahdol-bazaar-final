@@ -77,6 +77,10 @@ export function finalizeCognitionResponse(res: Response, executionState: Cogniti
     }));
   }
 
+  const finalResults = Array.isArray(response.results) ? response.results : [];
+  const hasRelevantResults = finalResults.length > 0;
+  (response as any).hasRelevantResults = hasRelevantResults;
+
   // Add execution metadata
   response.executionMetadata = {
     requestId: executionState.trace.requestId,

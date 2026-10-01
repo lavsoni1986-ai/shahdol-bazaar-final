@@ -62,7 +62,10 @@ export async function synthesizeResponse(context: ResponseSynthesisContext): Pro
   } = context;
 
   // Default fallback answer
-  let answer = `Here are a few trusted options in ${districtName || "your district"} for "${query}".`;
+  const hasEvidence = (vendors.length + products.length + services.length + hospitals.length + doctors.length) > 0;
+  let answer = hasEvidence
+    ? `Here are a few trusted options in ${districtName || "your district"} for "${query}".`
+    : `${districtName || "Shahdol"} mein is query ke liye koi verified local listing nahi mili.`;
 
   const groq = getGroq();
 
@@ -109,13 +112,15 @@ export async function synthesizeResponse(context: ResponseSynthesisContext): Pro
       ];
 
       const availabilityClause =
-        hasLiveAvailability
-          ? "Available hai. Booking active hai."
-          : entitiesForEvidence.some(e => e.trustLabel === "Highly Trusted")
-            ? "Availability confirm karne ke liye abhi call karein."
-            : entitiesForEvidence.some(e => e.trustLabel === "Verified")
-              ? "Verified listing hai. Availability ke liye sampark karein."
-              : "Local listing mili hai. Truth verify karke hi aage badhein.";
+        entitiesForEvidence.length === 0
+          ? `${districtName || "Shahdol"} mein is query ke liye koi verified local listing nahi mili.`
+          : hasLiveAvailability
+            ? "Available hai. Booking active hai."
+            : entitiesForEvidence.some(e => e.trustLabel === "Highly Trusted")
+              ? "Availability confirm karne ke liye abhi call karein."
+              : entitiesForEvidence.some(e => e.trustLabel === "Verified")
+                ? "Verified listing hai. Availability ke liye sampark karein."
+                : "Local listing mili hai. Truth verify karke hi aage badhein.";
 
       // Build context strings
       const vendorContext = vendors
@@ -210,7 +215,11 @@ ${memoryContext || "None"}
 Rules:
 1) Situational compression: max action, min words.
 2) Decisive language: "Call karein", "Navigate karein".
-3) Evidence discipline: if no live availability data, use: "${availabilityClause}".
+3) Evidence discipline: ${
+  entitiesForEvidence.length === 0
+    ? `Zero evidence entities found. Do NOT claim that a local listing exists. Do NOT imply availability. State clearly: "${availabilityClause}". Provide zero-result guidance instead.`
+    : `if no live availability data, use: "${availabilityClause}".`
+}
 4) No numbers: never mention scores (e.g., 0.9) or ranks.
 5) Max ${strategy.maxWords || 80} words.
 `;
@@ -244,7 +253,9 @@ Rules:
     }
   }
 
-  const hasAIResponse = !!answer && answer !== `Here are a few trusted options in ${districtName || "your district"} for "${query}".`;
+  const defaultFallbackOptions = `Here are a few trusted options in ${districtName || "your district"} for "${query}".`;
+  const defaultFallbackZero = `${districtName || "Shahdol"} mein is query ke liye koi verified local listing nahi mili.`;
+  const hasAIResponse = !!answer && answer !== defaultFallbackOptions && answer !== defaultFallbackZero;
 
   return {
     answer,

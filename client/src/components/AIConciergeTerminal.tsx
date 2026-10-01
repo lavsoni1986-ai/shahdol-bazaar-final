@@ -229,7 +229,7 @@ export default function AIConciergeTerminal() {
         )}
 
         {/* NO RESULTS FALLBACK */}
-        {!isLoading && !isError && query.length >= 2 && (!data?.results || data.results.length === 0) && !data?.answer && (
+        {!isLoading && !isError && query.length >= 2 && (!data?.results || data.results.length === 0) && (
           <div className="text-center py-8 text-gray-400 text-sm">
             <p>"{query}" के लिए कोई सीधा परिणाम नहीं मिला।</p>
             <p className="text-xs text-gray-500 mt-1">अन्य कीवर्ड से खोजें या ट्रेंडिंग सुझाव देखें।</p>
@@ -237,8 +237,9 @@ export default function AIConciergeTerminal() {
         )}
 
         {(() => {
+          const hasResults = (data?.results?.length ?? 0) > 0 && data?.hasRelevantResults !== false;
           const telemetryCount = data?.telemetryTruth?.matchedEntities ?? data?.telemetry?.matchedEntities ?? 0;
-          return !isLoading && telemetryCount > 0 ? (
+          return !isLoading && hasResults && telemetryCount > 0 ? (
             <p className="text-sm text-gray-300 mb-3">
               Found {telemetryCount} results in {district?.name || "Shahdol"}
             </p>
