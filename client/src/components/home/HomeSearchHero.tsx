@@ -4,7 +4,7 @@ import { useDistrict } from "@/contexts/DistrictContext";
 import { useLocation } from "wouter";
 import { aiRouter } from "@/lib/ai-router";
 
-export const AISearchTerminal = () => {
+export const HomeSearchHero = () => {
   const [query, setQuery] = useState("");
   const { currentDistrict } = useDistrict();
   const [, setLocation] = useLocation();
@@ -59,3 +59,5 @@ export const AISearchTerminal = () => {
     </div>
   );
 };
+
+export default HomeSearchHero;

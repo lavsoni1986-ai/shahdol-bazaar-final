@@ -12,7 +12,7 @@ import { normalizeCanonicalEntity } from "@/shared/api/response-normalizers";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { SovereignEntityCard } from "@/components/shared/SovereignEntityCard";
 
-export default function AISearchTerminal() {
+export default function AIConciergeTerminal() {
   const [query, setQuery] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);

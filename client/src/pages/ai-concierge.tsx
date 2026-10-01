@@ -1,5 +1,5 @@
 // 📁 client/src/pages/ai-concierge.tsx
-import AISearchTerminal from "@/components/AISearchTerminal";
+import AIConciergeTerminal from "@/components/AIConciergeTerminal";
 
 export default function AIConciergePage() {
   return (
@@ -13,7 +13,7 @@ export default function AIConciergePage() {
             Ask me anything about Shahdol's services, shops, healthcare, and education
           </p>
         </div>
-        <AISearchTerminal />
+        <AIConciergeTerminal />
       </div>
     </div>
   );

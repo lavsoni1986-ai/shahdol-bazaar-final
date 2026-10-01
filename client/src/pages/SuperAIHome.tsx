@@ -12,7 +12,7 @@ import { Wallet, ArrowRight, Bus, Newspaper } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 
 // Components
-import { AISearchTerminal } from "@/components/home/AISearchTerminal";
+import { HomeSearchHero } from "@/components/home/HomeSearchHero";
 import { QuickActions } from "@/components/home/QuickActions";
 import { TrustBar } from "@/components/home/TrustBar";
 import FeaturedShops from "@/components/home/FeaturedShops";
@@ -65,7 +65,7 @@ export default function SuperAIHome() {
           </motion.p>
         </motion.div>
 
-        <AISearchTerminal />
+        <HomeSearchHero />
 
         {/* 🛡️ SOVEREIGN: Guest-only Customer Auth CTA — hidden for authenticated users */}
         {!isAuthenticated && (
