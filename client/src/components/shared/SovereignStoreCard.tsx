@@ -198,8 +198,13 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
     const experience = resolveEntityExperience({ entityKind: resolvedKind, category });
     const ctaLabel = ctas.primaryCTA.label;
 
+    const storeRouteKind =
+      resolvedKind === "product"
+        ? "marketplace"
+        : resolvedKind;
+
     const href = buildCanonicalRoute({
-        entityKind: resolvedKind,
+        entityKind: storeRouteKind,
         slug: data.slug,
         id: data.id,
         districtSlug: district,
