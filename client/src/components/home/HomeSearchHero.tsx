@@ -51,9 +51,14 @@ export const HomeSearchHero = () => {
       {/* Suggested Prompts */}
       <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
         {["🩺 Find best pediatricians", "🛒 Cheapest grocery shops", "🔧 Mobile repair open now"].map((prompt) => (
-          <span key={prompt} onClick={() => handleSuggestion(prompt)} className="whitespace-nowrap px-4 py-1.5 rounded-full border border-white/[0.05] bg-white/[0.02] text-xs font-medium text-white/50 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer active:scale-95 z-[60]">
+          <button
+            key={prompt}
+            type="button"
+            onClick={() => handleSuggestion(prompt)}
+            className="whitespace-nowrap px-4 py-1.5 rounded-full border border-white/[0.05] bg-white/[0.02] text-xs font-medium text-white/50 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer active:scale-95 z-[60] focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 focus-visible:border-orange-500/50 focus-visible:text-white"
+          >
             {prompt}
-          </span>
+          </button>
         ))}
       </div>
     </div>
