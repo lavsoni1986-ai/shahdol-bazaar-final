@@ -316,6 +316,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   {/* THE ACTUAL BUTTON: Forced pointer-events-auto and max z-index */}
                   <button
                     type="button"
+                    aria-label="Ask AI Concierge"
                     onClick={() => setLocation(`/${currentDistrict?.slug || 'shahdol'}/ai/concierge`)}
                     className="relative z-[10000] w-14 h-14 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-[0_0_30px_rgba(249,115,22,0.7)] border-[2px] border-white/10 hover:scale-105 transition-transform cursor-pointer pointer-events-auto"
                   >
