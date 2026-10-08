@@ -540,6 +540,7 @@ export default function ShopDetail() {
                 size="icon"
                 className="bg-black/60 backdrop-blur-sm border border-zinc-700 text-zinc-300 hover:text-orange-400 hover:bg-black/80 rounded-full"
                 onClick={handleShare}
+                aria-label="Share"
               ><Share2 size={18} /></Button>
             </div>
           </div>
@@ -559,6 +560,7 @@ export default function ShopDetail() {
               size="icon"
               className="bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-orange-400 hover:bg-zinc-800 rounded-full"
               onClick={handleShare}
+              aria-label="Share"
             ><Share2 size={18} /></Button>
           </div>
         )}
@@ -773,6 +775,7 @@ export default function ShopDetail() {
           vendorId={displayVendor.id}
           vendorName={displayVendor.name}
           vendorCategory={displayVendor.category}
+          entityKind={entityKind}
         />
       )}
 

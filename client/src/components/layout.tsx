@@ -84,6 +84,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setLocation("/");
   }, [logout, setLocation]);
 
+  const handleShare = useCallback(async () => {
+    const shareUrl = window.location.href;
+    const shareTitle = document.title || `${districtName} Bazaar`;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Link copied to clipboard!");
+      }
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          toast.success("Link copied to clipboard!");
+        } catch {
+          // silent fallback
+        }
+      }
+    }
+  }, [districtName]);
+
   // Bottom nav — last item is auth-conditional
   const navItems = [
     { href: "/", icon: HomeIcon, label: "Home" },
@@ -137,10 +162,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
             {/* Right: Share/Save */}
             <div className="flex items-center gap-2">
-              <button className="p-2 rounded-full hover:bg-white/5 text-zinc-400 transition-colors" title="Share">
+              <button
+                type="button"
+                onClick={handleShare}
+                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 text-zinc-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#030003]"
+                aria-label="Share"
+                title="Share"
+              >
                 <Share2 className="w-4 h-4" />
               </button>
-              <button className="p-2 rounded-full hover:bg-white/5 text-zinc-400 transition-colors" title="Save">
+              <button
+                type="button"
+                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 text-zinc-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#030003]"
+                aria-label="Save"
+                title="Save"
+              >
                 <Heart className="w-4 h-4" />
               </button>
             </div>

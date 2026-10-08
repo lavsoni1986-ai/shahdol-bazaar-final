@@ -1,8 +1,14 @@
 import React, { useState } from "react";
-import { X, Calendar, Clock, User, Phone, Mail, Type, MessageSquare } from "lucide-react";
+import { Calendar, Clock, User, Phone, Mail, Type, MessageSquare } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/api-client";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -10,6 +16,8 @@ interface BookingModalProps {
   vendorId: number;
   vendorName: string;
   vendorCategory: string;
+  entityKind?: string;
+  title?: string;
 }
 
 interface BookingFormData {
@@ -28,6 +36,8 @@ export function BookingModal({
   vendorId,
   vendorName,
   vendorCategory,
+  entityKind,
+  title,
 }: BookingModalProps) {
   const [formData, setFormData] = useState<BookingFormData>({
     customerName: "",
@@ -78,8 +88,6 @@ export function BookingModal({
     },
   });
 
-  if (!isOpen) return null;
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -113,24 +121,33 @@ export function BookingModal({
   };
 
   const isLoading = createBookingMutation.isPending;
+  const isService = entityKind === "service" || vendorCategory?.toUpperCase() === "SERVICE" || vendorCategory?.toLowerCase().includes("service");
+  const resolvedTitle = title || (isService ? "Book Service" : "Book Appointment");
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#0A0A0A] border border-zinc-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          if (isLoading) return;
+          onClose();
+        }
+      }}
+    >
+      <DialogContent
+        onEscapeKeyDown={(e) => {
+          if (isLoading) e.preventDefault();
+        }}
+        onPointerDownOutside={(e) => {
+          if (isLoading) e.preventDefault();
+        }}
+        className={`bg-[#0A0A0A] border border-zinc-800 rounded-2xl shadow-2xl max-w-md w-[95%] sm:w-full max-h-[90vh] overflow-y-auto p-0 gap-0 text-white [&>button]:p-2.5 [&>button]:rounded-lg [&>button]:hover:bg-white/10 [&>button]:text-zinc-400 [&>button]:hover:text-white [&>button]:transition-colors ${isLoading ? '[&>button]:opacity-30 [&>button]:pointer-events-none [&>button]:cursor-not-allowed' : ''}`}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div>
-            <h2 className="text-xl font-bold text-white">Book Appointment</h2>
-            <p className="text-sm text-zinc-400 mt-1">{vendorName}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-300 transition"
-            disabled={isLoading}
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <DialogHeader className="p-6 border-b border-zinc-800 text-left pr-14">
+          <DialogTitle className="text-xl font-bold text-white">{resolvedTitle}</DialogTitle>
+          <p className="text-sm text-zinc-400 mt-1">{vendorName}</p>
+        </DialogHeader>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -268,7 +285,7 @@ export function BookingModal({
             phone.
           </p>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
