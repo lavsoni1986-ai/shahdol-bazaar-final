@@ -461,11 +461,11 @@ export default function ProductDetail() {
             <DetailSection title="Product Details" icon={<Package className="w-3.5 h-3.5" />}>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between py-1.5 border-b border-white/5">
-                  <span className="text-zinc-500">Category</span>
+                  <span className="text-zinc-400">Category</span>
                   <span className="text-zinc-200 font-medium">{categoryName}</span>
                 </div>
                 <div className="flex justify-between py-1.5">
-                  <span className="text-zinc-500">Delivery</span>
+                  <span className="text-zinc-400">Delivery</span>
                   <span className="text-emerald-400 font-semibold">Same Day</span>
                 </div>
               </div>

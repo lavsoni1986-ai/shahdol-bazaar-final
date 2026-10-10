@@ -213,7 +213,7 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                     <div className="flex items-center gap-2 mt-1">
                         <span className="text-sm font-black text-white">₹{formatPrice(price)}</span>
                         {mrp && mrp > price && (
-                            <span className="text-xs text-zinc-500 line-through">₹{formatPrice(mrp)}</span>
+                            <span className="text-xs text-zinc-400 line-through">₹{formatPrice(mrp)}</span>
                         )}
                     </div>
                 </div>
@@ -252,7 +252,7 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                     <div className="flex items-baseline gap-1.5">
                         <span className="text-sm font-black text-white">₹{formatPrice(price)}</span>
                         {mrp && mrp > price && (
-                            <span className="text-label text-zinc-500 line-through">₹{formatPrice(mrp)}</span>
+                            <span className="text-label text-zinc-400 line-through">₹{formatPrice(mrp)}</span>
                         )}
                     </div>
                 </div>
@@ -323,7 +323,7 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                         <span className="text-xl font-black text-white">₹{formatPrice(price)}</span>
                         {mrp && mrp > price && (
                             <>
-                                <span className="text-sm text-zinc-500 line-through">₹{formatPrice(mrp)}</span>
+                                <span className="text-sm text-zinc-400 line-through">₹{formatPrice(mrp)}</span>
                                 <span className="text-xs font-bold text-emerald-400">{discount}% off</span>
                             </>
                         )}
@@ -383,7 +383,7 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                     <div className="flex items-baseline gap-2 mt-0.5">
                         <span className="text-base font-black text-white">₹{formatPrice(price)}</span>
                         {mrp && mrp > price && (
-                            <span className="text-xs text-zinc-500 line-through">₹{formatPrice(mrp)}</span>
+                            <span className="text-xs text-zinc-400 line-through">₹{formatPrice(mrp)}</span>
                         )}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
@@ -461,7 +461,7 @@ export const SovereignProductCard = memo(function SovereignProductCard({
                     <span className="text-lg font-black text-white">₹{formatPrice(price)}</span>
                     {mrp != null && mrp > price && (
                         <>
-                            <span className="text-xs text-zinc-500 line-through">₹{formatPrice(mrp)}</span>
+                            <span className="text-xs text-zinc-400 line-through">₹{formatPrice(mrp)}</span>
                             <span className="text-label font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                                 -{discount}%
                             </span>

@@ -79,7 +79,7 @@ export default function SuperAIHome() {
               <p className="text-xs font-black uppercase tracking-widest text-orange-400 mb-1">
                 Apna Account Banayein
               </p>
-              <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+              <p className="text-[11px] text-gray-400 mb-3 leading-relaxed">
                 Orders Track Karein • Wishlist Save Karein • Apne Jile ki Dukaano se Kharidein
               </p>
               <div className="flex gap-2">
@@ -364,7 +364,7 @@ function LatestLocalNews() {
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm leading-relaxed line-clamp-3">{item.content}</p>
                 {item.createdAt && (
-                  <p className="text-gray-600 text-xs mt-1">
+                  <p className="text-gray-400 text-xs mt-1">
                     {new Date(item.createdAt).toLocaleDateString("en-IN", {
                       day: "numeric",
                       month: "short",

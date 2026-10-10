@@ -280,7 +280,7 @@ export function BookingModal({
           </button>
 
           {/* Info text */}
-          <p className="text-xs text-zinc-500 text-center mt-4">
+          <p className="text-xs text-zinc-400 text-center mt-4">
             We'll send this request to {vendorName} and they'll confirm your booking via WhatsApp or
             phone.
           </p>

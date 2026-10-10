@@ -189,7 +189,7 @@ export function PricingStack({
                 </span>
                 {originalPrice && originalPrice > price && (
                     <>
-                        <span className="text-lg line-through text-zinc-500">
+                        <span className="text-lg line-through text-zinc-400">
                             ₹{originalPrice.toLocaleString("en-IN")}
                         </span>
                         <span className="text-sm font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">

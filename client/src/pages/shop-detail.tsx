@@ -685,21 +685,21 @@ export default function ShopDetail() {
                   <Verified className="text-emerald-400 shrink-0 mt-0.5" size={16} />
                   <div>
                     <p className="font-semibold text-sm text-zinc-200">Business Verified</p>
-                    <p className="text-xs text-zinc-500">Identity & license confirmed</p>
+                    <p className="text-xs text-zinc-400">Identity & license confirmed</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5 bg-black/40 rounded-xl p-3 border border-zinc-800/50">
                   <Lock className="text-blue-400 shrink-0 mt-0.5" size={16} />
                   <div>
                     <p className="font-semibold text-sm text-zinc-200">Secure Contact</p>
-                    <p className="text-xs text-zinc-500">Phone & WhatsApp verified</p>
+                    <p className="text-xs text-zinc-400">Phone & WhatsApp verified</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5 bg-black/40 rounded-xl p-3 border border-zinc-800/50">
                   <FileCheck className="text-amber-400 shrink-0 mt-0.5" size={16} />
                   <div>
                     <p className="font-semibold text-sm text-zinc-200">Service Quality</p>
-                    <p className="text-xs text-zinc-500">Customer reviews monitored</p>
+                    <p className="text-xs text-zinc-400">Customer reviews monitored</p>
                   </div>
                 </div>
               </div>
@@ -743,7 +743,7 @@ export default function ShopDetail() {
                             />
                           </div>
                           <div className="p-3 flex flex-col flex-1 gap-1">
-                            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{product.category}</p>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{product.category}</p>
                             <h4 className="font-bold text-zinc-100 group-hover:text-orange-400 transition-colors line-clamp-2 text-sm flex-1">{product.name}</h4>
                             <p className="text-base font-bold text-orange-400">₹{parseFloat(product.price).toLocaleString()}</p>
                           </div>
