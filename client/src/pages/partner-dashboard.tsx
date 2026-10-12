@@ -274,10 +274,12 @@ export default function PartnerDashboard() {
         specialties: serviceDetails.specialties,
         serviceArea: serviceDetails.serviceArea,
         serviceHours: serviceDetails.serviceHours,
-        description: serviceDetails.description
+        description: serviceDetails.description,
+        logo: storeSettings.logo || null,
+        images: storeSettings.logo ? [storeSettings.logo] : []
       });
       toast.success("Service profile updated! ✅");
-      loadVendorData();
+      await loadVendorData();
     } catch (err: any) {
       toast.error(err.message || "Failed to update service profile");
     }
@@ -437,14 +439,14 @@ export default function PartnerDashboard() {
       const result = await apiRequest("POST", "/upload/single", formData);
       const uploadedUrl = result?.url || (result?.urls && result.urls[0]);
       if (uploadedUrl) {
-        setStoreSettings(prev => ({ ...prev, logo: uploadedUrl }));
         await apiRequest("PATCH", "/vendor/profile", {
           phone: storeSettings.phone,
           address: storeSettings.address,
           logo: uploadedUrl,
           images: [uploadedUrl]
         });
-        const label = isRetail ? "Shop" : isEducation ? "School" : "Profile";
+        setStoreSettings(prev => ({ ...prev, logo: uploadedUrl }));
+        const label = isRetail ? "Shop" : isEducation ? "School" : isService ? "Service" : "Profile";
         toast.success(`${label} profile image updated! 📸`);
         await loadVendorData();
       } else {
@@ -460,17 +462,17 @@ export default function PartnerDashboard() {
   };
 
   const handleRemoveProfileImage = async () => {
-    const label = isRetail ? "shop" : isEducation ? "school" : "profile";
+    const label = isRetail ? "shop" : isEducation ? "school" : isService ? "service" : "profile";
     if (!confirm(`Are you sure you want to remove the ${label} profile image?`)) return;
     try {
-      setStoreSettings(prev => ({ ...prev, logo: "" }));
       await apiRequest("PATCH", "/vendor/profile", {
         phone: storeSettings.phone,
         address: storeSettings.address,
         logo: null,
         images: []
       });
-      const labelCap = isRetail ? "Shop" : isEducation ? "School" : "Profile";
+      setStoreSettings(prev => ({ ...prev, logo: "" }));
+      const labelCap = isRetail ? "Shop" : isEducation ? "School" : isService ? "Service" : "Profile";
       toast.success(`${labelCap} profile image removed 🗑️`);
       await loadVendorData();
     } catch (err: any) {
@@ -494,6 +496,84 @@ export default function PartnerDashboard() {
       toast.error(err.message || "Failed to update settings");
     }
   };
+
+  const renderServiceProfileImageSection = (withTopBorder = true) => (
+    <div className={`${withTopBorder ? "pt-4 border-t border-white/10" : "pb-6 border-b border-white/10"} space-y-3`}>
+      <div>
+        <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1">
+          SERVICE PROFILE / BANNER IMAGE
+        </label>
+        <p className="text-xs text-gray-400">
+          Upload your service banner or business photo. Appears on your public service profile and discovery cards.
+        </p>
+      </div>
+
+      {storeSettings.logo ? (
+        <div className="space-y-3">
+          <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-white/5 max-w-sm aspect-[4/3] flex items-center justify-center p-2">
+            <img
+              src={storeSettings.logo}
+              alt="Service Profile Banner Preview"
+              className="w-full h-full object-contain rounded-xl"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all">
+              <Pencil className="w-3.5 h-3.5" />
+              Change Image
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                onChange={handleProfileImageUpload}
+                className="hidden"
+                disabled={uploadingProfileImage}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handleRemoveProfileImage}
+              disabled={uploadingProfileImage}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold transition-all"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Remove Image
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <label className="cursor-pointer border-2 border-dashed border-white/20 hover:border-emerald-500/50 bg-white/5 hover:bg-white/10 rounded-2xl p-6 flex flex-col items-center justify-center transition-all group max-w-sm block">
+            {uploadingProfileImage ? (
+              <div className="flex flex-col items-center gap-2 py-4">
+                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-emerald-400 font-bold">Uploading to Cloudinary...</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center text-center gap-2">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+                  <Briefcase className="w-6 h-6" />
+                </div>
+                <span className="text-sm font-bold text-white">Upload Banner / Image</span>
+                <span className="text-[10px] text-gray-500">JPG, PNG, WebP up to 5MB</span>
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              onChange={handleProfileImageUpload}
+              className="hidden"
+              disabled={uploadingProfileImage}
+            />
+          </label>
+        </div>
+      )}
+      {uploadingProfileImage && (
+        <p className="text-xs text-emerald-400 animate-pulse">
+          Uploading image, please wait...
+        </p>
+      )}
+    </div>
+  );
 
   const tabButton = (key: typeof activeTab, label: string, Icon: any) => (
     <button
@@ -844,6 +924,7 @@ export default function PartnerDashboard() {
             </header>
 
             <form onSubmit={handleSaveServices} className="glass-card-sovereign border border-white/10 p-6 md:p-8 rounded-2xl space-y-6">
+              {isService && renderServiceProfileImageSection(false)}
               <div>
                 <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Service Specialties / Skills</label>
                 <div className="flex gap-2 mb-3">
@@ -1243,6 +1324,10 @@ export default function PartnerDashboard() {
                       )}
                     </div>
                   )}
+
+                  {/* Service Profile / Banner Image (Service providers only) */}
+                  {isService && renderServiceProfileImageSection(true)}
+
                   <button type="submit" className="w-full bg-emerald-600 text-black py-3 rounded-xl font-black text-sm uppercase hover:bg-emerald-500 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] mt-4">
                     Save Changes
                   </button>
