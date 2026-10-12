@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { ShieldCheck, Phone, MapPin, Clock, Star, ArrowLeft, ArrowRight, MessageCircle, Package, MapPinned, Tag } from "lucide-react";
+import { optimizeCloudinaryUrl } from "@/design/media-governance";
 
 export type PageType = "school" | "hospital" | "product";
 
@@ -8,6 +9,7 @@ interface SovereignHeaderProps {
   category: string;
   type: PageType;
   subtitle?: string;
+  imageUrl?: string | null;
 }
 
 const themeConfigs = {
@@ -28,8 +30,61 @@ const themeConfigs = {
   },
 };
 
-export function SovereignPageHeader({ title, category, type, subtitle }: SovereignHeaderProps) {
+export function SovereignPageHeader({ title, category, type, subtitle, imageUrl }: SovereignHeaderProps) {
   const config = themeConfigs[type];
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [imageUrl]);
+
+  const optimizedImageUrl = imageUrl
+    ? optimizeCloudinaryUrl(imageUrl, { width: 1200 }) || imageUrl
+    : null;
+  const hasBannerImage = Boolean(optimizedImageUrl) && !imageError;
+
+  if (hasBannerImage) {
+    return (
+      <div className="relative rounded-b-[3.5rem] bg-zinc-950 overflow-hidden shadow-2xl border-b border-white/10">
+        {/* Prominent Vendor Banner Image */}
+        <div className="relative w-full aspect-[16/9] sm:aspect-[2/1] md:aspect-[21/9] max-h-[38vh] min-h-[200px] bg-zinc-950 flex items-center justify-center overflow-hidden">
+          {/* Layer 1: Ambient blurred cover background so square/portrait posters have no harsh letterbox bars */}
+          <img
+            src={optimizedImageUrl!}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110 pointer-events-none"
+          />
+
+          {/* Layer 2: Crisp uncropped promotional banner */}
+          <img
+            src={optimizedImageUrl!}
+            alt={title}
+            className="relative z-10 w-full h-full object-contain p-2"
+            loading="eager"
+            onError={() => setImageError(true)}
+          />
+
+          {/* Bottom gradient blend into title band */}
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-transparent pointer-events-none z-10" />
+        </div>
+
+        {/* Title & Verification Band */}
+        <div className="relative z-10 pt-2 pb-16 px-6 bg-gradient-to-b from-zinc-950 to-zinc-900/90">
+          <div className="flex items-center gap-3 mb-2">
+            <ShieldCheck className="w-5 h-5 text-orange-500" />
+            <span className="text-[10px] font-black uppercase text-orange-400 tracking-widest">
+              {category} • {config.badge}
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black uppercase italic text-white tracking-tighter leading-tight text-sovereign-title">
+            {title}
+          </h1>
+          {subtitle && <p className="text-slate-400 text-sm font-medium mt-1">{subtitle}</p>}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`relative pt-20 pb-16 px-6 rounded-b-[3.5rem] bg-gradient-to-br ${config.gradient} overflow-hidden shadow-2xl`}>
@@ -332,7 +387,6 @@ export const defaultThemeConfig: ThemeConfig = {
 // ============================================
 // SOVEREIGN THEME HOOK
 // ============================================
-import { useEffect } from 'react';
 
 export function useSovereignTheme(theme: ThemeConfig | null | undefined) {
   useEffect(() => {

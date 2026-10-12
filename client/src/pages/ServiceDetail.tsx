@@ -27,6 +27,10 @@ interface VendorData {
   dsslScore?: number;
   safetyBadges?: string[];
   serviceHours?: string;
+  logo?: string | null;
+  image?: string | null;
+  imageUrl?: string | null;
+  images?: string[];
 }
 
 const fetchServiceBySlug = async (slug: string): Promise<VendorData> => {
@@ -80,6 +84,13 @@ export default function ServiceDetail() {
         ? rawType
         : "service";
 
+  const bannerImage =
+    (Array.isArray(vendor.images) && vendor.images.length > 0 ? vendor.images[0] : null) ||
+    vendor.logo ||
+    vendor.image ||
+    vendor.imageUrl ||
+    null;
+
   // Map vendor data to service display format
   const serviceData = {
     name: vendor.businessName || vendor.name,
@@ -111,6 +122,7 @@ export default function ServiceDetail() {
         category={category}
         type={pageType}
         subtitle="Shahdol, Madhya Pradesh"
+        imageUrl={bannerImage}
       />
 
       <div className="px-6 -mt-12 pb-20">
