@@ -203,7 +203,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </div>
 
                   {/* 🗺️ NAVIGATION */}
-                  <nav className="flex-1 flex flex-col p-4 gap-2 overflow-y-auto">
+                  <nav className="flex-1 min-h-0 flex flex-col p-4 gap-2 overflow-y-auto">
                   {/* Always-visible nav links */}
                     {[
                       { href: "/", label: "🏠 Home" },
@@ -267,7 +267,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </nav>
 
                   {/* 🏪 FOOTER ACTION */}
-                  <div className="p-6 border-t border-white/5 mb-6">
+                  <div className="p-4 border-t border-white/5 mb-16 shrink-0">
                     <Link href="/vendor/register" className="flex items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-orange-600 to-red-600 hover:scale-[1.02] active:scale-95 text-white transition-all font-black shadow-lg shadow-orange-900/40">
                       🏪 Start Selling
                     </Link>
