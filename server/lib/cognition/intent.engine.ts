@@ -101,27 +101,38 @@ export function classifyQueryIntent(query: string, cognition: any): IntentClassi
     IntentAction.FIND;
 
   const entityHint = typeof cognition?.entity === 'string' ? cognition.entity.toLowerCase() : '';
-  const target: IntentTarget =
-    entityHint.includes('doctor') || queryLower.includes('doctor') || queryLower.includes('cardio') || queryLower.includes('heart') ? IntentTarget.DOCTOR :
-    entityHint.includes('hospital') || entityHint.includes('clinic') || queryLower.includes('hospital') ? IntentTarget.HOSPITAL :
-    entityHint.includes('pharmacy') || entityHint.includes('chemist') || queryLower.includes('pharmacy') ? IntentTarget.PHARMACY :
-    entityHint.includes('bus') || queryLower.includes('bus') ? IntentTarget.BUS :
-    queryLower.includes('police') ? IntentTarget.POLICE :
-    // Default target stays discoverable; keep it conservative
-    IntentTarget.HOSPITAL;
+  const isDoctor = entityHint.includes('doctor') || queryLower.includes('doctor') || queryLower.includes('cardio') || queryLower.includes('heart');
+  const isHospital = entityHint.includes('hospital') || entityHint.includes('clinic') || queryLower.includes('hospital');
+  const isPharmacy = entityHint.includes('pharmacy') || entityHint.includes('chemist') || queryLower.includes('pharmacy');
+  const isBus = entityHint.includes('bus') || queryLower.includes('bus');
+  const isPolice = queryLower.includes('police');
 
-  const isHealthcareEmergency = emergencyWords.some(word => queryLower.includes(word)) &&
-    (queryLower.includes('blood') || queryLower.includes('doctor') || queryLower.includes('hospital') || queryLower.includes('medical') || queryLower.includes('ambulance') || queryLower.includes('clinic'));
+  const isAstrology = /jyotish|astrolog|kundli|kundali|horoscope|pandit|shastri|muhurat|vastu|jyotishi|ज्योतिष|कुंडली|पंडित|शास्त्री|हस्तरेखा|वास्तु/i.test(queryLower);
 
-  const isServiceTrade = cognition?.domain === 'SERVICES' ||
+  const isServiceTrade = cognition?.domain === 'SERVICES' || isAstrology ||
     /plumber|plumbing|pipe\s*leak|electrician|bijli\s*mistri|mechanic|auto\s*garage|carpenter|badhai|painter|putai\s*mistri|putai|mistri|(?:ac|ro|fridge|refrigerator|washing\s*machine|tv|television|led\s*tv|lcd\s*tv|crt\s*tv)\s*(?:repair|service|servicing)/.test(queryLower);
+
+  const target: IntentTarget =
+    isDoctor ? IntentTarget.DOCTOR :
+    isHospital ? IntentTarget.HOSPITAL :
+    isPharmacy ? IntentTarget.PHARMACY :
+    isBus ? IntentTarget.BUS :
+    isPolice ? IntentTarget.POLICE :
+    isServiceTrade ? IntentTarget.SERVICE :
+    IntentTarget.GENERAL;
+
+  const isHealthcareExplicit = isDoctor || isHospital || isPharmacy ||
+    queryLower.includes('medical') || queryLower.includes('ambulance') || queryLower.includes('blood') ||
+    cognition?.domain === 'HEALTHCARE';
+
+  const isHealthcareEmergency = emergencyWords.some(word => queryLower.includes(word)) && isHealthcareExplicit;
 
   const domain: CanonicalDomain =
     isHealthcareEmergency ? CanonicalDomain.HEALTHCARE :
     isServiceTrade ? CanonicalDomain.SERVICES :
     cognition?.domain === 'EDUCATION' || ['school', 'admission', 'college', 'coaching', 'vidyalaya', 'education'].some(word => queryLower.includes(word)) ? CanonicalDomain.EDUCATION :
     target === IntentTarget.BUS ? CanonicalDomain.TRANSPORT :
-    [IntentTarget.DOCTOR, IntentTarget.HOSPITAL, IntentTarget.PHARMACY].includes(target) ? CanonicalDomain.HEALTHCARE :
+    isHealthcareExplicit ? CanonicalDomain.HEALTHCARE :
     queryLower.includes('police') || queryLower.includes('government') ? CanonicalDomain.GOVERNANCE :
     CanonicalDomain.COMMERCE;
 
@@ -140,7 +151,7 @@ export function classifyQueryIntent(query: string, cognition: any): IntentClassi
     urgencyLevel,
     temporalContext,
     geographicScope,
-    domain: cognition?.domain || (domain as string),
+    domain: cognition?.domain && cognition.domain !== 'GENERAL' ? cognition.domain : (domain === CanonicalDomain.SERVICES ? 'SERVICES' : (domain as string)),
     structuredIntent,
   };
 }

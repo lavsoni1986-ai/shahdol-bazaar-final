@@ -20,6 +20,8 @@ export enum IntentTarget {
   PHARMACY = "PHARMACY",
   BUS = "BUS",
   POLICE = "POLICE",
+  SERVICE = "SERVICE",
+  GENERAL = "GENERAL",
 }
 
 import { CanonicalDomain } from './contracts/ontology/index';

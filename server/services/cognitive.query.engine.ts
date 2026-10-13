@@ -66,6 +66,16 @@ export function cognitiveParseQuery(message: string): CognitiveParse {
     if (tradeMatch) {
       searchTerms.add(tradeMatch[0]);
     }
+  } else if (/jyotish|astrolog|kundli|kundali|horoscope|pandit|shastri|muhurat|vastu|jyotishi|ज्योतिष|कुंडली|पंडित|शास्त्री|हस्तरेखा|वास्तु/i.test(raw)) {
+    domain = "SERVICES";
+    entity = "ASTROLOGY_SERVICE";
+    searchTerms.add("service");
+    searchTerms.add("astrology");
+    searchTerms.add("astrologer");
+    searchTerms.add("jyotish");
+    searchTerms.add("ज्योतिष");
+    searchTerms.add("kundli");
+    searchTerms.add("कुंडली");
   } else if (/mobile|repair|electronics|phone/.test(raw)) {
     domain = "ELECTRONICS";
     entity = "REPAIR_OR_DEVICE";
@@ -118,6 +128,7 @@ export function cognitiveParseQuery(message: string): CognitiveParse {
   else if (domain === "TRANSPORT") fulfillment = "SHOW_TRAVEL_OPTIONS";
   else if (domain === "ELECTRONICS") fulfillment = "SHOW_REPAIR_SHOPS";
   else if (domain === "EDUCATION") fulfillment = "SHOW_EDUCATION_OPTIONS";
+  else if (domain === "SERVICES") fulfillment = "SHOW_LOCAL_SERVICES";
   else fulfillment = "SHOW_DISCOVERY_RESULTS";
 
   let responseMode: CognitiveParse['responseMode'] = "DIRECT_MATCH";

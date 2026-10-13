@@ -175,5 +175,10 @@ const SEMANTIC_EXPANSIONS: Record<string, string[]> = {
   "electrician": ["wiring", "electrical", "switch", "light", "fan", "current", "fuse", "bijli"],
   "mechanic": ["repair", "garage", "vehicle", "bike", "motorcycle", "car", "service"],
   "carpenter": ["wood", "furniture", "door", "window", "cabinet", "badhai"],
-  "painter": ["painting", "color", "whitewash", "distemper", "wall", "putai"]
+  "painter": ["painting", "color", "whitewash", "distemper", "wall", "putai"],
+  "astrology_service": ["astrology", "astrologer", "jyotish", "jyotishi", "kundli", "kundali", "horoscope", "pandit", "shastri", "ज्योतिष", "कुंडली", "पंडित", "शास्त्री"],
+  "astrology": ["astrology", "astrologer", "jyotish", "jyotishi", "kundli", "kundali", "horoscope", "pandit", "shastri", "ज्योतिष", "कुंडली", "पंडित", "शास्त्री"],
+  "astrologer": ["astrology", "astrologer", "jyotish", "jyotishi", "kundli", "kundali", "horoscope", "pandit", "shastri", "ज्योतिष", "कुंडली", "पंडित", "शास्त्री"],
+  "jyotish": ["astrology", "astrologer", "jyotish", "jyotishi", "kundli", "kundali", "horoscope", "pandit", "shastri", "ज्योतिष", "कुंडली", "पंडित", "शास्त्री"],
+  "kundli": ["astrology", "astrologer", "jyotish", "jyotishi", "kundli", "kundali", "horoscope", "pandit", "shastri", "ज्योतिष", "कुंडली", "पंडित", "शास्त्री"]
 };

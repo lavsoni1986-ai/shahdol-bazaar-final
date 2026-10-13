@@ -129,6 +129,11 @@ export function getUnifiedGroundingIndex(entity: any): string[] {
   if (entity.title) searchableTerms.push(entity.title.toLowerCase());
   if (entity.subtitle) searchableTerms.push(entity.subtitle.toLowerCase());
   if (entity.name) searchableTerms.push(entity.name.toLowerCase());
+  if (entity.slug) {
+    searchableTerms.push(entity.slug.toLowerCase());
+    const slugTokens = entity.slug.toLowerCase().split(/[-_]+/).filter(Boolean);
+    searchableTerms.push(...slugTokens);
+  }
 
   // Category and type terms
   if (entity.category) searchableTerms.push(entity.category.toLowerCase());
@@ -140,6 +145,23 @@ export function getUnifiedGroundingIndex(entity: any): string[] {
   if (entity.address) searchableTerms.push(entity.address.toLowerCase());
   if (entity.city) searchableTerms.push(entity.city.toLowerCase());
   if (entity.locality) searchableTerms.push(entity.locality.toLowerCase());
+
+  // Direct entity description indexing (supports both DTO and meta description)
+  const rawDescription = (typeof entity.description === 'string' && entity.description.trim())
+    ? entity.description
+    : (typeof entity.meta?.description === 'string' && entity.meta.description.trim())
+      ? entity.meta.description
+      : null;
+
+  if (rawDescription) {
+    const descTokens = rawDescription
+      .toLowerCase()
+      .replace(/[^\w\s\u0900-\u097F]/g, ' ')
+      .split(/\s+/)
+      .filter((t: string) => t.length > 2)
+      .slice(0, 50);
+    searchableTerms.push(...descTokens);
+  }
 
   // Controlled entity metadata indexing (Phase 3.10)
   if (entity.meta) {
@@ -159,15 +181,6 @@ export function getUnifiedGroundingIndex(entity: any): string[] {
           searchableTerms.push(spec.toLowerCase().trim());
         }
       }
-    }
-    if (typeof entity.meta.description === 'string' && entity.meta.description.trim()) {
-      const descTokens = entity.meta.description
-        .toLowerCase()
-        .replace(/[^\w\s\u0900-\u097F]/g, ' ')
-        .split(/\s+/)
-        .filter((t: string) => t.length > 2)
-        .slice(0, 25);
-      searchableTerms.push(...descTokens);
     }
   }
 
@@ -191,6 +204,15 @@ function getSemanticAliases(entity: any): string[] {
   // Education aliases
   if (type.includes('school') || type.includes('education') || type.includes('college')) {
     aliases.push('school', 'college', 'education', 'स्कूल', 'कॉलेज', 'शिक्षा');
+  }
+
+  // Astrology & Vedic services aliases
+  if (type.includes('astrology') || type.includes('jyotish') || (entity.category && /astrology|jyotish/i.test(entity.category))) {
+    aliases.push(
+      'astrology', 'astrologer', 'jyotish', 'jyotishi', 'kundli', 'kundali',
+      'horoscope', 'pandit', 'shastri', 'vastu', 'muhurat', 'hastrekha',
+      'ज्योतिष', 'ज्योतिषी', 'कुंडली', 'पंडित', 'शास्त्री', 'वास्तु', 'मुहूर्त', 'हस्तरेखा'
+    );
   }
 
   // Service aliases (Phase 3.10)
@@ -241,6 +263,11 @@ class KnowledgeGraph {
       intents: ['travel', 'commute', 'delivery', 'taxi', 'bus_timing'],
       services: ['bus', 'taxi', 'auto', 'bike', 'delivery', 'logistics'],
       related: ['route', 'timing', 'fare', 'station', 'terminal', 'parking']
+    },
+    'SERVICES': {
+      intents: ['local_service', 'service_booking', 'repair_request', 'astrology_consultation'],
+      services: ['plumbing', 'electrical', 'carpentry', 'painting', 'repair', 'astrology', 'jyotish', 'kundli', 'pandit'],
+      related: ['plumber', 'electrician', 'mechanic', 'carpenter', 'painter', 'astrology', 'astrologer', 'jyotish', 'jyotishi', 'kundli', 'pandit', 'shastri', 'ज्योतिष', 'कुंडली', 'पंडित', 'शास्त्री']
     }
   };
 
@@ -386,6 +413,80 @@ knowledgeGraph.initializeCoreKnowledge(1); // Shahdol district
 // FUZZY MATCHING & TYPO TOLERANCE
 // ============================================
 
+// Bidirectional Romanized Hindi / Devanagari transliteration dictionary
+export const TRANSLITERATION_MAP: Record<string, string[]> = {
+  // Astrology & Vedic terms
+  'jyotish': ['ज्योतिष', 'ज्योतिषी', 'astrology'],
+  'jyotishi': ['ज्योतिषी', 'ज्योतिष', 'astrology'],
+  'ज्योतिष': ['jyotish', 'jyotishi', 'astrology'],
+  'ज्योतिषी': ['jyotishi', 'jyotish', 'astrology'],
+  'astrology': ['ज्योतिष', 'jyotish', 'kundli'],
+  'astrologer': ['ज्योतिष', 'jyotish', 'jyotishi', 'pandit'],
+  'kundli': ['कुंडली', 'kundali', 'horoscope'],
+  'kundali': ['कुंडली', 'kundli', 'horoscope'],
+  'कुंडली': ['kundli', 'kundali', 'horoscope'],
+  'horoscope': ['kundli', 'kundali', 'कुंडली'],
+  'pandit': ['पंडित', 'पं', 'shastri'],
+  'पंडित': ['pandit', 'पं'],
+  'पं': ['pandit', 'पंडित'],
+  'shastri': ['शास्त्री'],
+  'शास्त्री': ['shastri'],
+  'sushil': ['सुशील'],
+  'सुशील': ['sushil'],
+  'varanasi': ['वाराणसी', 'banaras', 'बनारस'],
+  'वाराणसी': ['varanasi', 'banaras', 'बनारस'],
+  'banaras': ['बनारस', 'वाराणसी', 'varanasi'],
+  'बनारस': ['banaras', 'वाराणसी', 'varanasi'],
+  'muhurat': ['मुहूर्त'],
+  'मुहूर्त': ['muhurat'],
+  'vastu': ['वास्तु'],
+  'वास्तु': ['vastu'],
+  'hastrekha': ['हस्तरेखा', 'hastrekh'],
+  'hastrekh': ['हस्तरेखा'],
+  'हस्तरेखा': ['hastrekha', 'hastrekh'],
+
+  // Local Trade Services
+  'plumber': ['नलसाज', 'प्लंबर', 'pipe'],
+  'प्लंबर': ['plumber'],
+  'electrician': ['इलेक्ट्रीशियन', 'बिजली मिस्त्री', 'bijli'],
+  'इलेक्ट्रीशियन': ['electrician'],
+  'bijli': ['बिजली', 'electrician'],
+  'बिजली': ['bijli', 'electrician'],
+  'mistri': ['मिस्त्री'],
+  'मिस्त्री': ['mistri'],
+  'carpenter': ['बढ़ई', 'badhai'],
+  'बढ़ई': ['carpenter', 'badhai'],
+  'badhai': ['बढ़ई', 'carpenter'],
+  'painter': ['पुताई मिस्त्री', 'पेंटर', 'putai'],
+  'पेंटर': ['painter'],
+  'putai': ['पुताई', 'painter'],
+  'पुताई': ['putai', 'painter'],
+  'mechanic': ['मैकेनिक', 'garage'],
+  'मैकेनिक': ['mechanic'],
+
+  // Healthcare
+  'doctor': ['डॉक्टर', 'daktar', 'चिकित्सक'],
+  'डॉक्टर': ['doctor', 'daktar'],
+  'hospital': ['अस्पताल', 'aspatal'],
+  'अस्पताल': ['hospital', 'aspatal'],
+  'dawa': ['दवा', 'medicine', 'pharmacy'],
+  'दवा': ['dawa', 'medicine'],
+
+  // Transport
+  'bus': ['बस'],
+  'बस': ['bus'],
+  'gaadi': ['गाड़ी'],
+  'गाड़ी': ['gaadi']
+};
+
+export function getTransliterations(token: string): string[] {
+  const lower = token.toLowerCase().trim();
+  const direct = TRANSLITERATION_MAP[lower] || [];
+  const stripped = lower.replace(/[.\-_,]/g, '');
+  const strippedMatches = stripped !== lower ? (TRANSLITERATION_MAP[stripped] || []) : [];
+  return [...new Set([...direct, ...strippedMatches])];
+}
+
 interface FuzzyMatch {
   term: string;
   score: number; // 0-1 similarity score
@@ -410,6 +511,19 @@ export function findFuzzyMatches(query: string, searchableTerms: string[]): Fuzz
       results.push({ term: query, score: 0.8, matchedTerm: term });
       continue;
     }
+
+    // Transliteration matching (Devanagari <-> Latin)
+    const transliterations = getTransliterations(queryLower);
+    let translitMatched = false;
+    for (const t of transliterations) {
+      const tLower = t.toLowerCase();
+      if (termLower.includes(tLower) || tLower.includes(termLower)) {
+        results.push({ term: query, score: 0.95, matchedTerm: term });
+        translitMatched = true;
+        break;
+      }
+    }
+    if (translitMatched) continue;
 
     // Levenshtein distance for typos
     const distance = levenshteinDistance(queryLower, termLower);

@@ -7,7 +7,7 @@ export const ENGINE_VERSION = "1.0.0";
 import type { CognitionResult } from './types';
 export type { CognitionResult };
 
-import { findFuzzyMatches, getUnifiedGroundingIndex } from '../../services/district-memory.service';
+import { findFuzzyMatches, getUnifiedGroundingIndex, getTransliterations } from '../../services/district-memory.service';
 
 // Ranking interfaces
 export interface DiscoveryEntity {
@@ -53,6 +53,15 @@ export enum QueryIntent {
   COMPARATIVE = 'COMPARATIVE'
 }
 
+// Query stop words (geographic and prepositional filler that should not match business titles)
+const QUERY_STOP_WORDS = new Set([
+  'in', 'at', 'near', 'me', 'mein', 'ko', 'ke', 'ki', 'ka', 'se', 'par',
+  'shahdol', 'शाहडोल', 'bazaar', 'market'
+]);
+
+// Generic taxonomy terms that should not score points unless explicitly requested by the user
+const GENERIC_CATEGORY_TERMS = new Set(['service', 'services', 'सेवा', 'shop', 'store', 'दुकान']);
+
 export function calculateRelevanceScore(
   entity: DiscoveryEntity,
   searchTerms: string[],
@@ -61,6 +70,7 @@ export function calculateRelevanceScore(
 ): RankedEntity {
   const searchableTerms = getUnifiedGroundingIndex(entity);
   const matchReasons: string[] = [];
+  const rawQuery = (cognition?.normalized || '').toLowerCase();
 
   // 1. Text Relevance (0-40 points)
   let textRelevance = 0;
@@ -69,28 +79,53 @@ export function calculateRelevanceScore(
   const categoryLower = entity.category?.toLowerCase() || '';
 
   for (const term of searchTerms) {
-    const termLower = term.toLowerCase();
+    const termLower = term.toLowerCase().trim();
+    if (!termLower) continue;
+
+    // Skip location stop words (e.g. "in shahdol" should not match every entity with "Shahdol" in title)
+    if (QUERY_STOP_WORDS.has(termLower)) continue;
+
+    // For generic terms like "service", only match if the user's actual query included that term
+    const isGeneric = GENERIC_CATEGORY_TERMS.has(termLower);
+    if (isGeneric && !rawQuery.includes(termLower)) continue;
+
     let termMatched = false;
 
-    // Exact title match = highest
-    if (titleLower.includes(termLower)) {
-      textRelevance += 15;
-      matchReasons.push(`title:${term}`);
-      termMatched = true;
+    // Transliteration expansion (Devanagari <-> Latin)
+    const variants = [termLower, ...getTransliterations(termLower).map(t => t.toLowerCase())];
+
+    // Exact or transliterated title match = highest
+    for (const v of variants) {
+      if (titleLower.includes(v)) {
+        textRelevance += 15;
+        matchReasons.push(v === termLower ? `title:${term}` : `title:${term}->${v}`);
+        termMatched = true;
+        break;
+      }
     }
 
     // Category/subtitle match = medium
-    if (subtitleLower.includes(termLower) || categoryLower.includes(termLower)) {
-      textRelevance += 10;
-      matchReasons.push(`category:${term}`);
-      termMatched = true;
+    if (!termMatched) {
+      for (const v of variants) {
+        if (subtitleLower.includes(v) || categoryLower.includes(v)) {
+          textRelevance += 10;
+          matchReasons.push(v === termLower ? `category:${term}` : `category:${term}->${v}`);
+          termMatched = true;
+          break;
+        }
+      }
     }
 
     // Unified index match = low but broad
-    if (searchableTerms.some(st => st.includes(termLower))) {
-      textRelevance += 5;
-      matchReasons.push(`semantic:${term}`);
-      termMatched = true;
+    if (!termMatched) {
+      for (const v of variants) {
+        if (searchableTerms.some(st => st.includes(v))) {
+          textRelevance += 5;
+          matchReasons.push(v === termLower ? `semantic:${term}` : `semantic:${term}->${v}`);
+          termMatched = true;
+          break;
+        }
+      }
     }
 
     // Fuzzy matching for typos and phonetic similarity
@@ -98,7 +133,6 @@ export function calculateRelevanceScore(
       const fuzzyMatches = findFuzzyMatches(termLower, searchableTerms);
       if (fuzzyMatches.length > 0) {
         const bestMatch = fuzzyMatches[0];
-        // Add score based on fuzzy similarity (max 8 points for 0.8 score)
         const fuzzyScore = Math.floor(bestMatch.score * 10);
         textRelevance += fuzzyScore;
         matchReasons.push(`fuzzy:${term}~${bestMatch.matchedTerm}(${Math.round(bestMatch.score * 100)}%)`);
@@ -106,9 +140,29 @@ export function calculateRelevanceScore(
     }
   }
 
+  // Multi-token title coverage bonus (boost exact person/business name matches)
+  const queryTokens = rawQuery.split(/\s+/).filter((t: string) => t.length > 2 && !QUERY_STOP_WORDS.has(t));
+  if (queryTokens.length > 1) {
+    let matchedTokenCount = 0;
+    for (const qTok of queryTokens) {
+      const tokVariants = [qTok, ...getTransliterations(qTok).map(t => t.toLowerCase())];
+      if (tokVariants.some(v => titleLower.includes(v))) {
+        matchedTokenCount++;
+      }
+    }
+    if (matchedTokenCount >= 2) {
+      const coverageRatio = matchedTokenCount / queryTokens.length;
+      const coverageBonus = Math.round(coverageRatio * 20); // up to 20 bonus points
+      textRelevance += coverageBonus;
+      matchReasons.push(`multi_token_title_match:${matchedTokenCount}/${queryTokens.length}(+${coverageBonus})`);
+    }
+  }
+
   // 2. Domain Match (0-25 points)
   let domainMatch = 0;
   if (cognition.domain === entity.entityType ||
+    (cognition.domain === 'SERVICES' && entity.entityType === 'SERVICE') ||
+    (cognition.domain === 'SERVICE' && entity.entityType === 'SERVICE') ||
     (cognition.domain === 'HEALTHCARE' && ['HOSPITAL', 'DOCTOR'].includes(entity.entityType)) ||
     (cognition.domain === 'TRANSPORT' && entity.entityType === 'BUS') ||
     (cognition.domain === 'EDUCATION' && entity.entityType === 'SCHOOL')) {
@@ -127,7 +181,10 @@ export function calculateRelevanceScore(
   let semanticMatch = 0;
   const semanticTerms = cognition.searchTerms || [];
   for (const term of semanticTerms) {
-    if (searchableTerms.some(st => st.includes(term.toLowerCase()))) {
+    const sLower = term.toLowerCase().trim();
+    if (QUERY_STOP_WORDS.has(sLower)) continue;
+    if (GENERIC_CATEGORY_TERMS.has(sLower) && !rawQuery.includes(sLower)) continue;
+    if (searchableTerms.some(st => st.includes(sLower))) {
       semanticMatch += 5;
       matchReasons.push(`semantic_term:${term}`);
     }
@@ -158,9 +215,10 @@ export function calculateRelevanceScore(
   }
 
   // Critical Relevance Gate:
-  // If an entity has NO text relevance and NO domain match, trust/popularity/freshness
-  // must NEVER substitute for relevance. The candidate is rejected (relevanceScore = 0).
-  const isRelevant = textRelevance >= 10 || domainMatch > 0;
+  // Text relevance must be >= 10. Domain match, trust, and popularity
+  // can augment a relevant candidate, but can NEVER fabricate relevance
+  // for an entity that has no textual or semantic match to the user query.
+  const isRelevant = textRelevance >= 10;
   const relevanceScore = isRelevant
     ? textRelevance + domainMatch + trustScore + semanticMatch + popularity + intentBonus
     : 0;
