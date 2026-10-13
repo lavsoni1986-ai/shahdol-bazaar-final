@@ -705,7 +705,9 @@ router.patch("/vendors/:id", requireAuth, requireCityAdmin, adminActionLimiter, 
         serviceArea: true,
         serviceHours: true,
         specialties: true,
-        dsslScore: true
+        dsslScore: true,
+        logo: true,
+        images: true
       }
     });
 
@@ -746,7 +748,8 @@ router.patch("/vendors/:id", requireAuth, requireCityAdmin, adminActionLimiter, 
       serviceArea,
       serviceHours,
       specialties,
-      dsslScore
+      dsslScore,
+      logo
     } = req.body;
 
     const updateData: any = {};
@@ -911,6 +914,67 @@ router.patch("/vendors/:id", requireAuth, requireCityAdmin, adminActionLimiter, 
         updateData.dsslScore = finalScore;
         previousValues.dsslScore = existingVendor.dsslScore;
         newValues.dsslScore = finalScore;
+      }
+    }
+
+    // logo: string (valid Cloudinary HTTPS URL) or null (to remove)
+    if (logo !== undefined) {
+      if (logo === null || (typeof logo === "string" && logo.trim() === "")) {
+        // Explicit removal path
+        if (existingVendor.logo !== null) {
+          updateData.logo = null;
+          previousValues.logo = existingVendor.logo;
+          newValues.logo = null;
+
+          // Synchronize images array: remove stale primary image while preserving any existing gallery entries
+          const existingImages = Array.isArray(existingVendor.images) ? existingVendor.images : [];
+          const updatedImages = existingImages.filter(img => img !== existingVendor.logo);
+          updateData.images = updatedImages;
+        }
+      } else if (typeof logo === "string") {
+        const trimmedLogo = logo.trim();
+        // Allow unchanged legacy value if it already matched existingVendor.logo
+        if (trimmedLogo === existingVendor.logo) {
+          // No-op: unchanged primary image
+        } else {
+          // Strictly validate new incoming URL
+          try {
+            const parsedUrl = new URL(trimmedLogo);
+            const isValidProtocol = parsedUrl.protocol === "https:";
+            const isValidHost = parsedUrl.hostname.toLowerCase() === "res.cloudinary.com";
+            const hasValidPath = parsedUrl.pathname.length > 1 && !/\s/.test(parsedUrl.pathname);
+
+            if (!isValidProtocol || !isValidHost || !hasValidPath) {
+              return res.status(400).json(validationError([{
+                field: "logo",
+                message: "Invalid image URL. Must be an HTTPS Cloudinary URL (res.cloudinary.com).",
+                code: "INVALID_LOGO_URL"
+              }]));
+            }
+          } catch {
+            return res.status(400).json(validationError([{
+              field: "logo",
+              message: "Malformed image URL.",
+              code: "MALFORMED_LOGO_URL"
+            }]));
+          }
+
+          updateData.logo = trimmedLogo;
+          previousValues.logo = existingVendor.logo;
+          newValues.logo = trimmedLogo;
+
+          // Synchronize images array safely:
+          // Put new primary URL first, remove duplicates and old primary, preserve existing extra items
+          const existingImages = Array.isArray(existingVendor.images) ? existingVendor.images : [];
+          const remainingImages = existingImages.filter(img => img !== existingVendor.logo && img !== trimmedLogo);
+          updateData.images = [trimmedLogo, ...remainingImages].slice(0, 5);
+        }
+      } else {
+        return res.status(400).json(validationError([{
+          field: "logo",
+          message: "Logo must be a valid URL string or null",
+          code: "INVALID_LOGO_TYPE"
+        }]));
       }
     }
 

@@ -1,5 +1,5 @@
 import { apiRequest } from "@/lib/api-client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { safeText } from "@/lib/admin-response";
@@ -23,6 +23,8 @@ interface Vendor {
   aiConfidence?: number;
   isSponsored?: boolean;
   status?: string;
+  logo?: string | null;
+  images?: string[];
 }
 
 export default function VendorManagement() {
@@ -40,7 +42,23 @@ export default function VendorManagement() {
   // Edit Modal and form state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingVendorId, setEditingVendorId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({
+  const [initialLogo, setInitialLogo] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editForm, setEditForm] = useState<{
+    name: string;
+    category: string;
+    businessType: string;
+    phone: string;
+    mobile: string;
+    address: string;
+    serviceArea: string;
+    serviceHours: string;
+    description: string;
+    specialties: string;
+    dsslScore: number;
+    logo: string | null;
+  }>({
     name: "",
     category: "",
     businessType: "RETAIL",
@@ -51,7 +69,8 @@ export default function VendorManagement() {
     serviceHours: "",
     description: "",
     specialties: "",
-    dsslScore: 50
+    dsslScore: 50,
+    logo: null
   });
 
   const updateStatusMutation = useMutation({
@@ -109,7 +128,14 @@ export default function VendorManagement() {
   });
 
   const handleOpenEdit = (v: any) => {
+    const primaryLogo = (typeof v.logo === "string" && v.logo.trim().length > 0)
+      ? v.logo.trim()
+      : (Array.isArray(v.images) && typeof v.images[0] === "string" && v.images[0].trim().length > 0)
+        ? v.images[0].trim()
+        : null;
+
     setEditingVendorId(v.id);
+    setInitialLogo(primaryLogo);
     setEditForm({
       name: v.name || "",
       category: v.category || "",
@@ -121,9 +147,52 @@ export default function VendorManagement() {
       serviceHours: v.serviceHours || "",
       description: v.description || "",
       specialties: Array.isArray(v.specialties) ? v.specialties.join(", ") : "",
-      dsslScore: v.dsslScore !== undefined ? v.dsslScore : 50
+      dsslScore: v.dsslScore !== undefined ? v.dsslScore : 50,
+      logo: primaryLogo
     });
     setIsEditModalOpen(true);
+  };
+
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Only JPG, PNG, WebP, or GIF images are allowed.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image file size exceeds 5MB limit.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const result = await apiRequest("POST", "/upload/single", formData);
+      const uploadedUrl = result?.url || (result?.urls && result.urls[0]);
+      if (!uploadedUrl || typeof uploadedUrl !== "string") {
+        throw new Error("Server returned no image URL");
+      }
+      setEditForm(prev => ({ ...prev, logo: uploadedUrl }));
+      toast.success("Image uploaded successfully");
+    } catch (err: any) {
+      const msg = err?.message || "Failed to upload image";
+      toast.error(msg);
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setEditForm(prev => ({ ...prev, logo: null }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const { data: vendors, isLoading } = useQuery({
@@ -359,6 +428,11 @@ export default function VendorManagement() {
                   dsslScore: Number(editForm.dsslScore)
                 };
 
+                // Only include logo if user changed it
+                if (editForm.logo !== initialLogo) {
+                  payload.logo = editForm.logo;
+                }
+
                 updateVendorMutation.mutate({
                   id: editingVendorId,
                   data: payload
@@ -366,6 +440,64 @@ export default function VendorManagement() {
               }}
               className="space-y-4"
             >
+              {/* Primary Image Upload & Preview Control */}
+              <div className="bg-[#1a1a1a] border border-gray-800 p-4 rounded-xl space-y-3">
+                <label className="text-xs text-gray-400 font-semibold block">Primary Banner / Profile Image</label>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-black/40 border border-gray-700 flex items-center justify-center shrink-0">
+                    {editForm.logo ? (
+                      <img
+                        src={editForm.logo}
+                        alt="Vendor primary banner"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-gray-500 text-xs text-center p-2">
+                        <span>No image</span>
+                      </div>
+                    )}
+                    {isUploadingImage && (
+                      <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                        <span className="text-orange-500 text-xs font-semibold animate-pulse">Uploading...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={handleImageFileChange}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={isUploadingImage || updateVendorMutation.isPending}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                      >
+                        {isUploadingImage ? "Uploading..." : editForm.logo ? "Replace Image" : "Upload Image"}
+                      </button>
+                      {editForm.logo && (
+                        <button
+                          type="button"
+                          disabled={isUploadingImage || updateVendorMutation.isPending}
+                          onClick={handleRemoveImage}
+                          className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                        >
+                          Remove Image
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Supports JPG, PNG, WebP, GIF up to 5MB. Synchronizes primary banner and fallback references safely.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-400 font-semibold block mb-1">Business Name *</label>
