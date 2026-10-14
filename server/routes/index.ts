@@ -460,18 +460,23 @@ router.get("/marketplace/vendors/:slug", async (req, res) => {
   }
 });
 
-// 🛡️ SOVEREIGN API: Marketplace orders by vendor slug
+// 🛡️ SOVEREIGN API: Marketplace orders by vendor slug (Protected: Owner, authorized City Admin, or Super Admin)
 router.get("/marketplace/orders/:slug", requireAuth, async (req, res) => {
   try {
     const { slug } = req.params;
-    const districtId = req.ctx?.districtId || req.districtId;
+    const districtId = req.ctx?.districtId;
     if (!districtId) {
       return failure(res, "DISTRICT_REQUIRED", "District context required", 400);
     }
+    const strictDistrictId = Number(districtId);
+    if (isNaN(strictDistrictId)) {
+      return failure(res, "DISTRICT_REQUIRED", "Invalid district context", 400);
+    }
+
     const vendor = await prisma.vendor.findFirst({
       where: {
         slug,
-        districtId,
+        districtId: strictDistrictId,
         status: "APPROVED",
         isShadowBanned: false
       }
@@ -479,6 +484,20 @@ router.get("/marketplace/orders/:slug", requireAuth, async (req, res) => {
     if (!vendor) {
       return failure(res, "NOT_FOUND", "Vendor not found", 404);
     }
+
+    // 🛡️ P0 AUTHORIZATION: Verify authenticated principal has legitimate authority (req.ctx as single source of truth)
+    const { normalizeRole, UserRole } = await import("../../shared/roles");
+    const userId = req.ctx?.userId;
+    const normalizedRole = normalizeRole(req.ctx?.role);
+    const isSuperAdmin = normalizedRole === UserRole.SUPER_ADMIN;
+    const isCityAdmin = normalizedRole === UserRole.CITY_ADMIN;
+    const isDistrictAuthorized = isCityAdmin && vendor.districtId != null && vendor.districtId === strictDistrictId;
+    const isOwner = vendor.userId != null && userId != null && vendor.userId === Number(userId);
+
+    if (!isSuperAdmin && !isDistrictAuthorized && !isOwner) {
+      return failure(res, "FORBIDDEN", "Forbidden: Access denied to vendor orders", 403);
+    }
+
     const orders = await prisma.order.findMany({
       where: { vendorId: vendor.id },
       include: {
