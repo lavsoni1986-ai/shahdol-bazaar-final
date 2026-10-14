@@ -319,6 +319,15 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (paymentMethod !== "cod") {
+      toast({
+        title: "भुगतान त्रुटि",
+        description: "ऑनलाइन भुगतान अभी उपलब्ध नहीं है। कृपया कैश ऑन डिलीवरी (COD) चुनें।",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCheckoutState("submitting");
 
     // SOVEREIGN: Fresh AbortController per submission

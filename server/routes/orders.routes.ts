@@ -48,6 +48,16 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
       return sendError(res, 400, ErrorCode.DISTRICT_REQUIRED, "District required");
     }
 
+    // 🛡️ GUARD: Reject unsupported payment methods before transaction/inventory/order creation
+    if (paymentMethod === "online" || paymentMethod === "card") {
+      return sendError(
+        res,
+        400,
+        ErrorCode.BAD_REQUEST,
+        "Online payment is currently unavailable. Please select Cash on Delivery (COD)."
+      );
+    }
+
     // ============================================
     // MIGRATION CONTROL: Route to appropriate engine
     // ============================================
@@ -152,12 +162,46 @@ router.post("/", requireAuth, validate(createOrderSchema, 'body'), async (req: R
             ? { ...deliveryAddressSnapshot, clientOrderId: idempotencyKey || null }
             : (idempotencyKey ? { clientOrderId: idempotencyKey } : deliveryAddressSnapshot);
 
+          // 🛡️ 1. PRE-VALIDATE & AGGREGATE QUANTITIES PER PRODUCT ID (MAX 20 PER PRODUCT PER ORDER)
+          const aggregatedQuantities = new Map<number, number>();
           for (const item of items) {
-            // BLOCK NEGATIVE/INVALID QUANTITIES
-            if (item.quantity <= 0 || item.quantity > 20) {
+            if (!Number.isInteger(item.quantity) || item.quantity <= 0 || item.quantity > 20) {
               throw new Error("Invalid quantity");
             }
+            const currentTotal = (aggregatedQuantities.get(item.productId) || 0) + item.quantity;
+            if (currentTotal > 20) {
+              throw new Error("Maximum allowed quantity for any single product is 20 units");
+            }
+            aggregatedQuantities.set(item.productId, currentTotal);
+          }
 
+          // 🛡️ 2. ATOMIC CONDITIONAL STOCK DECREMENT (CONCURRENCY-SAFE)
+          for (const [productId, requiredQty] of aggregatedQuantities.entries()) {
+            const decrementResult = await tx.product.updateMany({
+              where: {
+                id: productId,
+                stock: { gte: requiredQty }
+              },
+              data: {
+                stock: { decrement: requiredQty }
+              }
+            });
+
+            if (decrementResult.count === 0) {
+              const productCheck = await tx.product.findUnique({
+                where: { id: productId },
+                select: { title: true, stock: true }
+              });
+
+              if (!productCheck) {
+                throw new Error("Product not found");
+              }
+
+              throw new Error(`Insufficient stock for ${productCheck.title || 'product'}`);
+            }
+          }
+
+          for (const item of items) {
             // FETCH PRODUCT (LEGACY VALIDATION) — include vendor status for server-side verification
             const product = await tx.product.findFirst({
               where: { id: item.productId },
