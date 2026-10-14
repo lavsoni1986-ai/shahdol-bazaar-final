@@ -5,6 +5,7 @@ import { mapVendorByType } from "../../dto/entity.dto";
 import { countActiveProductsByDistrict } from "../../repositories/product.repo";
 import { ErrorCode, sendError, sendSuccess } from "../../middleware/errorHandler";
 import logger from "../../middleware/logger";
+import { mutationLimiter } from "../../auth/rateLimiter";
 
 const router = express.Router();
 
@@ -44,37 +45,91 @@ router.get("/stats", async (req: Request, res: Response) => {
 
 
 // --- LEAD TRACKING ---
-router.post("/leads", async (req: Request, res: Response) => {
+router.post("/leads", mutationLimiter, async (req: Request, res: Response) => {
   try {
-    const { source, action, itemId, itemName, category, searchTerm, productId, vendorId, districtId, shopId, shopName, customerName, customerPhone, message } = req.body;
+    const { source, action, itemId, itemName, category, searchTerm, productId, vendorId, shopId, customerName, customerPhone, message } = req.body;
     const userId = req.ctx?.userId || null;
 
-    // Build message from available info (combine extra data into message field)
-    let combinedMessage = message || "";
-    if (itemName) {
-      combinedMessage += (combinedMessage ? " | " : "") + `Item: ${itemName}`;
-    }
-    if (itemId || productId) {
-      combinedMessage += (combinedMessage ? " | " : "") + `ID: ${itemId || productId}`;
-    }
-    if (category) {
-      combinedMessage += (combinedMessage ? " | " : "") + `Category: ${category}`;
-    }
-    if (searchTerm) {
-      combinedMessage += (combinedMessage ? " | " : "") + `Search: ${searchTerm}`;
+    // 1. Authoritative Server-Side District Context Resolution
+    const serverDistrictId = req.ctx?.districtId || req.districtId;
+    const strictDistrictId = serverDistrictId && !isNaN(Number(serverDistrictId)) ? Number(serverDistrictId) : null;
+
+    // 2. Validate and Verify Target Vendor / Shop if provided
+    const rawTargetId = vendorId || shopId;
+    let validatedShopId: number | null = null;
+    let validatedShopName: string | null = null;
+
+    if (rawTargetId !== undefined && rawTargetId !== null) {
+      const parsedId = Number(rawTargetId);
+      if (isNaN(parsedId) || !Number.isInteger(parsedId) || parsedId <= 0) {
+        return sendError(res, 400, ErrorCode.BAD_REQUEST, "Invalid vendor or shop ID format");
+      }
+
+      // If a district is resolved, the target vendor MUST belong to that district
+      const vendorQuery: any = { id: parsedId };
+      if (strictDistrictId !== null) {
+        vendorQuery.districtId = strictDistrictId;
+      }
+
+      const existingVendor = await prisma.vendor.findFirst({
+        where: vendorQuery,
+        select: { id: true, name: true, districtId: true }
+      });
+
+      if (!existingVendor) {
+        return sendError(res, 404, ErrorCode.NOT_FOUND, "Target vendor not found in the current district");
+      }
+
+      validatedShopId = existingVendor.id;
+      validatedShopName = existingVendor.name;
     }
 
-    // Create lead record in database (only using schema fields)
+    // 3. Bound and Sanitize String Inputs
+    const cleanSource = typeof source === "string" ? source.trim().slice(0, 50) : "WHATSAPP_INQUIRY";
+    const cleanAction = typeof action === "string" ? action.trim().slice(0, 50) : "click";
+    const cleanCustomerName = typeof customerName === "string" && customerName.trim() ? customerName.trim().slice(0, 100) : null;
+    const cleanCustomerPhone = typeof customerPhone === "string" && customerPhone.trim() ? customerPhone.trim().slice(0, 20) : null;
+
+    // Build bounded message string
+    let combinedMessage = typeof message === "string" ? message.trim() : "";
+    if (itemName && typeof itemName === "string") {
+      combinedMessage += (combinedMessage ? " | " : "") + `Item: ${itemName.trim().slice(0, 100)}`;
+    }
+    if (itemId || productId) {
+      const cleanProdId = String(itemId || productId).trim().slice(0, 50);
+      combinedMessage += (combinedMessage ? " | " : "") + `ID: ${cleanProdId}`;
+    }
+    if (category && typeof category === "string") {
+      combinedMessage += (combinedMessage ? " | " : "") + `Category: ${category.trim().slice(0, 50)}`;
+    }
+    if (searchTerm && typeof searchTerm === "string") {
+      combinedMessage += (combinedMessage ? " | " : "") + `Search: ${searchTerm.trim().slice(0, 100)}`;
+    }
+
+    const finalMessage = combinedMessage ? combinedMessage.slice(0, 1000) : null;
+
+    // 4. Construct Safe Metadata — Never trust client-supplied districtId to override authority
+    const safeMetadata: Record<string, any> = {
+      districtId: strictDistrictId,
+      userId,
+      targetVendorId: validatedShopId,
+    };
+    if (productId) {
+      safeMetadata.productId = Number(productId) || String(productId).slice(0, 50);
+    }
+
+    // 5. Create lead record
     const lead = await prisma.lead.create({
       data: {
-        source: source || "WHATSAPP_INQUIRY",
-        action: action || "click",
-        shopId: shopId ? parseInt(shopId) : null,
-        shopName: shopName || null,
-        customerName: customerName || null,
-        customerPhone: customerPhone || null,
-        message: combinedMessage || null,
-        metadata: { productId, vendorId, districtId, userId },
+        source: cleanSource,
+        action: cleanAction,
+        shopId: validatedShopId,
+        shopName: validatedShopName,
+        customerName: cleanCustomerName,
+        customerPhone: cleanCustomerPhone,
+        message: finalMessage,
+        metadata: safeMetadata,
+        status: "new",
       }
     });
 
