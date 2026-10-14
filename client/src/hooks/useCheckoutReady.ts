@@ -35,10 +35,18 @@ export interface CheckoutGateState {
     errors: string[];
 }
 
-export function useCheckoutReady(): CheckoutGateState {
+export interface UseCheckoutReadyOptions {
+    customItems?: Array<any>;
+    isBuyNow?: boolean;
+}
+
+export function useCheckoutReady(options?: UseCheckoutReadyOptions): CheckoutGateState {
     const { initialized, loading: authLoading, authState } = useAuth();
     const { currentDistrict, isReady: districtReady } = useDistrict();
-    const { items, cartHydrated } = useCart();
+    const { items: cartItems, cartHydrated } = useCart();
+
+    const effectiveItems = options?.customItems !== undefined ? options.customItems : cartItems;
+    const isBuyNow = !!options?.isBuyNow;
 
     return useMemo(() => {
         // SOVEREIGN: Use centralized validation engine
@@ -46,10 +54,10 @@ export function useCheckoutReady(): CheckoutGateState {
             authInitialized: initialized,
             authLoading,
             authState,
-            cartHydrated,
-            cartItems: items.map((item) => ({
+            cartHydrated: isBuyNow ? true : cartHydrated,
+            cartItems: effectiveItems.map((item) => ({
                 id: String(item.id || item.productId || ""),
-                productId: item.productId || Number(item.id) || null,
+                productId: item.productId || (typeof item.id === 'number' ? item.id : Number(item.id)) || null,
                 vendorId: item.vendorId || null,
                 quantity: item.quantity || 1,
                 price: Number(item.price) || 0,
@@ -68,8 +76,8 @@ export function useCheckoutReady(): CheckoutGateState {
             errors.push("auth");
         }
 
-        // SOVEREIGN: Cart must be hydrated (sanitized)
-        const cartReady = cartHydrated;
+        // SOVEREIGN: Cart must be hydrated (sanitized) — Buy Now is self-contained from product API
+        const cartReady = isBuyNow ? true : cartHydrated;
         if (!cartReady) {
             errors.push("cart");
         }
@@ -81,14 +89,14 @@ export function useCheckoutReady(): CheckoutGateState {
         }
 
         // SOVEREIGN: Must have items to check out
-        const hasItems = items.length > 0;
+        const hasItems = effectiveItems.length > 0;
         if (!hasItems) {
             errors.push("no_items");
         }
 
         // SOVEREIGN: All guards must pass — use validation report OR local checks
         const checkoutReady = report.overall && authReady && cartReady && districtValid && hasItems;
-        const loading = authLoading || !initialized || !cartHydrated;
+        const loading = authLoading || !initialized || (!isBuyNow && !cartHydrated);
 
         return {
             authReady,
@@ -105,7 +113,8 @@ export function useCheckoutReady(): CheckoutGateState {
         authState,
         currentDistrict,
         districtReady,
-        items,
+        effectiveItems,
         cartHydrated,
+        isBuyNow,
     ]);
 }

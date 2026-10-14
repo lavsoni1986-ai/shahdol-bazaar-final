@@ -160,23 +160,81 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items]);
 
-  // Refresh cart when user changes (login/logout) — with sanitization
+  // Refresh cart when user changes (login/logout) — with safe guest migration & sanitization
   useEffect(() => {
-    const saved = localStorage.getItem(getCartKey());
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const result = sanitizeCartItems(parsed);
-        if (result.removed.length > 0) {
-          console.warn(`🧹 [CART SANITIZATION] Removed ${result.removed.length} invalid items on user change:`, result.removed);
-          setSanitizedItems((prev) => [...prev, ...result.removed]);
+    if (user?.id) {
+      // Authenticated state: Check if there is a guest_cart to migrate
+      const guestRaw = localStorage.getItem('guest_cart');
+      let guestItems: CartItem[] = [];
+      if (guestRaw) {
+        try {
+          const parsedGuest = JSON.parse(guestRaw);
+          const resultGuest = sanitizeCartItems(parsedGuest);
+          guestItems = resultGuest.sanitized;
+        } catch {
+          guestItems = [];
         }
-        setItems(result.sanitized);
-      } catch {
-        setItems([]);
+      }
+
+      // Load existing user cart
+      const userRaw = localStorage.getItem(getCartKey());
+      let userItems: CartItem[] = [];
+      if (userRaw) {
+        try {
+          const parsedUser = JSON.parse(userRaw);
+          const resultUser = sanitizeCartItems(parsedUser);
+          if (resultUser.removed.length > 0) {
+            console.warn(`🧹 [CART SANITIZATION] Removed ${resultUser.removed.length} invalid items on user change:`, resultUser.removed);
+            setSanitizedItems((prev) => [...prev, ...resultUser.removed]);
+          }
+          userItems = resultUser.sanitized;
+        } catch {
+          userItems = [];
+        }
+      }
+
+      if (guestItems.length > 0) {
+        // Safe migration: Merge guest items into user cart without duplication
+        const merged: CartItem[] = [...userItems];
+        for (const gItem of guestItems) {
+          const existingIdx = merged.findIndex((i) => i.productId === gItem.productId || i.id === gItem.id);
+          if (existingIdx >= 0) {
+            // Aggregate quantity up to max 20 per store policy
+            const combinedQty = Math.min(20, Math.max(1, (merged[existingIdx].quantity || 1) + (gItem.quantity || 1)));
+            merged[existingIdx] = { ...merged[existingIdx], quantity: combinedQty };
+          } else {
+            merged.push({
+              ...gItem,
+              quantity: Math.min(20, Math.max(1, gItem.quantity || 1))
+            });
+          }
+        }
+
+        try {
+          localStorage.setItem(getCartKey(), JSON.stringify(merged));
+          // Clear guest_cart only after successful persist
+          localStorage.removeItem('guest_cart');
+        } catch (e) {
+          console.error("Failed to persist merged cart to localStorage", e);
+        }
+        setItems(merged);
+      } else {
+        setItems(userItems);
       }
     } else {
-      setItems([]);
+      // Guest state: Load guest_cart
+      const saved = localStorage.getItem('guest_cart');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const result = sanitizeCartItems(parsed);
+          setItems(result.sanitized);
+        } catch {
+          setItems([]);
+        }
+      } else {
+        setItems([]);
+      }
     }
     // SOVEREIGN: Mark cart as hydrated after initial load
     setCartHydrated(true);

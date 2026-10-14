@@ -26,6 +26,14 @@ interface CheckoutSovereignGateProps {
     children: ReactNode;
     /** Optional custom loading skeleton */
     skeleton?: ReactNode;
+    /** Optional items from Buy Now or custom source */
+    customItems?: Array<any>;
+    /** Optional flag indicating Buy Now mode */
+    isBuyNow?: boolean;
+    /** Optional flag indicating Buy Now product fetch in flight */
+    isLoadingProduct?: boolean;
+    /** Optional error message if Buy Now product fetch failed */
+    productError?: string | null;
 }
 
 /**
@@ -161,26 +169,119 @@ function CheckoutRecoveryBanner({ gate }: { gate: CheckoutGateState }) {
     );
 }
 
-export function CheckoutSovereignGate({ children, skeleton }: CheckoutSovereignGateProps) {
-    const gate = useCheckoutReady();
-    const { authState, initialized } = useAuth();
+/**
+ * EmptyCartGate — shown when an authenticated or guest user reaches checkout with an empty cart.
+ * Replaces the infinite skeleton with a clear recovery message and return to cart/shop action.
+ */
+function EmptyCartGate() {
+    const [, setLocation] = useLocation();
+    return (
+        <div className="min-h-screen bg-[#030303] flex items-center justify-center px-4">
+            <div className="text-center space-y-5 max-w-sm w-full">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/20 mb-2">
+                    <ShoppingBag className="h-8 w-8 text-[#FFB800]" />
+                </div>
+                <div>
+                    <h2 className="text-xl font-black text-white mb-2">आपकी कार्ट खाली है</h2>
+                    <p className="text-sm text-slate-400 leading-relaxed">
+                        चेकआउट करने के लिए कृपया पहले कार्ट में सामान जोड़ें।
+                    </p>
+                </div>
+                <div className="flex flex-col gap-3">
+                    <Button
+                        onClick={() => setLocation("/cart")}
+                        className="w-full bg-[#FFB800] hover:bg-[#e5a600] text-black font-bold gap-2"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        कार्ट पर जाएं / View Cart
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => setLocation("/")}
+                        className="w-full border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 gap-2"
+                    >
+                        मार्केटप्लेस देखें / Browse Shop
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
-    // SOVEREIGN: Render skeleton while loading
+export function CheckoutSovereignGate({
+    children,
+    skeleton,
+    customItems,
+    isBuyNow,
+    isLoadingProduct,
+    productError,
+}: CheckoutSovereignGateProps) {
+    const gate = useCheckoutReady({ customItems, isBuyNow });
+    const { authState, initialized } = useAuth();
+    const [, setLocation] = useLocation();
+
+    // 1. Buy Now product fetch in progress → show loading skeleton
+    if (isLoadingProduct) {
+        return skeleton || <CheckoutSkeleton />;
+    }
+
+    // 2. Buy Now product fetch failed → show clean error state with action
+    if (productError) {
+        return (
+            <div className="min-h-screen bg-[#030303] flex items-center justify-center px-4">
+                <div className="text-center space-y-5 max-w-sm w-full">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-red-500/15 border border-red-500/20 mb-2">
+                        <AlertTriangle className="h-8 w-8 text-red-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-black text-white mb-2">उत्पाद उपलब्ध नहीं है</h2>
+                        <p className="text-sm text-slate-400 leading-relaxed">
+                            {productError}
+                        </p>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                        <Button
+                            onClick={() => setLocation("/")}
+                            className="w-full bg-[#FFB800] hover:bg-[#e5a600] text-black font-bold gap-2"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            मार्केटप्लेस पर लौटें / Back to Shop
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => setLocation("/cart")}
+                            className="w-full border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 gap-2"
+                        >
+                            <ShoppingBag className="h-4 w-4" />
+                            मेरी कार्ट देखें / View Cart
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // 3. Render skeleton while gate/auth/cart are loading
     if (gate.loading) {
         return skeleton || <CheckoutSkeleton />;
     }
 
-    // SOVEREIGN: Auth initialized and user is a guest — show login prompt (not infinite skeleton)
+    // 4. Guest user reached checkout → show login prompt
     if (initialized && authState === "guest") {
         return <AuthRequiredGate />;
     }
 
-    // SOVEREIGN: Auth not ready for other reasons (e.g. initializing) — show loading state
+    // 5. Auth initializing
     if (!gate.authReady) {
         return skeleton || <CheckoutSkeleton />;
     }
 
-    // SOVEREIGN: If checkout is not ready, show skeleton with recovery banner
+    // 6. Genuinely empty cart (and not a buy-now flow) → show EmptyCartGate instead of infinite skeleton
+    if (!gate.hasItems && !isBuyNow) {
+        return <EmptyCartGate />;
+    }
+
+    // 7. If checkout is not ready due to specific recovery errors (e.g. removed vendor/product)
     if (!gate.checkoutReady) {
         return (
             <>
@@ -190,7 +291,7 @@ export function CheckoutSovereignGate({ children, skeleton }: CheckoutSovereignG
         );
     }
 
-    // SOVEREIGN: All guards passed — render children
+    // 8. All guards passed — render children
     return <>{children}</>;
 }
 

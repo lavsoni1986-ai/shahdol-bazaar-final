@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,14 +47,37 @@ export default function CheckoutPage() {
   const { currentDistrict, isReady: districtReady } = useDistrict();
   const { toast } = useToast();
 
+  // URL product for Buy Now flow
+  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const productIdFromUrl = searchParams.get('productId');
+  const [buyNowProduct, setBuyNowProduct] = useState<any>(null);
+  const [isLoadingProduct, setIsLoadingProduct] = useState(!!productIdFromUrl);
+  const [productError, setProductError] = useState<string | null>(null);
+
+  const displayItems = useMemo(() => {
+    if (buyNowProduct) {
+      return [{
+        id: buyNowProduct.id,
+        productId: buyNowProduct.id,
+        name: buyNowProduct.title || buyNowProduct.name,
+        price: parseFloat(buyNowProduct.price) || 0,
+        quantity: 1,
+        vendorId: buyNowProduct.vendorId,
+        imageUrl: buyNowProduct.imageUrl
+      }];
+    }
+    return cart;
+  }, [buyNowProduct, cart]);
+
   // SOVEREIGN: Render gating — all guards checked by CheckoutSovereignGate
-  const checkoutGate = useCheckoutReady();
+  const checkoutGate = useCheckoutReady({
+    customItems: displayItems,
+    isBuyNow: !!productIdFromUrl
+  });
 
   // SOVEREIGN: State machine — single source of truth for checkout lifecycle
   const [checkoutState, setCheckoutState] = useState<CheckoutState>("initializing");
   const [paymentMethod, setPaymentMethod] = useState<"online" | "cod">("cod");
-  const [buyNowProduct, setBuyNowProduct] = useState<any>(null);
-  const [isLoadingProduct, setIsLoadingProduct] = useState(false);
 
   // SOVEREIGN: AbortController for stale async prevention
   const mountedRef = useRef(true);
@@ -88,10 +111,6 @@ export default function CheckoutPage() {
     }
   }, [checkoutGate.checkoutReady, checkoutGate.loading, checkoutGate.authReady, checkoutGate.errors.length, checkoutState]);
 
-  // URL product for Buy Now flow
-  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  const productIdFromUrl = searchParams.get('productId');
-
   useEffect(() => {
     if (productIdFromUrl) {
       abortRef.current = new AbortController();
@@ -104,30 +123,23 @@ export default function CheckoutPage() {
 
   const fetchProductDetails = async (productId: string) => {
     setIsLoadingProduct(true);
+    setProductError(null);
     try {
       const response = await apiRequest("GET", `marketplace/products/${productId}`);
       if (!mountedRef.current) return;
       const product = (response as any)?.data ?? response;
+      if (!product || !product.id) {
+        throw new Error("उत्पाद उपलब्ध नहीं है या हटा दिया गया है।");
+      }
       setBuyNowProduct(product);
-    } catch (error) {
+    } catch (error: any) {
       if (!mountedRef.current) return;
       console.error("Failed to fetch product:", error);
+      setProductError(error?.message || "उत्पाद लोड करने में असमर्थ। कृपया पुनः प्रयास करें।");
     } finally {
       if (mountedRef.current) setIsLoadingProduct(false);
     }
   };
-
-  const displayItems = buyNowProduct
-    ? [{
-      id: buyNowProduct.id,
-      productId: buyNowProduct.id,
-      name: buyNowProduct.title || buyNowProduct.name,
-      price: parseFloat(buyNowProduct.price) || 0,
-      quantity: 1,
-      vendorId: buyNowProduct.vendorId,
-      imageUrl: buyNowProduct.imageUrl
-    }]
-    : cart;
 
   const displayTotal = buyNowProduct
     ? parseFloat(buyNowProduct.price) || 0
@@ -283,12 +295,12 @@ export default function CheckoutPage() {
     }
   };
 
-  // Empty cart guard (only redirect if no buy now product)
+  // Empty cart guard (only redirect if no buy now product) — eliminates circular checkoutGate.checkoutReady deadlock
   useEffect(() => {
-    if (!productIdFromUrl && displayItems.length === 0 && checkoutGate.checkoutReady) {
-      setLocation("/");
+    if (!productIdFromUrl && cartHydrated && !isLoadingProduct && displayItems.length === 0) {
+      setLocation("/cart");
     }
-  }, [displayItems, setLocation, productIdFromUrl, checkoutGate.checkoutReady]);
+  }, [displayItems.length, setLocation, productIdFromUrl, cartHydrated, isLoadingProduct]);
 
   const handlePlaceOrder = useCallback(async () => {
     // SOVEREIGN: Double-check guards before submission
@@ -831,7 +843,12 @@ export default function CheckoutPage() {
 
   // SOVEREIGN: Gate all rendering through CheckoutSovereignGate
   return (
-    <CheckoutSovereignGate>
+    <CheckoutSovereignGate
+      customItems={displayItems}
+      isBuyNow={!!productIdFromUrl}
+      isLoadingProduct={isLoadingProduct}
+      productError={productError}
+    >
       {renderCheckoutContent()}
     </CheckoutSovereignGate>
   );
