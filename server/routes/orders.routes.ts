@@ -9,6 +9,7 @@ import { prisma } from "../storage";
 import { MIGRATION_FLAGS, logMigrationEvent, logMigrationWarning, logMigrationError } from "../config/migration";
 import { SovereignOrderEngine } from "../services/order.engine";
 import { reliableEventPublisher } from "../services/event-delivery-verification";
+import { normalizeRole, UserRole } from "../../shared/roles";
 
 // Order validation schemas
 const orderItemSchema = z.object({
@@ -424,6 +425,96 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Orders fetch error:", err);
     return sendError(res, 500, ErrorCode.INTERNAL_ERROR, err.message);
+  }
+});
+
+// --- GET ORDER STATUS (P1-C: Payment & Order Status Polling) ---
+router.get("/:orderId/status", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const orderIdParam = req.params.orderId;
+    const orderId = parseInt(orderIdParam, 10);
+    if (isNaN(orderId) || orderId <= 0 || String(orderId) !== orderIdParam.trim()) {
+      return sendError(res, 400, ErrorCode.BAD_REQUEST, "Invalid order ID");
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        userId: true,
+        vendorId: true,
+        districtId: true,
+        quantity: true,
+        totalPrice: true,
+        status: true,
+        paymentMethod: true,
+        createdAt: true,
+      }
+    });
+
+    if (!order) {
+      return sendError(res, 404, ErrorCode.NOT_FOUND, "Order not found");
+    }
+
+    // Resolve canonical identity and authority from req.ctx
+    const userId = req.ctx?.userId;
+    const normalizedRole = normalizeRole(req.ctx?.role);
+    const userDistrictId = req.ctx?.districtId ?? req.districtId;
+
+    const isSuperAdmin = normalizedRole === UserRole.SUPER_ADMIN;
+
+    // Cross-district isolation for non-Super-Admin
+    if (!isSuperAdmin && userDistrictId != null && order.districtId != null && Number(order.districtId) !== Number(userDistrictId)) {
+      return sendError(res, 403, ErrorCode.FORBIDDEN, "Access denied to order status");
+    }
+
+    // 1. Order Owner (Customer who placed the order)
+    const isOrderOwner = order.userId != null && userId != null && Number(order.userId) === Number(userId);
+
+    // 2. City Admin (Restricted to authorized district)
+    const isCityAdmin = normalizedRole === UserRole.CITY_ADMIN &&
+      userDistrictId != null &&
+      order.districtId != null &&
+      Number(order.districtId) === Number(userDistrictId);
+
+    // 3. Vendor Owner (Merchant owning the vendor associated with this order)
+    let isVendorOwner = false;
+    if (order.vendorId != null && (normalizedRole === UserRole.MERCHANT || req.ctx?.role === "VENDOR" || req.ctx?.role === "MERCHANT")) {
+      const vendor = await prisma.vendor.findFirst({
+        where: {
+          id: order.vendorId,
+          OR: [
+            ...(userId ? [{ userId: Number(userId) }] : []),
+            ...(req.user?.username ? [{ slug: req.user.username }] : [])
+          ]
+        },
+        select: { id: true, districtId: true }
+      });
+      if (vendor) {
+        if (!isSuperAdmin && userDistrictId != null && vendor.districtId != null && Number(vendor.districtId) !== Number(userDistrictId)) {
+          isVendorOwner = false;
+        } else {
+          isVendorOwner = true;
+        }
+      }
+    }
+
+    if (!isSuperAdmin && !isOrderOwner && !isCityAdmin && !isVendorOwner) {
+      return sendError(res, 403, ErrorCode.FORBIDDEN, "Access denied to order status");
+    }
+
+    // Return minimal, non-sensitive status payload matching PaymentOrderStatus contract
+    return sendSuccess(res, {
+      id: String(order.id),
+      status: order.status,
+      total: Number(order.totalPrice),
+      items: order.quantity,
+      paymentMethod: order.paymentMethod,
+      createdAt: order.createdAt.toISOString(),
+    });
+  } catch (err: any) {
+    console.error("Order status fetch error:", err);
+    return sendError(res, 500, ErrorCode.INTERNAL_ERROR, "Failed to fetch order status");
   }
 });
 
