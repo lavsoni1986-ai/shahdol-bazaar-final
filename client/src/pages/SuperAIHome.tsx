@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { fadeUp, stagger } from "@/lib/motion.config";
 import { Wallet, ArrowRight, Bus, Newspaper } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
+import { optimizeCloudinaryUrl } from "@/design/media-governance";
 
 // Components
 import { HomeSearchHero } from "@/components/home/HomeSearchHero";
@@ -354,10 +355,15 @@ function LatestLocalNews() {
             >
               {item.imageUrl && (
                 <img
-                  src={item.imageUrl}
-                  alt=""
+                  src={optimizeCloudinaryUrl(item.imageUrl, { width: 160 }) || item.imageUrl}
+                  alt={item.content ? item.content.slice(0, 40) : "Local news thumbnail"}
                   width={80}
                   height={60}
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
                   className="w-20 h-16 rounded-xl object-cover shrink-0 border border-white/10"
                 />
               )}

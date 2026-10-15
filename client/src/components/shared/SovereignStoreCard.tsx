@@ -9,7 +9,7 @@
 //   - All text sizes use semantic Tailwind classes (NO arbitrary `text-[...]`)
 //   - All shadows use `shadow-lg`/`shadow-xl`/`shadow-2xl` (NO arbitrary `shadow-[...]`)
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { MapPin, PhoneCall, Store, Navigation } from "lucide-react";
 import { Link } from "wouter";
 import { getCurrentDistrictSlug, buildCanonicalRoute } from "@/shared/routing/sovereign-routes";
@@ -22,7 +22,7 @@ import {
 } from "./DistrictIntelligencePrimitives";
 import { resolveEntityExperience, resolveEntityCTAs } from "@/governance";
 import { trackEvent } from "@/lib/analytics";
-import { GovernedImage } from "@/design/media-governance";
+import { GovernedImage, optimizeCloudinaryUrl } from "@/design/media-governance";
 
 // ─── TYPES ────────────────────────────────────────────────
 
@@ -185,6 +185,10 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
 }: SovereignStoreCardProps) {
     const name = getStoreName(data);
     const imageSrc = getStoreImage(data);
+    const [avatarError, setAvatarError] = useState(false);
+    const optimizedAvatarSrc = imageSrc
+        ? optimizeCloudinaryUrl(imageSrc, { width: 100 }) || imageSrc
+        : null;
     const categoryName = getCategoryLabel(data.category, data.businessType);
     const open = isStoreOpen(data);
     const distance = getDistance(data);
@@ -340,10 +344,13 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
                 <div className={`group relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-5 opacity-50 cursor-not-allowed ${className}`}>
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 border border-white/10 bg-white/5 flex items-center justify-center">
-                            {imageSrc ? (
+                            {optimizedAvatarSrc && !avatarError ? (
                                 <img
-                                    src={imageSrc}
+                                    src={optimizedAvatarSrc}
                                     alt={name}
+                                    loading="lazy"
+                                    decoding="async"
+                                    onError={() => setAvatarError(true)}
                                     className="w-full h-full object-contain p-1"
                                 />
                             ) : (
@@ -376,10 +383,13 @@ export const SovereignStoreCard = memo(function SovereignStoreCard({
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 border border-white/10 bg-white/5 flex items-center justify-center">
-                        {imageSrc ? (
+                        {optimizedAvatarSrc && !avatarError ? (
                             <img
-                                src={imageSrc}
+                                src={optimizedAvatarSrc}
                                 alt={name}
+                                loading="lazy"
+                                decoding="async"
+                                onError={() => setAvatarError(true)}
                                 className="w-full h-full object-contain p-1"
                             />
                         ) : (

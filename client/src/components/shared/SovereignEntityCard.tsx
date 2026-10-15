@@ -191,8 +191,9 @@ export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: Sover
 
     // ── NON-PRODUCT ENTITY: STANDARD ENTITY CARD ──
     const [imageError, setImageError] = useState(false);
+    const targetWidth = variant === 'search' ? 140 : 480;
     const optimizedImageUrl = entity.imageUrl
-        ? optimizeCloudinaryUrl(entity.imageUrl, { width: 800 }) || entity.imageUrl
+        ? optimizeCloudinaryUrl(entity.imageUrl, { width: targetWidth }) || entity.imageUrl
         : null;
     const hasImage = Boolean(optimizedImageUrl) && !imageError;
 
@@ -216,6 +217,7 @@ export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: Sover
                             alt={entity.title}
                             className="w-full h-full object-cover"
                             loading="lazy"
+                            decoding="async"
                             onError={() => setImageError(true)}
                         />
                     </div>
@@ -292,6 +294,8 @@ export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: Sover
                         src={optimizedImageUrl!}
                         alt=""
                         aria-hidden="true"
+                        loading="lazy"
+                        decoding="async"
                         className="absolute inset-0 w-full h-full object-cover blur-xl opacity-35 scale-110 pointer-events-none"
                     />
 
@@ -301,6 +305,7 @@ export function SovereignEntityCard({ entity, variant = 'grid', onTrack }: Sover
                         alt={entity.title}
                         className="relative z-10 w-full h-full object-contain p-1.5 transition-transform duration-300 group-hover:scale-[1.02]"
                         loading="lazy"
+                        decoding="async"
                         onError={() => setImageError(true)}
                     />
 
