@@ -7,7 +7,7 @@ class MockCognitionEngine {
     const lowerQuery = query.toLowerCase();
 
     // Conversational patterns
-    if (['hello', 'hi', 'namaste', 'hey'].some(g => lowerQuery.includes(g))) {
+    if (['hello', 'hi', 'namaste', 'hey'].some(g => new RegExp(`\\b${g}\\b`, 'i').test(lowerQuery))) {
       return { intent: 'GREETING', confidence: 0.95 };
     }
 
@@ -40,14 +40,14 @@ class MockCognitionEngine {
   classifyEntityType(query: string): { entityType: string; confidence: number } {
     const lowerQuery = query.toLowerCase();
 
+    // School indicators (check school before medical keyword for compound queries like "best school for medical")
+    if (['school', 'vidyalaya', 'college'].some(s => lowerQuery.includes(s))) {
+      return { entityType: 'SCHOOL', confidence: 0.85 };
+    }
+
     // Hospital indicators
     if (['hospital', 'clinic', 'medical', 'aspatal'].some(h => lowerQuery.includes(h))) {
       return { entityType: 'HOSPITAL', confidence: 0.9 };
-    }
-
-    // School indicators
-    if (['school', 'vidyalaya', 'college'].some(s => lowerQuery.includes(s))) {
-      return { entityType: 'SCHOOL', confidence: 0.85 };
     }
 
     return { entityType: 'UNKNOWN', confidence: 0.1 };
