@@ -59,6 +59,7 @@ interface VendorResult {
   name: string;
   slug: string;
   category: string;
+  businessType?: string;
   districtId: number;
   trustScore: number;
   dsslScore?: number;
@@ -75,15 +76,19 @@ interface VendorResult {
 interface ProductResult {
   id: number;
   name: string;
+  title?: string;
   description: string | null;
   price: number;
   mrp: number | null;
   unit: string | null;
   imageUrl: string | null;
+  images?: any[];
   inStock: boolean;
   discount: number | null;
   soldCount: number;
   rating: number | null;
+  categoryName?: string | null;
+  vendorId?: number;
 }
 
 interface BusRoute {
@@ -106,6 +111,30 @@ export async function searchUnified(query: string, districtId: number): Promise<
   results: SearchResult;
   meta: { count: number; district: number; error?: string; rankingIntelligence?: any; searchExpansion?: any };
 }> {
+  const trimmedQuery = typeof query === "string" ? query.trim() : "";
+  if (!trimmedQuery) {
+    return {
+      intent: null,
+      canonicalSemantics: {
+        intent: 'DISCOVERY' as any,
+        domain: 'SERVICES' as any,
+        entity: 'PROVIDER' as any,
+        category: 'GROCERY' as any,
+        operationalSignals: [],
+        userIntentSignals: []
+      },
+      results: {
+        vendors: [],
+        products: [],
+        busRoutes: []
+      },
+      meta: {
+        count: 0,
+        district: districtId
+      }
+    };
+  }
+
   let intent: any = null;
   let searchExpansion: any = null;
   let canonicalSemantics: ResolverResult = {
@@ -118,16 +147,16 @@ export async function searchUnified(query: string, districtId: number): Promise<
   };
   try {
     // 1. Detect intent with taxonomy expansion
-    intent = detectIntent(query);
+    intent = detectIntent(trimmedQuery);
 
     // 2. Resolve to canonical ontology
-    canonicalSemantics = resolveQuery({ text: query });
+    canonicalSemantics = resolveQuery({ text: trimmedQuery });
     assertCanonicalResult(canonicalSemantics); // Runtime assertion
 
     // Log search expansion for debugging
     searchExpansion = {
-      original: query,
-      corrected: intent.correctedQuery !== query ? intent.correctedQuery : undefined,
+      original: trimmedQuery,
+      corrected: intent.correctedQuery !== trimmedQuery ? intent.correctedQuery : undefined,
       expandedTerms: intent.expandedTerms,
       confidence: intent.confidence,
       canonicalCategories: intent.mainCategory
@@ -136,16 +165,16 @@ export async function searchUnified(query: string, districtId: number): Promise<
 
 
     // legacy rule intent enrichment
-    const parsedIntent = parseIntent(query);
+    const parsedIntent = parseIntent(trimmedQuery);
     if (parsedIntent?.category) {
       intent.mainCategory = parsedIntent.category || intent.mainCategory;
     }
 
     // guarded AI intent enrichment (uses cognitive routing)
-    if (query.length > 5) {
+    if (trimmedQuery.length > 5) {
       try {
         const aiIntent: any = await Promise.race([
-          parseIntentAI(query),
+          parseIntentAI(trimmedQuery),
           new Promise((_, reject) => setTimeout(() => reject("timeout"), 1200))
         ]);
 
@@ -157,31 +186,34 @@ export async function searchUnified(query: string, districtId: number): Promise<
       }
     }
 
-    // 3. Try semantic search first using expanded terms
+    // 3. Unified search: taxonomy expansion + multi-field text search
     let vendors: any[] = [];
     let products: any[] = [];
     const category = canonicalSemantics.category;
 
-    if (intent.expandedTerms.length > 0 && intent.confidence > 0.5) {
-      // Use semantic search with taxonomy expansion
-      ({ vendors, products } = await semanticSearch(intent.expandedTerms, districtId));
-    }
+    ({ vendors, products } = await semanticSearch(trimmedQuery, intent.expandedTerms, districtId, intent.mainCategory, intent.correctedQuery));
 
-    // 3. Fallback to category-based search if semantic search found nothing
+    // Fallback to category-based search only if unified search found nothing and intent was high-confidence
     if (vendors.length === 0 && products.length === 0) {
-      if (category) {
+      if (category && intent.confidence > 0.5) {
         ({ vendors, products } = await fetchData(category, districtId));
       }
     }
 
     // 4. Normalize all vendor results to canonical DTO shape before ranking and enrichment
     if (vendors.length > 0) {
-      vendors = await Promise.all(vendors.map((vendor) => mapVendorByType(vendor)));
+      vendors = await Promise.all(vendors.map(async (vendor) => {
+        const mapped: any = await mapVendorByType(vendor);
+        return {
+          ...mapped,
+          category: vendor.category || mapped.category || mapped.entityType || mapped.businessType || 'general'
+        };
+      }));
     }
 
     // Debug panel logging
     logRetrievalDebug({
-      query,
+      query: trimmedQuery,
       expansion: { expanded: intent.expandedTerms, confidence: intent.confidence },
       intent,
       results: { vendors: vendors.length, products: products.length },
@@ -190,7 +222,7 @@ export async function searchUnified(query: string, districtId: number): Promise<
     });
 
     // 4. Rank vendors with dynamic discovery intelligence
-    const ranked = await rankVendors(vendors, districtId, query);
+    const ranked = await rankVendors(vendors, districtId, trimmedQuery);
 
     // 5. DSSL ADVISORY ONLY (non-blocking)
     const ids = ranked.map(v => v.id);
@@ -215,7 +247,7 @@ export async function searchUnified(query: string, districtId: number): Promise<
           if (i >= 5) return v;
           try {
             // Use cognitive routing for AI-powered reasoning
-            const reason = await generateReason(query, {
+            const reason = await generateReason(trimmedQuery, {
               name: v.name,
               rating: v.rating ?? v.avgRating ?? 0,
               category: v.category,
@@ -273,7 +305,7 @@ export async function searchUnified(query: string, districtId: number): Promise<
     // Record search demand with canonical ontology semantics
     districtMemory.recordDemand({
       districtId,
-      query,
+      query: trimmedQuery,
       domain: canonicalSemantics.domain,
       entity: canonicalSemantics.entity,
       category: canonicalSemantics.category,
@@ -481,47 +513,51 @@ async function fetchData(category: string, districtId: number): Promise<{
 }
 
 // ============================================
-// SEMANTIC SEARCH WITH TAXONOMY EXPANSION
+// SEMANTIC SEARCH WITH TAXONOMY EXPANSION & MULTI-FIELD MATCHING
 // ============================================
-async function semanticSearch(expandedTerms: string[], districtId: number): Promise<{
+async function semanticSearch(
+  query: string,
+  expandedTerms: string[],
+  districtId: number,
+  mainCategory?: string,
+  correctedQuery?: string
+): Promise<{
   vendors: any[];
   products: any[];
 }> {
   const { prisma } = await import('../storage.js');
 
-  // Use taxonomy mapping to find canonical categories, then search by those categories
-  // Map taxonomy categories to actual VendorCategory enum values
-  // NOTE: electronics split migration (electronics.store vs electronics.repair)
-  const categoryMapping: Record<string, string> = {
-    'healthcare': 'HOSPITAL',
-    'hospital': 'HOSPITAL',
-    'pharmacy': 'PHARMACY',
-    'electrician': 'SERVICE',
-    // legacy 'electronics' mapping retained for compatibility (will be resolved by resolver below)
-    'electronics': 'SERVICE',
-    'electronics.store': 'COMMERCE',
-    'electronics.repair': 'SERVICE',
-    'carpenter': 'SERVICE',
-    'mechanic': 'SERVICE',
-    'restaurant': 'SERVICE',
-    'grocery': 'GROCERY',
-    'school': 'EDUCATION',
-    'taxi': 'TRANSPORT',
-    'laundry': 'SERVICE'
+  // Map taxonomy categories to actual database category values
+  // Notice 'hospital' & 'healthcare' map to both 'HOSPITAL' and 'HEALTHCARE'
+  const categoryMapping: Record<string, string[]> = {
+    'healthcare': ['HOSPITAL', 'HEALTHCARE'],
+    'hospital': ['HOSPITAL', 'HEALTHCARE'],
+    'pharmacy': ['PHARMACY'],
+    'electrician': ['SERVICE'],
+    'electronics': ['SERVICE', 'ELECTRONICS'],
+    'electronics.store': ['COMMERCE', 'ELECTRONICS'],
+    'electronics.repair': ['SERVICE', 'ELECTRONICS'],
+    'carpenter': ['SERVICE'],
+    'mechanic': ['SERVICE'],
+    'restaurant': ['FOOD', 'RESTAURANT'],
+    'food': ['FOOD', 'RESTAURANT'],
+    'grocery': ['GROCERY'],
+    'school': ['EDUCATION'],
+    'taxi': ['TRANSPORT'],
+    'laundry': ['SERVICE'],
+    'retail': ['RETAIL', 'COMMERCE']
   };
 
   const canonicalCategories = new Set<string>();
 
-  // Resolve expanded taxonomy terms to vendor categories, with compatibility resolver for 'electronics'
+  // Resolve expanded taxonomy terms to vendor categories
   for (const term of expandedTerms) {
     const taxonomyCategory = ALIAS_TO_CANONICAL[term.toLowerCase()];
     if (taxonomyCategory) {
-      // Compatibility resolution for ambiguous 'electronics' token
       let resolvedTaxonomyCategory = taxonomyCategory;
       if (taxonomyCategory.toLowerCase() === 'electronics') {
-        // Heuristic: detect repair-oriented tokens in expandedTerms or original term
         const repairTokens = ['repair', 'fix', 'broken', 'service center', 'repair shop', 'screen', 'battery', 'replacement'];
-        const lowerQuery = expandedTerms.join(' ').toLowerCase();
+        const lowerQuery = (expandedTerms.join(' ') + ' ' + query).toLowerCase();
         const isRepair = repairTokens.some(rt => lowerQuery.includes(rt) || term.toLowerCase().includes(rt));
         if (isRepair) {
           resolvedTaxonomyCategory = 'electronics.repair';
@@ -530,71 +566,155 @@ async function semanticSearch(expandedTerms: string[], districtId: number): Prom
         }
       }
 
-      const mappedCategory = categoryMapping[resolvedTaxonomyCategory.toLowerCase()];
-      if (mappedCategory) {
-        canonicalCategories.add(mappedCategory);
+      const mappedCategories = categoryMapping[resolvedTaxonomyCategory.toLowerCase()];
+      if (mappedCategories) {
+        mappedCategories.forEach(c => canonicalCategories.add(c));
       }
+    }
+  }
+
+  // Also include mainCategory mapping if recognized
+  if (mainCategory) {
+    const mainMapped = categoryMapping[mainCategory.toLowerCase()];
+    if (mainMapped) {
+      mainMapped.forEach(c => canonicalCategories.add(c));
     }
   }
 
   // Convert to array
   const categoriesToSearch = Array.from(canonicalCategories);
 
-  // Search vendors by category (taxonomy-powered)
+  const trimmed = (query || "").trim();
+  const searchTerms: string[] = [];
+  if (trimmed) {
+    searchTerms.push(trimmed);
+  }
+  if (correctedQuery && correctedQuery.trim().toLowerCase() !== trimmed.toLowerCase()) {
+    searchTerms.push(correctedQuery.trim());
+  }
+
+  // 1. Search Vendors (Taxonomy + Multi-Field Text Matching)
   let vendors: any[] = [];
+  const vendorWhere: any = {
+    districtId,
+    status: "APPROVED",
+    isShadowBanned: false
+  };
+
+  const vendorOrConditions: any[] = [];
+
   if (categoriesToSearch.length > 0) {
+    vendorOrConditions.push({
+      category: {
+        in: categoriesToSearch as any
+      }
+    });
+  }
+
+  for (const term of searchTerms) {
+    vendorOrConditions.push(
+      { name: { contains: term, mode: "insensitive" } },
+      { searchText: { contains: term, mode: "insensitive" } },
+      { description: { contains: term, mode: "insensitive" } },
+      { specialties: { has: term } }
+    );
+  }
+
+  if (vendorOrConditions.length > 0) {
+    vendorWhere.OR = vendorOrConditions;
+
     vendors = await prisma.vendor.findMany({
-      where: {
-        districtId,
-        category: {
-          in: categoriesToSearch as any
-        }
-      },
+      where: vendorWhere,
       select: {
         id: true,
         name: true,
         slug: true,
         category: true,
+        businessType: true,
         districtId: true,
         logo: true,
         rating: true,
         dsslScore: true,
         isVerified: true,
         boostedUntil: true,
-        description: true
+        description: true,
+        specialties: true,
+        searchText: true,
+        createdAt: true,
+        updatedAt: true
       },
       take: 50
     });
   }
 
-  // Search products by category
-  const products = await prisma.product.findMany({
-    where: {
+  // 2. Search Products (Taxonomy + Title/Description Text Matching)
+  let products: any[] = [];
+  const productWhere: any = {
+    districtId,
+    approved: true,
+    status: {
+      in: ["APPROVED", "approved", "ACTIVE", "active"]
+    },
+    vendor: {
+      districtId,
+      status: "APPROVED",
+      isShadowBanned: false
+    }
+  };
+
+  const productOrConditions: any[] = [];
+
+  if (categoriesToSearch.length > 0) {
+    productOrConditions.push({
       categoryName: {
         in: categoriesToSearch
-      },
-      districtId,
-      approved: true,
-      status: {
-        in: ["APPROVED", "approved", "ACTIVE", "active"]
-      },
-      vendor: {
-        districtId,
-        status: "APPROVED",
-        isShadowBanned: false
       }
-    },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      categoryName: true,
-      price: true,
-      images: true,
-      vendorId: true
-    },
-    take: 50
-  });
+    });
+  }
+
+  for (const term of searchTerms) {
+    productOrConditions.push(
+      { title: { contains: term, mode: "insensitive" } },
+      { description: { contains: term, mode: "insensitive" } }
+    );
+  }
+
+  if (productOrConditions.length > 0) {
+    productWhere.OR = productOrConditions;
+
+    const rawProducts = await prisma.product.findMany({
+      where: productWhere,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        categoryName: true,
+        price: true,
+        imageUrl: true,
+        images: true,
+        vendorId: true
+      },
+      take: 50
+    });
+
+    products = rawProducts.map((p: any) => ({
+      id: p.id,
+      name: p.title,
+      title: p.title,
+      description: p.description,
+      price: p.price ?? 0,
+      mrp: null,
+      unit: null,
+      imageUrl: p.imageUrl || (p.images && p.images.length > 0 ? (p.images[0].imageUrl || p.images[0].url) : null),
+      images: p.images || [],
+      inStock: true,
+      discount: null,
+      soldCount: 0,
+      rating: null,
+      categoryName: p.categoryName,
+      vendorId: p.vendorId
+    }));
+  }
 
   return { vendors, products };
 }
@@ -603,40 +723,67 @@ async function semanticSearch(expandedTerms: string[], districtId: number): Prom
 // RANK VENDORS WITH DYNAMIC DISCOVERY INTELLIGENCE
 // ============================================
 async function rankVendors(vendors: any[], districtId: number, query: string): Promise<VendorResult[]> {
-  // Use the dynamic discovery ranking engine
-  const rankingContext = {
-    query,
-    districtId,
-    entityType: 'vendor' as const,
-    category: 'general' // Would be extracted from query analysis
-  };
+  if (vendors.length === 0) return [];
 
-  const rankings = await dynamicDiscoveryRanking.rankEntities(vendors, rankingContext);
-
-  // Convert back to VendorResult format for compatibility
-  const results: (VendorResult | null)[] = rankings.map(ranking => {
-    const vendor = vendors.find(v => v.id === ranking.entityId);
-    if (!vendor) return null;
-
-    return {
-      id: vendor.id,
-      name: vendor.name,
-      slug: vendor.slug,
-      category: vendor.category || 'general',
-      districtId: vendor.districtId,
-      trustScore: vendor.trustScore ?? vendor.dsslScore ?? 0,
-      dsslScore: vendor.dsslScore,
-      rating: vendor.rating,
-      avgRating: vendor.avgRating,
-      isVerified: vendor.isVerified,
-      description: vendor.description,
-      logo: vendor.logo,
-      // Enhanced with dynamic ranking intelligence
-      finalScore: ranking.finalScore,
-      rank: ranking.rank,
-      insights: ranking.insights
+  try {
+    // Use the dynamic discovery ranking engine
+    const rankingContext = {
+      query,
+      districtId,
+      entityType: 'vendor' as const,
+      category: 'general'
     };
-  });
 
-  return results.filter((v): v is VendorResult => v !== null).sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0));
+    const rankings = await dynamicDiscoveryRanking.rankEntities(vendors, rankingContext);
+
+    // Convert back to VendorResult format for compatibility
+    const results: (VendorResult | null)[] = rankings.map(ranking => {
+      const vendor = vendors.find(v => v.id === ranking.entityId);
+      if (!vendor) return null;
+
+      return {
+        id: vendor.id,
+        name: vendor.name,
+        slug: vendor.slug,
+        category: vendor.category || vendor.entityType || vendor.businessType || 'general',
+        businessType: vendor.businessType || vendor.category || 'general',
+        districtId: vendor.districtId,
+        trustScore: vendor.trustScore ?? vendor.dsslScore ?? 0,
+        dsslScore: vendor.dsslScore,
+        rating: vendor.rating,
+        avgRating: vendor.avgRating,
+        isVerified: vendor.isVerified,
+        description: vendor.description,
+        logo: vendor.logo,
+        finalScore: ranking.finalScore,
+        rank: ranking.rank,
+        insights: ranking.insights
+      };
+    });
+
+    const filtered = results.filter((v): v is VendorResult => v !== null).sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0));
+    if (filtered.length > 0) return filtered;
+  } catch (err) {
+    console.warn("dynamicDiscoveryRanking failed, using fallback vendor ranking:", err);
+  }
+
+  // Resilient fallback if dynamicDiscoveryRanking is unavailable
+  return vendors.map((v, i) => ({
+    id: v.id,
+    name: v.name,
+    slug: v.slug,
+    category: v.category || v.entityType || v.businessType || 'general',
+    businessType: v.businessType || v.category || 'general',
+    districtId: v.districtId,
+    trustScore: v.trustScore ?? v.dsslScore ?? 0,
+    dsslScore: v.dsslScore,
+    rating: v.rating,
+    avgRating: v.avgRating,
+    isVerified: v.isVerified,
+    description: v.description,
+    logo: v.logo,
+    finalScore: v.dsslScore ?? v.trustScore ?? 50,
+    rank: i + 1,
+    insights: []
+  }));
 }
