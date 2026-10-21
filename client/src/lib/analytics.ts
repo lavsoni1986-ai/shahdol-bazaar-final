@@ -79,17 +79,40 @@ function saveQueue(queue: AnalyticsPayload[]): void {
 
 const trackedHashes = new Map<string, number>(); // hash -> timestamp
 
+/**
+ * 32-bit deterministic, privacy-conscious string hash (djb2).
+ * Converts discriminatory strings into compact opaque base-36 tokens.
+ * Never stores or leaks raw queries or sensitive text into hash keys or logs.
+ */
+function hashDiscriminator(input: string): string {
+    let hash = 5381;
+    for (let i = 0; i < input.length; i++) {
+        hash = ((hash << 5) + hash) + input.charCodeAt(i);
+        hash = hash & hash;
+    }
+    return (hash >>> 0).toString(36);
+}
+
 function calculateEventHash(event: AnalyticsPayload): string {
     const district = event.districtSlug || "shahdol";
     const eventType = event.eventType;
     const source = event.source || "";
+    const action = event.action || "";
     const vendorId = event.vendorId != null ? String(event.vendorId) : "";
+
+    // Privacy-conscious discriminator: deterministic opaque hash of normalized query or entityId
+    let discriminator = "";
+    if (typeof event.value?.query === "string" && event.value.query.trim()) {
+        discriminator = hashDiscriminator(event.value.query.trim().toLowerCase());
+    } else if (event.value?.entityId != null) {
+        discriminator = String(event.value.entityId);
+    }
     
     // 10-second timestamp bucket
     const timeMs = event.timestamp ? new Date(event.timestamp).getTime() : Date.now();
     const bucket = Math.floor(timeMs / 10000);
     
-    return `${district}:${eventType}:${source}:${vendorId}:${bucket}`;
+    return `${district}:${eventType}:${source}:${action}:${vendorId}:${discriminator}:${bucket}`;
 }
 
 function isDuplicateEvent(event: AnalyticsPayload): boolean {

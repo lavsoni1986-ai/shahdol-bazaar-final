@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/api-client";
 import { useDistrict } from "@/contexts/DistrictContext";
 import { CanonicalEntity, normalizeCanonicalEntity } from "@/shared/api/response-normalizers";
 import { SovereignEntityCard } from "@/components/shared/SovereignEntityCard";
+import { trackEvent } from "@/lib/analytics";
 
 interface CategorySuggestion {
   label: string;
@@ -41,6 +42,18 @@ function resolveSuggestionUrl(districtSlug: string, suggestion: CategorySuggesti
   return `/${cleanDistrict}/${rawPath}`;
 }
 
+/**
+ * Minimizes sensitive query data for telemetry events:
+ * Trims whitespace, redacts Indian mobile numbers (\b[6-9]\d{9}\b), and caps length at 80 characters.
+ */
+function sanitizeTelemetryQuery(rawQuery: string): string {
+  if (!rawQuery) return "";
+  return rawQuery
+    .trim()
+    .replace(/\b[6-9]\d{9}\b/g, "[REDACTED_PHONE]")
+    .slice(0, 80);
+}
+
 export default function CategoryListing() {
   const [location] = useLocation();
   const [, params] = useRoute("/category/:slug");
@@ -52,13 +65,45 @@ export default function CategoryListing() {
   const [entities, setEntities] = useState<CanonicalEntity[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryName, setCategoryName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
   const [retryTrigger, setRetryTrigger] = useState(0);
   const activeControllerRef = useRef<AbortController | null>(null);
+  const hasEmittedZeroResultRef = useRef<string | null>(null);
 
   const handleRetry = useCallback(() => {
     setRetryTrigger((prev) => prev + 1);
   }, []);
+
+  const handleEntityClick = useCallback(
+    (action: string, entity: CanonicalEntity) => {
+      // Sovereign identifier semantics:
+      // Only assign vendorId if entity is actually a partner/vendor/hospital/service.
+      // For products, resolve vendorId from raw payload if available; never assign productId or busId to vendorId.
+      let resolvedVendorId: number | undefined;
+      if (entity.kind === "partner" || entity.kind === "hospital" || entity.kind === "service") {
+        resolvedVendorId = Number.isFinite(entity.id) && entity.id > 0 ? entity.id : undefined;
+      } else if (entity.kind === "product") {
+        const rawVendorId = entity.raw?.vendorId ?? entity.raw?.sellerId ?? entity.raw?.meta?.vendorId;
+        const numVendorId = typeof rawVendorId === "number" ? rawVendorId : Number(rawVendorId);
+        resolvedVendorId = Number.isFinite(numVendorId) && numVendorId > 0 ? numVendorId : undefined;
+      }
+
+      trackEvent("CLICK", {
+        vendorId: resolvedVendorId,
+        source: "search_catalog",
+        action: "result_click",
+        value: {
+          action,
+          entityId: entity.id,
+          entityKind: entity.kind,
+          query: sanitizeTelemetryQuery(searchQuery),
+          district: districtSlug,
+        },
+      }).catch(() => {});
+    },
+    [searchQuery, districtSlug]
+  );
 
   useEffect(() => {
     // 1. Extract query / slug synchronously for instant header rendering
@@ -74,6 +119,7 @@ export default function CategoryListing() {
       setError("No search term specified");
       setLoading(false);
       setCategoryName("Search");
+      setSearchQuery("");
       return;
     }
 
@@ -83,10 +129,12 @@ export default function CategoryListing() {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
 
-    // Immediate heading update on route / query change
+    // Immediate heading and query state update on route / query change
     setCategoryName(displayName);
+    setSearchQuery(trimmed);
     setError("");
     setEntities([]);
+    hasEmittedZeroResultRef.current = null;
 
     // 2. Abort any previous pending in-flight request
     if (activeControllerRef.current) {
@@ -129,6 +177,19 @@ export default function CategoryListing() {
 
           const combined = [...vendors, ...products, ...buses];
           setEntities(combined);
+
+          if (combined.length === 0 && hasEmittedZeroResultRef.current !== trimmed) {
+            hasEmittedZeroResultRef.current = trimmed;
+            trackEvent("SEARCH", {
+              source: "search_catalog",
+              action: "zero_results",
+              value: {
+                resultsCount: 0,
+                query: sanitizeTelemetryQuery(trimmed),
+                district: districtSlug,
+              },
+            }).catch(() => {});
+          }
         } else {
           setEntities([]);
         }
@@ -292,7 +353,12 @@ export default function CategoryListing() {
         {!loading && entities.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {entities.map((entity) => (
-              <SovereignEntityCard key={entity.id} entity={entity} variant="grid" />
+              <SovereignEntityCard
+                key={entity.id}
+                entity={entity}
+                variant="grid"
+                onTrack={(action) => handleEntityClick(action, entity)}
+              />
             ))}
           </div>
         )}
